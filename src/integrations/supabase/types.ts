@@ -677,6 +677,7 @@ export type Database = {
       }
       worker_documents: {
         Row: {
+          category: string | null
           created_at: string
           deleted_at: string | null
           document_number: string | null
@@ -690,10 +691,12 @@ export type Database = {
           issuing_authority: string | null
           mime_type: string | null
           notes: string | null
+          status: string
           updated_at: string
           worker_id: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
           deleted_at?: string | null
           document_number?: string | null
@@ -707,10 +710,12 @@ export type Database = {
           issuing_authority?: string | null
           mime_type?: string | null
           notes?: string | null
+          status?: string
           updated_at?: string
           worker_id: string
         }
         Update: {
+          category?: string | null
           created_at?: string
           deleted_at?: string | null
           document_number?: string | null
@@ -724,6 +729,7 @@ export type Database = {
           issuing_authority?: string | null
           mime_type?: string | null
           notes?: string | null
+          status?: string
           updated_at?: string
           worker_id?: string
         }
@@ -803,29 +809,45 @@ export type Database = {
         Row: {
           address: string | null
           allergies: string | null
+          birth_country: string | null
           birth_date: string | null
           blood_type: string | null
           city: string | null
           cpf: string
           created_at: string
+          ctps_number: string | null
+          ctps_series: string | null
+          ctps_state: string | null
           deleted_at: string | null
+          education_level: string | null
           email: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
+          father_name: string | null
           full_name: string
           gender: string | null
           id: string
+          is_pcd: boolean
+          is_rehabilitated: boolean
           marital_status: string | null
           medical_conditions: string | null
+          mother_name: string | null
           nationality: string | null
           neighborhood: string | null
           nickname: string | null
+          nis_pis: string | null
           notes: string | null
+          pcd_notes: string | null
+          pcd_type: string | null
           phone_main: string | null
           phone_secondary: string | null
+          race_color: string | null
           rg: string | null
+          rg_issuer: string | null
+          rg_state: string | null
           shirt_size: string | null
           shoe_size: string | null
+          social_name: string | null
           state: string | null
           updated_at: string
           zip_code: string | null
@@ -833,29 +855,45 @@ export type Database = {
         Insert: {
           address?: string | null
           allergies?: string | null
+          birth_country?: string | null
           birth_date?: string | null
           blood_type?: string | null
           city?: string | null
           cpf: string
           created_at?: string
+          ctps_number?: string | null
+          ctps_series?: string | null
+          ctps_state?: string | null
           deleted_at?: string | null
+          education_level?: string | null
           email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
+          father_name?: string | null
           full_name: string
           gender?: string | null
           id?: string
+          is_pcd?: boolean
+          is_rehabilitated?: boolean
           marital_status?: string | null
           medical_conditions?: string | null
+          mother_name?: string | null
           nationality?: string | null
           neighborhood?: string | null
           nickname?: string | null
+          nis_pis?: string | null
           notes?: string | null
+          pcd_notes?: string | null
+          pcd_type?: string | null
           phone_main?: string | null
           phone_secondary?: string | null
+          race_color?: string | null
           rg?: string | null
+          rg_issuer?: string | null
+          rg_state?: string | null
           shirt_size?: string | null
           shoe_size?: string | null
+          social_name?: string | null
           state?: string | null
           updated_at?: string
           zip_code?: string | null
@@ -863,29 +901,45 @@ export type Database = {
         Update: {
           address?: string | null
           allergies?: string | null
+          birth_country?: string | null
           birth_date?: string | null
           blood_type?: string | null
           city?: string | null
           cpf?: string
           created_at?: string
+          ctps_number?: string | null
+          ctps_series?: string | null
+          ctps_state?: string | null
           deleted_at?: string | null
+          education_level?: string | null
           email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
+          father_name?: string | null
           full_name?: string
           gender?: string | null
           id?: string
+          is_pcd?: boolean
+          is_rehabilitated?: boolean
           marital_status?: string | null
           medical_conditions?: string | null
+          mother_name?: string | null
           nationality?: string | null
           neighborhood?: string | null
           nickname?: string | null
+          nis_pis?: string | null
           notes?: string | null
+          pcd_notes?: string | null
+          pcd_type?: string | null
           phone_main?: string | null
           phone_secondary?: string | null
+          race_color?: string | null
           rg?: string | null
+          rg_issuer?: string | null
+          rg_state?: string | null
           shirt_size?: string | null
           shoe_size?: string | null
+          social_name?: string | null
           state?: string | null
           updated_at?: string
           zip_code?: string | null
