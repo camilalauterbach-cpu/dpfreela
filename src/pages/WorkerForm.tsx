@@ -216,10 +216,10 @@ export default function WorkerForm() {
       };
 
       if (isEdit) {
-        const { error } = await supabase.from("workers").update(payload).eq("id", id);
+        const { error } = await supabase.from("workers").update(payload as any).eq("id", id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("workers").insert(payload);
+        const { error } = await supabase.from("workers").insert(payload as any);
         if (error) throw error;
       }
     },
