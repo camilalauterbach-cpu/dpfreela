@@ -1,0 +1,17 @@
+ALTER TABLE public.workers
+  ADD COLUMN IF NOT EXISTS social_name text,
+  ADD COLUMN IF NOT EXISTS race_color text,
+  ADD COLUMN IF NOT EXISTS education_level text,
+  ADD COLUMN IF NOT EXISTS birth_country text DEFAULT 'Brasil',
+  ADD COLUMN IF NOT EXISTS mother_name text,
+  ADD COLUMN IF NOT EXISTS father_name text,
+  ADD COLUMN IF NOT EXISTS nis_pis text,
+  ADD COLUMN IF NOT EXISTS rg_issuer text,
+  ADD COLUMN IF NOT EXISTS rg_state text,
+  ADD COLUMN IF NOT EXISTS ctps_number text,
+  ADD COLUMN IF NOT EXISTS ctps_series text,
+  ADD COLUMN IF NOT EXISTS ctps_state text,
+  ADD COLUMN IF NOT EXISTS is_pcd boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS is_rehabilitated boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS pcd_type text,
+  ADD COLUMN IF NOT EXISTS pcd_notes text;
