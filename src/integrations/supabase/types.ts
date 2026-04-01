@@ -169,6 +169,177 @@ export type Database = {
         }
         Relationships: []
       }
+      worker_dependents: {
+        Row: {
+          birth_date: string | null
+          cpf: string | null
+          created_at: string
+          deleted_at: string | null
+          full_name: string
+          id: string
+          notes: string | null
+          relationship: string | null
+          updated_at: string
+          worker_id: string
+        }
+        Insert: {
+          birth_date?: string | null
+          cpf?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          full_name: string
+          id?: string
+          notes?: string | null
+          relationship?: string | null
+          updated_at?: string
+          worker_id: string
+        }
+        Update: {
+          birth_date?: string | null
+          cpf?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          full_name?: string
+          id?: string
+          notes?: string | null
+          relationship?: string | null
+          updated_at?: string
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_dependents_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      worker_documents: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          document_number: string | null
+          document_type: string
+          expiry_date: string | null
+          file_name: string | null
+          file_path: string | null
+          file_size: number | null
+          id: string
+          issue_date: string | null
+          issuing_authority: string | null
+          mime_type: string | null
+          notes: string | null
+          updated_at: string
+          worker_id: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          document_number?: string | null
+          document_type: string
+          expiry_date?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          issue_date?: string | null
+          issuing_authority?: string | null
+          mime_type?: string | null
+          notes?: string | null
+          updated_at?: string
+          worker_id: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          document_number?: string | null
+          document_type?: string
+          expiry_date?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          issue_date?: string | null
+          issuing_authority?: string | null
+          mime_type?: string | null
+          notes?: string | null
+          updated_at?: string
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_documents_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      worker_payment_methods: {
+        Row: {
+          account_number: string | null
+          account_type: string | null
+          agency: string | null
+          bank_code: string | null
+          bank_name: string | null
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_preferred: boolean
+          method_type: string
+          notes: string | null
+          pix_key: string | null
+          pix_key_type: string | null
+          updated_at: string
+          worker_id: string
+        }
+        Insert: {
+          account_number?: string | null
+          account_type?: string | null
+          agency?: string | null
+          bank_code?: string | null
+          bank_name?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_preferred?: boolean
+          method_type: string
+          notes?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          updated_at?: string
+          worker_id: string
+        }
+        Update: {
+          account_number?: string | null
+          account_type?: string | null
+          agency?: string | null
+          bank_code?: string | null
+          bank_name?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_preferred?: boolean
+          method_type?: string
+          notes?: string | null
+          pix_key?: string | null
+          pix_key_type?: string | null
+          updated_at?: string
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_payment_methods_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workers: {
         Row: {
           address: string | null
