@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      change_logs: {
+        Row: {
+          action: string
+          changed_by: string | null
+          created_at: string
+          id: string
+          ip_address: unknown
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string
+          table_name: string
+        }
+        Insert: {
+          action: string
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: unknown
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id: string
+          table_name: string
+        }
+        Update: {
+          action?: string
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: unknown
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           address: string | null
@@ -331,6 +367,189 @@ export type Database = {
           },
         ]
       }
+      payment_receipts: {
+        Row: {
+          batch_id: string | null
+          created_at: string
+          deleted_at: string | null
+          file_name: string | null
+          file_path: string | null
+          file_size: number | null
+          id: string
+          item_id: string | null
+          mime_type: string | null
+          notes: string | null
+          receipt_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          batch_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          item_id?: string | null
+          mime_type?: string | null
+          notes?: string | null
+          receipt_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          batch_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          item_id?: string | null
+          mime_type?: string | null
+          notes?: string | null
+          receipt_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_receipts_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_receipts_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_batch_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_batch_items: {
+        Row: {
+          base_amount: number
+          batch_id: string
+          bonuses: number | null
+          created_at: string
+          deductions: number | null
+          deleted_at: string | null
+          employment_link_id: string | null
+          id: string
+          net_amount: number
+          notes: string | null
+          overtime_amount: number | null
+          status: string
+          updated_at: string
+          worker_id: string
+        }
+        Insert: {
+          base_amount?: number
+          batch_id: string
+          bonuses?: number | null
+          created_at?: string
+          deductions?: number | null
+          deleted_at?: string | null
+          employment_link_id?: string | null
+          id?: string
+          net_amount?: number
+          notes?: string | null
+          overtime_amount?: number | null
+          status?: string
+          updated_at?: string
+          worker_id: string
+        }
+        Update: {
+          base_amount?: number
+          batch_id?: string
+          bonuses?: number | null
+          created_at?: string
+          deductions?: number | null
+          deleted_at?: string | null
+          employment_link_id?: string | null
+          id?: string
+          net_amount?: number
+          notes?: string | null
+          overtime_amount?: number | null
+          status?: string
+          updated_at?: string
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_batch_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_batch_items_employment_link_id_fkey"
+            columns: ["employment_link_id"]
+            isOneToOne: false
+            referencedRelation: "employment_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_batch_items_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_batches: {
+        Row: {
+          batch_name: string
+          created_at: string
+          deleted_at: string | null
+          event_id: string | null
+          id: string
+          notes: string | null
+          paid_at: string | null
+          reference_month: string | null
+          status: string
+          total_amount: number | null
+          updated_at: string
+        }
+        Insert: {
+          batch_name: string
+          created_at?: string
+          deleted_at?: string | null
+          event_id?: string | null
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          reference_month?: string | null
+          status?: string
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Update: {
+          batch_name?: string
+          created_at?: string
+          deleted_at?: string | null
+          event_id?: string | null
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          reference_month?: string | null
+          status?: string
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_batches_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -353,6 +572,36 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      saved_filters: {
+        Row: {
+          created_at: string
+          filter_config: Json
+          filter_name: string
+          id: string
+          table_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          filter_config?: Json
+          filter_name: string
+          id?: string
+          table_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          filter_config?: Json
+          filter_name?: string
+          id?: string
+          table_name?: string
           updated_at?: string
           user_id?: string
         }
