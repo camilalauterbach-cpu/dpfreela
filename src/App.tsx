@@ -16,7 +16,11 @@ import Workers from "./pages/Workers";
 import WorkerForm from "./pages/WorkerForm";
 import WorkerDetail from "./pages/WorkerDetail";
 import Events from "./pages/Events";
+import EventForm from "./pages/EventForm";
+import EventDetail from "./pages/EventDetail";
 import Companies from "./pages/Companies";
+import CompanyForm from "./pages/CompanyForm";
+import CompanyDetail from "./pages/CompanyDetail";
 import Links from "./pages/Links";
 import Payroll from "./pages/Payroll";
 import SettingsPage from "./pages/SettingsPage";
@@ -46,7 +50,13 @@ const App = () => (
               <Route path="/workers/:id" element={<WorkerDetail />} />
               <Route path="/workers/:id/edit" element={<WorkerForm />} />
               <Route path="/events" element={<Events />} />
+              <Route path="/events/new" element={<EventForm />} />
+              <Route path="/events/:id" element={<EventDetail />} />
+              <Route path="/events/:id/edit" element={<EventForm />} />
               <Route path="/companies" element={<Companies />} />
+              <Route path="/companies/new" element={<CompanyForm />} />
+              <Route path="/companies/:id" element={<CompanyDetail />} />
+              <Route path="/companies/:id/edit" element={<CompanyForm />} />
               <Route path="/links" element={<Links />} />
               <Route path="/payroll" element={<Payroll />} />
               <Route path="/settings" element={<ProtectedRoute requiredRoles={["admin", "manager"]}><SettingsPage /></ProtectedRoute>} />
