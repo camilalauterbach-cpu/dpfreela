@@ -13,6 +13,8 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Workers from "./pages/Workers";
+import WorkerForm from "./pages/WorkerForm";
+import WorkerDetail from "./pages/WorkerDetail";
 import Events from "./pages/Events";
 import Companies from "./pages/Companies";
 import Links from "./pages/Links";
