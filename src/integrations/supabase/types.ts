@@ -14,6 +14,113 @@ export type Database = {
   }
   public: {
     Tables: {
+      companies: {
+        Row: {
+          address: string | null
+          city: string | null
+          cnpj: string | null
+          created_at: string
+          deleted_at: string | null
+          email: string | null
+          id: string
+          legal_name: string
+          notes: string | null
+          phone: string | null
+          state: string | null
+          trade_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          cnpj?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          email?: string | null
+          id?: string
+          legal_name: string
+          notes?: string | null
+          phone?: string | null
+          state?: string | null
+          trade_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          cnpj?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          email?: string | null
+          id?: string
+          legal_name?: string
+          notes?: string | null
+          phone?: string | null
+          state?: string | null
+          trade_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      events: {
+        Row: {
+          city: string | null
+          company_id: string | null
+          created_at: string
+          deleted_at: string | null
+          description: string | null
+          end_date: string | null
+          id: string
+          location: string | null
+          name: string
+          notes: string | null
+          start_date: string | null
+          state: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          city?: string | null
+          company_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          location?: string | null
+          name: string
+          notes?: string | null
+          start_date?: string | null
+          state?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          city?: string | null
+          company_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          location?: string | null
+          name?: string
+          notes?: string | null
+          start_date?: string | null
+          state?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -59,6 +166,99 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      workers: {
+        Row: {
+          address: string | null
+          allergies: string | null
+          birth_date: string | null
+          blood_type: string | null
+          city: string | null
+          cpf: string
+          created_at: string
+          deleted_at: string | null
+          email: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          full_name: string
+          gender: string | null
+          id: string
+          marital_status: string | null
+          medical_conditions: string | null
+          nationality: string | null
+          neighborhood: string | null
+          nickname: string | null
+          notes: string | null
+          phone_main: string | null
+          phone_secondary: string | null
+          rg: string | null
+          shirt_size: string | null
+          shoe_size: string | null
+          state: string | null
+          updated_at: string
+          zip_code: string | null
+        }
+        Insert: {
+          address?: string | null
+          allergies?: string | null
+          birth_date?: string | null
+          blood_type?: string | null
+          city?: string | null
+          cpf: string
+          created_at?: string
+          deleted_at?: string | null
+          email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          full_name: string
+          gender?: string | null
+          id?: string
+          marital_status?: string | null
+          medical_conditions?: string | null
+          nationality?: string | null
+          neighborhood?: string | null
+          nickname?: string | null
+          notes?: string | null
+          phone_main?: string | null
+          phone_secondary?: string | null
+          rg?: string | null
+          shirt_size?: string | null
+          shoe_size?: string | null
+          state?: string | null
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Update: {
+          address?: string | null
+          allergies?: string | null
+          birth_date?: string | null
+          blood_type?: string | null
+          city?: string | null
+          cpf?: string
+          created_at?: string
+          deleted_at?: string | null
+          email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          full_name?: string
+          gender?: string | null
+          id?: string
+          marital_status?: string | null
+          medical_conditions?: string | null
+          nationality?: string | null
+          neighborhood?: string | null
+          nickname?: string | null
+          notes?: string | null
+          phone_main?: string | null
+          phone_secondary?: string | null
+          rg?: string | null
+          shirt_size?: string | null
+          shoe_size?: string | null
+          state?: string | null
+          updated_at?: string
+          zip_code?: string | null
         }
         Relationships: []
       }
