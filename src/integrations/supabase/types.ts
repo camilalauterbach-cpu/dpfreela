@@ -62,6 +62,216 @@ export type Database = {
         }
         Relationships: []
       }
+      employment_link_documents: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          document_number: string | null
+          document_type: string
+          employment_link_id: string
+          file_name: string | null
+          file_path: string | null
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          notes: string | null
+          updated_at: string
+          worker_id: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          document_number?: string | null
+          document_type: string
+          employment_link_id: string
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          updated_at?: string
+          worker_id: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          document_number?: string | null
+          document_type?: string
+          employment_link_id?: string
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          updated_at?: string
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employment_link_documents_employment_link_id_fkey"
+            columns: ["employment_link_id"]
+            isOneToOne: false
+            referencedRelation: "employment_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employment_link_documents_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employment_links: {
+        Row: {
+          assembly_point: string | null
+          badge_number: string | null
+          call_time: string | null
+          contract_type: string | null
+          created_at: string
+          daily_hours: number | null
+          daily_rate: number | null
+          deleted_at: string | null
+          department: string | null
+          end_date: string | null
+          event_id: string | null
+          fixed_salary: number | null
+          hazard_pay: number | null
+          hire_date: string | null
+          hourly_rate: number | null
+          id: string
+          job_function: string | null
+          job_role: string | null
+          locker_number: string | null
+          meal_allowance: number | null
+          meal_entitlement: string | null
+          night_shift_rate: number | null
+          notes: string | null
+          other_allowances: number | null
+          overtime_rate: number | null
+          parking_spot: string | null
+          payment_frequency: string | null
+          rest_days_pattern: string | null
+          shift_type: string | null
+          status: string
+          supervisor_contact: string | null
+          supervisor_name: string | null
+          transport_allowance: number | null
+          transport_notes: string | null
+          uniform_notes: string | null
+          updated_at: string
+          weekly_hours: number | null
+          work_days_pattern: string | null
+          work_schedule: string | null
+          work_shift: string | null
+          worker_id: string
+        }
+        Insert: {
+          assembly_point?: string | null
+          badge_number?: string | null
+          call_time?: string | null
+          contract_type?: string | null
+          created_at?: string
+          daily_hours?: number | null
+          daily_rate?: number | null
+          deleted_at?: string | null
+          department?: string | null
+          end_date?: string | null
+          event_id?: string | null
+          fixed_salary?: number | null
+          hazard_pay?: number | null
+          hire_date?: string | null
+          hourly_rate?: number | null
+          id?: string
+          job_function?: string | null
+          job_role?: string | null
+          locker_number?: string | null
+          meal_allowance?: number | null
+          meal_entitlement?: string | null
+          night_shift_rate?: number | null
+          notes?: string | null
+          other_allowances?: number | null
+          overtime_rate?: number | null
+          parking_spot?: string | null
+          payment_frequency?: string | null
+          rest_days_pattern?: string | null
+          shift_type?: string | null
+          status?: string
+          supervisor_contact?: string | null
+          supervisor_name?: string | null
+          transport_allowance?: number | null
+          transport_notes?: string | null
+          uniform_notes?: string | null
+          updated_at?: string
+          weekly_hours?: number | null
+          work_days_pattern?: string | null
+          work_schedule?: string | null
+          work_shift?: string | null
+          worker_id: string
+        }
+        Update: {
+          assembly_point?: string | null
+          badge_number?: string | null
+          call_time?: string | null
+          contract_type?: string | null
+          created_at?: string
+          daily_hours?: number | null
+          daily_rate?: number | null
+          deleted_at?: string | null
+          department?: string | null
+          end_date?: string | null
+          event_id?: string | null
+          fixed_salary?: number | null
+          hazard_pay?: number | null
+          hire_date?: string | null
+          hourly_rate?: number | null
+          id?: string
+          job_function?: string | null
+          job_role?: string | null
+          locker_number?: string | null
+          meal_allowance?: number | null
+          meal_entitlement?: string | null
+          night_shift_rate?: number | null
+          notes?: string | null
+          other_allowances?: number | null
+          overtime_rate?: number | null
+          parking_spot?: string | null
+          payment_frequency?: string | null
+          rest_days_pattern?: string | null
+          shift_type?: string | null
+          status?: string
+          supervisor_contact?: string | null
+          supervisor_name?: string | null
+          transport_allowance?: number | null
+          transport_notes?: string | null
+          uniform_notes?: string | null
+          updated_at?: string
+          weekly_hours?: number | null
+          work_days_pattern?: string | null
+          work_schedule?: string | null
+          work_shift?: string | null
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employment_links_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employment_links_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           city: string | null
