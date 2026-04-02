@@ -166,6 +166,11 @@ export default function LinkForm() {
         hourly_rate: form.hourly_rate ? Number(form.hourly_rate) : null,
         fixed_salary: form.fixed_salary ? Number(form.fixed_salary) : null,
         payment_frequency: form.payment_frequency || null,
+        remuneration_type: form.remuneration_type || null,
+        has_transport_allowance: form.has_transport_allowance,
+        transport_allowance: form.transport_allowance ? Number(form.transport_allowance) : null,
+        has_meal_allowance: form.has_meal_allowance,
+        meal_allowance: form.meal_allowance ? Number(form.meal_allowance) : null,
         notes: form.notes || null,
       };
 
