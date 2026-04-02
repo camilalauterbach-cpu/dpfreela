@@ -35,6 +35,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <InstallAppBanner />
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
         <p className="text-sm text-muted-foreground">Visão geral do sistema</p>
