@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Calendar, Building2, Link2 } from "lucide-react";
@@ -7,6 +8,7 @@ import { InstallAppBanner } from "@/components/InstallAppBanner";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const { data: counts } = useQuery({
     queryKey: ["dashboard-counts"],
@@ -27,10 +29,10 @@ export default function Dashboard() {
   });
 
   const cards = [
-    { label: "Trabalhadores", value: counts?.workers ?? "—", icon: Users },
-    { label: "Eventos", value: counts?.events ?? "—", icon: Calendar },
-    { label: "Empresas", value: counts?.companies ?? "—", icon: Building2 },
-    { label: "Vínculos", value: counts?.links ?? "—", icon: Link2 },
+    { label: "Trabalhadores", value: counts?.workers ?? "—", icon: Users, href: "/workers", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-950/30" },
+    { label: "Eventos", value: counts?.events ?? "—", icon: Calendar, href: "/events", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/30" },
+    { label: "Empresas", value: counts?.companies ?? "—", icon: Building2, href: "/companies", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-950/30" },
+    { label: "Vínculos", value: counts?.links ?? "—", icon: Link2, href: "/links", color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-50 dark:bg-violet-950/30" },
   ];
 
   return (
@@ -42,10 +44,16 @@ export default function Dashboard() {
       </div>
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
-          <Card key={card.label}>
+          <Card
+            key={card.label}
+            className="cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] hover:border-primary/30"
+            onClick={() => navigate(card.href)}
+          >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">{card.label}</CardTitle>
-              <card.icon className="h-4 w-4 text-muted-foreground" />
+              <div className={`p-1.5 rounded-lg ${card.bg}`}>
+                <card.icon className={`h-4 w-4 ${card.color}`} />
+              </div>
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{card.value}</p>
