@@ -56,6 +56,11 @@ export default function Links() {
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
+  const [exportConfig, setExportConfig] = useState<any>(null);
+
+  useEffect(() => {
+    getSystemSetting("links_admission_config").then((val) => setExportConfig(val));
+  }, []);
 
   const { data: links, isLoading } = useEmploymentLinks(search, statusFilter);
   const { data: companies } = useCompanies("");
