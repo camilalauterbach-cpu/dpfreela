@@ -111,6 +111,8 @@ export default function WorkerForm() {
         education_level: (existing as any).education_level || "",
         nationality: existing.nationality || "Brasileira",
         birth_country: (existing as any).birth_country || "Brasil",
+        birth_city: (existing as any).birth_city || "",
+        birth_state: (existing as any).birth_state || "",
         mother_name: (existing as any).mother_name || "",
         father_name: (existing as any).father_name || "",
         nis_pis: (existing as any).nis_pis || "",
