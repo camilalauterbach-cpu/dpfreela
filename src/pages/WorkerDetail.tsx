@@ -167,7 +167,7 @@ export default function WorkerDetail() {
           {(worker.shirt_size || worker.shoe_size || worker.blood_type || worker.allergies || worker.medical_conditions || worker.emergency_contact_name) && (
             <Card>
               <CardHeader><CardTitle className="text-base">Informações operacionais</CardTitle></CardHeader>
-              <CardContent className="grid gap-4 grid-cols-3">
+              <CardContent className="grid gap-4 grid-cols-2 sm:grid-cols-3">
                 {info("Camiseta", worker.shirt_size)}
                 {info("Calçado", worker.shoe_size)}
                 {info("Tipo sanguíneo", worker.blood_type)}

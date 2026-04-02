@@ -213,13 +213,13 @@ export default function PayrollDetail() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Trabalhador</TableHead>
-                    <TableHead>Função</TableHead>
-                    <TableHead className="text-right">Base</TableHead>
-                    <TableHead className="text-right">Extras</TableHead>
-                    <TableHead className="text-right">Bônus</TableHead>
-                    <TableHead className="text-right">Descontos</TableHead>
+                    <TableHead className="hidden md:table-cell">Função</TableHead>
+                    <TableHead className="hidden sm:table-cell text-right">Base</TableHead>
+                    <TableHead className="hidden lg:table-cell text-right">Extras</TableHead>
+                    <TableHead className="hidden lg:table-cell text-right">Bônus</TableHead>
+                    <TableHead className="hidden lg:table-cell text-right">Descontos</TableHead>
                     <TableHead className="text-right">Líquido</TableHead>
-                    <TableHead>Comprov.</TableHead>
+                    <TableHead className="hidden sm:table-cell">Comprov.</TableHead>
                     {isDraft && canEdit && <TableHead className="w-20">Ações</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -234,15 +234,16 @@ export default function PayrollDetail() {
                             {(item.workers as any)?.nickname && (
                               <span className="text-muted-foreground text-xs ml-1">({(item.workers as any).nickname})</span>
                             )}
+                            <p className="md:hidden text-xs text-muted-foreground">{(item.employment_links as any)?.job_role || ""}</p>
                           </div>
                         </TableCell>
-                        <TableCell className="text-sm">{(item.employment_links as any)?.job_role || "—"}</TableCell>
-                        <TableCell className="text-right">{fmt(item.base_amount)}</TableCell>
-                        <TableCell className="text-right">{fmt(item.overtime_amount)}</TableCell>
-                        <TableCell className="text-right">{fmt(item.bonuses)}</TableCell>
-                        <TableCell className="text-right">{fmt(item.deductions)}</TableCell>
+                        <TableCell className="hidden md:table-cell text-sm">{(item.employment_links as any)?.job_role || "—"}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-right">{fmt(item.base_amount)}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-right">{fmt(item.overtime_amount)}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-right">{fmt(item.bonuses)}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-right">{fmt(item.deductions)}</TableCell>
                         <TableCell className="text-right font-medium">{fmt(item.net_amount)}</TableCell>
-                        <TableCell>{hasItemReceipt || hasBatchReceipt ? <Badge variant="secondary" className="text-xs">✓</Badge> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
+                        <TableCell className="hidden sm:table-cell">{hasItemReceipt || hasBatchReceipt ? <Badge variant="secondary" className="text-xs">✓</Badge> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
                         {isDraft && canEdit && (
                           <TableCell>
                             <div className="flex gap-1">
