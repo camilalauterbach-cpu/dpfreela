@@ -56,7 +56,10 @@ export function AppSidebar() {
       <SidebarContent>
         {!collapsed && (
           <div className="px-3 pt-3 pb-1">
-            <h2 className="text-lg font-bold tracking-tight text-foreground">DPfreela</h2>
+            <h2 className="text-lg font-bold tracking-tight">
+              <span className="text-white">DP</span>
+              <span className="text-blue-400">freela</span>
+            </h2>
           </div>
         )}
         <SidebarGroup>
