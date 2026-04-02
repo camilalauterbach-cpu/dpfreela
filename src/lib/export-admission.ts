@@ -8,6 +8,10 @@ const formatDateBR = (d: string | null | undefined) => {
 
 const boolLabel = (v: boolean | null | undefined) => (v ? "Sim" : "Não");
 
+const remunerationLabels: Record<string, string> = {
+  daily: "Diarista", monthly: "Mensalista", hourly: "Horista", per_event: "Por evento",
+};
+
 const workDatesLabel = (link: any) => {
   if (link.work_days_mode === "specific_dates" && link.specific_work_dates?.length > 0) {
     return link.specific_work_dates.map((d: string) => formatDateBR(d)).join("; ");
