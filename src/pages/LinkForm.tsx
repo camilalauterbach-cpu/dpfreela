@@ -368,7 +368,16 @@ export default function LinkForm() {
         <CardContent className="space-y-4">
           <div>
             <Label>Modo</Label>
-            <Select value={form.work_days_mode} onValueChange={(v) => set("work_days_mode", v)}>
+            <Select value={form.work_days_mode} onValueChange={(v) => {
+              set("work_days_mode", v);
+              if (v === "specific_dates" && (!form.hire_date || !form.end_date)) {
+                setHighlightDates(true);
+                setTimeout(() => {
+                  contractSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  setTimeout(() => hireDateRef.current?.focus(), 400);
+                }, 50);
+              }
+            }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="continuous">Contínuo (todos os dias do período)</SelectItem>
