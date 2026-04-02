@@ -28,6 +28,10 @@ const contractLabels: Record<string, string> = {
   clt: "CLT", pj: "PJ", freelancer: "Freelancer", temporary: "Temporário", intern: "Estagiário",
 };
 
+const remunerationLabels: Record<string, string> = {
+  daily: "Diarista", monthly: "Mensalista", hourly: "Horista", per_event: "Por evento",
+};
+
 const paymentLabels: Record<string, string> = {
   daily: "Diária", weekly: "Semanal", biweekly: "Quinzenal", monthly: "Mensal", per_event: "Por evento",
 };
