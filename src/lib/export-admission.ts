@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 const formatDateBR = (d: string | null | undefined) => {
   if (!d) return "";
@@ -36,9 +36,8 @@ interface ExportAdmissionParams {
   includeEmptyColumns?: boolean;
 }
 
-export function exportAdmissionXlsx({ links, companyNameMap, eventCompanyMap, filePrefix = "admissao", includeEmptyColumns = true }: ExportAdmissionParams) {
+export async function exportAdmissionXlsx({ links, companyNameMap, eventCompanyMap, filePrefix = "admissao", includeEmptyColumns = true }: ExportAdmissionParams) {
   const headers = [
-    // Worker (1-42)
     "Nome Completo", "Nome Social", "Apelido", "CPF", "RG", "Órgão Emissor", "UF RG",
     "Data Nascimento", "País Nascimento", "Cidade Nascimento", "UF Nascimento",
     "Gênero", "Estado Civil", "Nacionalidade", "Raça/Cor", "Escolaridade",
@@ -49,7 +48,6 @@ export function exportAdmissionXlsx({ links, companyNameMap, eventCompanyMap, fi
     "Contato Emergência", "Tel. Emergência",
     "Tam. Camisa", "Tam. Calçado", "Tipo Sanguíneo", "Alergias", "Condições Médicas",
     "PCD", "Tipo PCD", "Obs. PCD", "Reabilitado", "Obs. Trabalhador",
-    // Link (43-76)
     "Nome do Vínculo", "Evento", "Empresa", "Função", "Cargo", "Departamento",
     "Tipo Contrato", "Status", "Data Início", "Data Fim",
     "Modo Dias", "Dias de Atuação", "Obs. Escala",
@@ -79,7 +77,6 @@ export function exportAdmissionXlsx({ links, companyNameMap, eventCompanyMap, fi
       w.emergency_contact_name || "", w.emergency_contact_phone || "",
       w.shirt_size || "", w.shoe_size || "", w.blood_type || "", w.allergies || "", w.medical_conditions || "",
       boolLabel(w.is_pcd), w.pcd_type || "", w.pcd_notes || "", boolLabel(w.is_rehabilitated), w.notes || "",
-      // Link
       link.link_name || "", eventName, companyName,
       link.job_role || "", link.job_function || "", link.department || "",
       link.contract_type || "", statusLabels[link.status] || link.status,
@@ -104,20 +101,34 @@ export function exportAdmissionXlsx({ links, companyNameMap, eventCompanyMap, fi
   let finalRows = rows;
 
   if (!includeEmptyColumns) {
-    // Remove columns where all rows are empty
     const nonEmptyCols = headers.map((_, i) => rows.some((r) => r[i] !== "" && r[i] != null));
     finalHeaders = headers.filter((_, i) => nonEmptyCols[i]);
     finalRows = rows.map((r) => r.filter((_, i) => nonEmptyCols[i]));
   }
 
-  const ws = XLSX.utils.aoa_to_sheet([finalHeaders, ...finalRows]);
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Admissão");
 
-  ws["!cols"] = finalHeaders.map((h, i) => {
-    const maxLen = Math.max(h.length, ...finalRows.map((r) => String(r[i] || "").length));
-    return { wch: Math.min(maxLen + 2, 40) };
+  ws.addRow(finalHeaders);
+  for (const row of finalRows) {
+    ws.addRow(row);
+  }
+
+  // Auto-size columns
+  ws.columns.forEach((col, i) => {
+    const maxLen = Math.max(
+      finalHeaders[i]?.length || 0,
+      ...finalRows.map((r) => String(r[i] || "").length)
+    );
+    col.width = Math.min(maxLen + 2, 40);
   });
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Admissão");
-  XLSX.writeFile(wb, `${filePrefix}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${filePrefix}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
