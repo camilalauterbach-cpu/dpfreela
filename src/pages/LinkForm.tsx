@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEmploymentLink } from "@/hooks/useEmploymentLinks";
+import { getSystemSetting } from "@/lib/system-settings";
 import { useWorkers } from "@/hooks/useWorkers";
 import { useEvents } from "@/hooks/useEvents";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,34 @@ export default function LinkForm() {
     meal_allowance: "",
     notes: "",
   });
+
+  const [globalConfig, setGlobalConfig] = useState<any>(null);
+  const [configLoaded, setConfigLoaded] = useState(false);
+
+  // Load global config
+  useEffect(() => {
+    getSystemSetting("links_admission_config").then((val) => {
+      setGlobalConfig(val);
+      setConfigLoaded(true);
+    });
+  }, []);
+
+  // Apply global defaults for NEW links only, after config is loaded
+  useEffect(() => {
+    if (isEdit || !configLoaded || !globalConfig) return;
+    // Only apply if form hasn't been touched (still default empty values)
+    setForm((prev) => ({
+      ...prev,
+      has_transport_allowance: prev.has_transport_allowance || globalConfig.default_vt || false,
+      transport_allowance: prev.transport_allowance || globalConfig.default_vt_value || "",
+      has_meal_allowance: prev.has_meal_allowance || globalConfig.default_vr_va || false,
+      meal_allowance: prev.meal_allowance || globalConfig.default_vr_va_value || "",
+      uniform_notes: prev.uniform_notes || globalConfig.default_uniform_notes || "",
+      transport_notes: prev.transport_notes || globalConfig.default_transport_notes || "",
+      meal_entitlement: prev.meal_entitlement || globalConfig.default_meal_entitlement || "",
+      notes: prev.notes || globalConfig.default_notes || "",
+    }));
+  }, [isEdit, configLoaded, globalConfig]);
 
   const [newDate, setNewDate] = useState("");
   const [highlightDates, setHighlightDates] = useState(false);
@@ -215,12 +244,46 @@ export default function LinkForm() {
       toast({ title: "Data de fim deve ser posterior à data de início", variant: "destructive" });
       return;
     }
+    // Global required fields validation
+    const rf = globalConfig?.required_fields;
+    if (rf) {
+      if (rf.job_role && !form.job_role.trim()) {
+        toast({ title: "Função/Cargo é obrigatório", variant: "destructive" }); return;
+      }
+      if (rf.department && !form.department.trim()) {
+        toast({ title: "Departamento é obrigatório", variant: "destructive" }); return;
+      }
+      if (rf.contract_type && !form.contract_type) {
+        toast({ title: "Tipo de contrato é obrigatório", variant: "destructive" }); return;
+      }
+      if (rf.daily_hours && !form.daily_hours) {
+        toast({ title: "Horas diárias é obrigatório", variant: "destructive" }); return;
+      }
+      if (rf.weekly_hours && !form.weekly_hours) {
+        toast({ title: "Horas semanais é obrigatório", variant: "destructive" }); return;
+      }
+    }
     mutation.mutate();
   };
+
+  // Enabled remuneration types from global config
+  const enabledRemTypes = useMemo(() => {
+    const allTypes = [
+      { value: "daily", label: "Diarista" },
+      { value: "monthly", label: "Mensalista" },
+      { value: "hourly", label: "Horista" },
+      { value: "per_event", label: "Por evento" },
+    ];
+    if (!globalConfig?.remuneration_types) return allTypes;
+    return allTypes.filter((t) => globalConfig.remuneration_types[t.value] !== false);
+  }, [globalConfig]);
 
   if (isEdit && loadingExisting) {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
+
+  const isRequired = (field: string) => globalConfig?.required_fields?.[field] === true;
+  const reqMark = (field: string) => isRequired(field) ? " *" : "";
 
   const formatDateBR = (d: string) => {
     const [y, m, day] = d.split("-");
@@ -271,7 +334,7 @@ export default function LinkForm() {
             </Select>
           </div>
           <div>
-            <Label>Função/Cargo</Label>
+            <Label>Função/Cargo{reqMark("job_role")}</Label>
             <Input value={form.job_role} onChange={(e) => set("job_role", e.target.value)} />
           </div>
           <div>
@@ -279,7 +342,7 @@ export default function LinkForm() {
             <Input value={form.job_function} onChange={(e) => set("job_function", e.target.value)} />
           </div>
           <div>
-            <Label>Departamento</Label>
+            <Label>Departamento{reqMark("department")}</Label>
             <Input value={form.department} onChange={(e) => set("department", e.target.value)} />
           </div>
         </CardContent>
@@ -290,7 +353,7 @@ export default function LinkForm() {
         <CardHeader><CardTitle className="text-base">Contrato</CardTitle></CardHeader>
         <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2">
           <div>
-            <Label>Tipo de contrato</Label>
+            <Label>Tipo de contrato{reqMark("contract_type")}</Label>
             <Select value={form.contract_type} onValueChange={(v) => set("contract_type", v)}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
@@ -367,11 +430,11 @@ export default function LinkForm() {
             <Input type="time" value={form.call_time} onChange={(e) => set("call_time", e.target.value)} />
           </div>
           <div>
-            <Label>Horas diárias</Label>
+            <Label>Horas diárias{reqMark("daily_hours")}</Label>
             <Input type="number" step="0.5" value={form.daily_hours} onChange={(e) => set("daily_hours", e.target.value)} />
           </div>
           <div>
-            <Label>Horas semanais</Label>
+            <Label>Horas semanais{reqMark("weekly_hours")}</Label>
             <Input type="number" step="0.5" value={form.weekly_hours} onChange={(e) => set("weekly_hours", e.target.value)} />
           </div>
         </CardContent>
@@ -493,10 +556,9 @@ export default function LinkForm() {
               <Select value={form.remuneration_type} onValueChange={(v) => set("remuneration_type", v)}>
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="daily">Diarista</SelectItem>
-                  <SelectItem value="monthly">Mensalista</SelectItem>
-                  <SelectItem value="hourly">Horista</SelectItem>
-                  <SelectItem value="per_event">Por evento</SelectItem>
+                  {enabledRemTypes.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
