@@ -20,6 +20,7 @@ function formatCnpj(cnpj: string | null): string {
 const statusLabels: Record<string, string> = {
   planned: "Planejado",
   active: "Ativo",
+  confirmed: "Confirmado",
   completed: "Concluído",
   cancelled: "Cancelado",
 };
