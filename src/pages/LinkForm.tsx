@@ -60,7 +60,9 @@ export default function LinkForm() {
   });
 
   const [newDate, setNewDate] = useState("");
-
+  const [highlightDates, setHighlightDates] = useState(false);
+  const hireDateRef = useRef<HTMLInputElement>(null);
+  const contractSectionRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (isEdit && existing) {
       const e = existing as any;
