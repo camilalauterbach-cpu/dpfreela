@@ -31,7 +31,7 @@ const adminItems = [
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { signOut, hasAnyRole, user } = useAuth();
@@ -39,6 +39,10 @@ export function AppSidebar() {
   const isActive = (path: string) => {
     if (path === "/") return location.pathname === "/";
     return location.pathname.startsWith(path);
+  };
+
+  const handleNavClick = () => {
+    if (isMobile) setOpenMobile(false);
   };
 
   return (
@@ -55,7 +59,7 @@ export function AppSidebar() {
               {mainItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink to={item.url} end={item.url === "/"} className="hover:bg-sidebar-accent/50">
+                    <NavLink to={item.url} end={item.url === "/"} className="hover:bg-sidebar-accent/50" onClick={handleNavClick}>
                       <item.icon className="h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
@@ -81,7 +85,7 @@ export function AppSidebar() {
                 {adminItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                      <NavLink to={item.url} className="hover:bg-sidebar-accent/50">
+                      <NavLink to={item.url} className="hover:bg-sidebar-accent/50" onClick={handleNavClick}>
                         <item.icon className="h-4 w-4" />
                         {!collapsed && <span>{item.title}</span>}
                       </NavLink>
