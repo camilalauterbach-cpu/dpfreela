@@ -12,6 +12,7 @@ import { Search, Plus, Loader2 } from "lucide-react";
 const statusLabels: Record<string, string> = {
   planned: "Planejado",
   active: "Ativo",
+  confirmed: "Confirmado",
   completed: "Concluído",
   cancelled: "Cancelado",
 };

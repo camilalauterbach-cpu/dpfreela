@@ -14,6 +14,7 @@ const statusLabel: Record<string, string> = {
   draft: "Rascunho",
   approved: "Aprovado",
   paid: "Pago",
+  completed: "Concluído",
   cancelled: "Cancelado",
 };
 
