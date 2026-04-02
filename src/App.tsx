@@ -60,6 +60,9 @@ const App = () => (
               <Route path="/companies/:id" element={<CompanyDetail />} />
               <Route path="/companies/:id/edit" element={<CompanyForm />} />
               <Route path="/links" element={<Links />} />
+              <Route path="/links/new" element={<LinkForm />} />
+              <Route path="/links/:id" element={<LinkDetail />} />
+              <Route path="/links/:id/edit" element={<LinkForm />} />
               <Route path="/payroll" element={<Payroll />} />
               <Route path="/settings" element={<ProtectedRoute requiredRoles={["admin", "manager"]}><SettingsPage /></ProtectedRoute>} />
             </Route>
