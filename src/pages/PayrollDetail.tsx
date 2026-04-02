@@ -166,7 +166,7 @@ export default function PayrollDetail() {
               </AlertDialog>
             )}
 
-            <Button size="sm" variant="outline" onClick={() => exportPayrollBatchXlsx(batch, items || [])}>
+            <Button size="sm" variant="outline" onClick={async () => await exportPayrollBatchXlsx(batch, items || [])}>
               <Download className="mr-1 h-3 w-3" /> Exportar
             </Button>
           </div>
