@@ -1,0 +1,1 @@
+ALTER TABLE public.workers ADD COLUMN birth_city text, ADD COLUMN birth_state text;
