@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEmploymentLinks } from "@/hooks/useEmploymentLinks";
 import { useCompanies } from "@/hooks/useCompanies";
