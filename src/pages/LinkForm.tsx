@@ -100,6 +100,11 @@ export default function LinkForm() {
         hourly_rate: e.hourly_rate != null ? String(e.hourly_rate) : "",
         fixed_salary: e.fixed_salary != null ? String(e.fixed_salary) : "",
         payment_frequency: e.payment_frequency || "",
+        remuneration_type: e.remuneration_type || "",
+        has_transport_allowance: e.has_transport_allowance || false,
+        transport_allowance: e.transport_allowance != null ? String(e.transport_allowance) : "",
+        has_meal_allowance: e.has_meal_allowance || false,
+        meal_allowance: e.meal_allowance != null ? String(e.meal_allowance) : "",
         notes: e.notes || "",
       });
     }
