@@ -181,6 +181,8 @@ export type Database = {
           end_date: string | null
           event_id: string | null
           fixed_salary: number | null
+          has_meal_allowance: boolean
+          has_transport_allowance: boolean
           hazard_pay: number | null
           hire_date: string | null
           hourly_rate: number | null
@@ -197,6 +199,7 @@ export type Database = {
           overtime_rate: number | null
           parking_spot: string | null
           payment_frequency: string | null
+          remuneration_type: string | null
           rest_days_pattern: string | null
           shift_type: string | null
           specific_work_dates: string[]
@@ -228,6 +231,8 @@ export type Database = {
           end_date?: string | null
           event_id?: string | null
           fixed_salary?: number | null
+          has_meal_allowance?: boolean
+          has_transport_allowance?: boolean
           hazard_pay?: number | null
           hire_date?: string | null
           hourly_rate?: number | null
@@ -244,6 +249,7 @@ export type Database = {
           overtime_rate?: number | null
           parking_spot?: string | null
           payment_frequency?: string | null
+          remuneration_type?: string | null
           rest_days_pattern?: string | null
           shift_type?: string | null
           specific_work_dates?: string[]
@@ -275,6 +281,8 @@ export type Database = {
           end_date?: string | null
           event_id?: string | null
           fixed_salary?: number | null
+          has_meal_allowance?: boolean
+          has_transport_allowance?: boolean
           hazard_pay?: number | null
           hire_date?: string | null
           hourly_rate?: number | null
@@ -291,6 +299,7 @@ export type Database = {
           overtime_rate?: number | null
           parking_spot?: string | null
           payment_frequency?: string | null
+          remuneration_type?: string | null
           rest_days_pattern?: string | null
           shift_type?: string | null
           specific_work_dates?: string[]

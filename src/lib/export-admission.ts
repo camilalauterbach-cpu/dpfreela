@@ -8,6 +8,10 @@ const formatDateBR = (d: string | null | undefined) => {
 
 const boolLabel = (v: boolean | null | undefined) => (v ? "Sim" : "Não");
 
+const remunerationLabels: Record<string, string> = {
+  daily: "Diarista", monthly: "Mensalista", hourly: "Horista", per_event: "Por evento",
+};
+
 const workDatesLabel = (link: any) => {
   if (link.work_days_mode === "specific_dates" && link.specific_work_dates?.length > 0) {
     return link.specific_work_dates.map((d: string) => formatDateBR(d)).join("; ");
@@ -48,6 +52,7 @@ export function exportAdmissionXlsx({ links, companyNameMap, eventCompanyMap }: 
     "Tipo Contrato", "Status", "Data Início", "Data Fim",
     "Modo Dias", "Dias de Atuação", "Obs. Escala",
     "Diária (R$)", "Hora (R$)", "Salário Fixo (R$)", "Freq. Pagamento",
+    "Tipo Remuneração", "Recebe VT", "Valor VT (R$)", "Recebe VR/VA", "Valor VR/VA (R$)",
     "Horas Diárias", "Horas Semanais",
     "Turno", "Escala", "Horário", "Padrão Dias", "Padrão Folgas", "Hora Chamada",
     "Supervisor", "Ponto Encontro", "Uniforme", "Transporte", "Alimentação",
@@ -80,6 +85,9 @@ export function exportAdmissionXlsx({ links, companyNameMap, eventCompanyMap }: 
       link.work_days_mode === "specific_dates" ? "Datas específicas" : "Contínuo",
       workDatesLabel(link), link.work_days_notes || "",
       link.daily_rate ?? "", link.hourly_rate ?? "", link.fixed_salary ?? "", link.payment_frequency || "",
+      link.remuneration_type ? remunerationLabels[link.remuneration_type] || link.remuneration_type : "",
+      boolLabel(link.has_transport_allowance), link.transport_allowance ?? "",
+      boolLabel(link.has_meal_allowance), link.meal_allowance ?? "",
       link.daily_hours ?? "", link.weekly_hours ?? "",
       link.shift_type || "", link.work_shift || "", link.work_schedule || "",
       link.work_days_pattern || "", link.rest_days_pattern || "", link.call_time || "",

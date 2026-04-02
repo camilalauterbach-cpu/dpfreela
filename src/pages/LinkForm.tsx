@@ -56,6 +56,11 @@ export default function LinkForm() {
     hourly_rate: "",
     fixed_salary: "",
     payment_frequency: "",
+    remuneration_type: "",
+    has_transport_allowance: false,
+    transport_allowance: "",
+    has_meal_allowance: false,
+    meal_allowance: "",
     notes: "",
   });
 
@@ -95,6 +100,11 @@ export default function LinkForm() {
         hourly_rate: e.hourly_rate != null ? String(e.hourly_rate) : "",
         fixed_salary: e.fixed_salary != null ? String(e.fixed_salary) : "",
         payment_frequency: e.payment_frequency || "",
+        remuneration_type: e.remuneration_type || "",
+        has_transport_allowance: e.has_transport_allowance || false,
+        transport_allowance: e.transport_allowance != null ? String(e.transport_allowance) : "",
+        has_meal_allowance: e.has_meal_allowance || false,
+        meal_allowance: e.meal_allowance != null ? String(e.meal_allowance) : "",
         notes: e.notes || "",
       });
     }
@@ -156,6 +166,11 @@ export default function LinkForm() {
         hourly_rate: form.hourly_rate ? Number(form.hourly_rate) : null,
         fixed_salary: form.fixed_salary ? Number(form.fixed_salary) : null,
         payment_frequency: form.payment_frequency || null,
+        remuneration_type: form.remuneration_type || null,
+        has_transport_allowance: form.has_transport_allowance,
+        transport_allowance: form.transport_allowance ? Number(form.transport_allowance) : null,
+        has_meal_allowance: form.has_meal_allowance,
+        meal_allowance: form.meal_allowance ? Number(form.meal_allowance) : null,
         notes: form.notes || null,
       };
 
@@ -468,34 +483,96 @@ export default function LinkForm() {
         </CardContent>
       </Card>
 
-      {/* Remuneração */}
+      {/* Remuneração e benefícios */}
       <Card>
-        <CardHeader><CardTitle className="text-base">Remuneração</CardTitle></CardHeader>
-        <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <Label>Diária (R$)</Label>
-            <Input type="number" step="0.01" value={form.daily_rate} onChange={(e) => set("daily_rate", e.target.value)} />
+        <CardHeader><CardTitle className="text-base">Remuneração e benefícios</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+            <div>
+              <Label>Tipo de remuneração principal</Label>
+              <Select value={form.remuneration_type} onValueChange={(v) => set("remuneration_type", v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Diarista</SelectItem>
+                  <SelectItem value="monthly">Mensalista</SelectItem>
+                  <SelectItem value="hourly">Horista</SelectItem>
+                  <SelectItem value="per_event">Por evento</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Frequência de pagamento</Label>
+              <Select value={form.payment_frequency} onValueChange={(v) => set("payment_frequency", v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Diária</SelectItem>
+                  <SelectItem value="weekly">Semanal</SelectItem>
+                  <SelectItem value="biweekly">Quinzenal</SelectItem>
+                  <SelectItem value="monthly">Mensal</SelectItem>
+                  <SelectItem value="per_event">Por evento</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div>
-            <Label>Hora (R$)</Label>
-            <Input type="number" step="0.01" value={form.hourly_rate} onChange={(e) => set("hourly_rate", e.target.value)} />
+
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+            <div className={form.remuneration_type === "daily" ? "ring-2 ring-primary/30 rounded-md p-2 -m-2" : ""}>
+              <Label className={form.remuneration_type === "daily" ? "font-semibold text-primary" : ""}>
+                Diária (R$) {form.remuneration_type === "daily" && <span className="text-xs">← principal</span>}
+              </Label>
+              <Input type="number" step="0.01" value={form.daily_rate} onChange={(e) => set("daily_rate", e.target.value)} />
+            </div>
+            <div className={form.remuneration_type === "monthly" ? "ring-2 ring-primary/30 rounded-md p-2 -m-2" : ""}>
+              <Label className={form.remuneration_type === "monthly" ? "font-semibold text-primary" : ""}>
+                Salário fixo (R$) {form.remuneration_type === "monthly" && <span className="text-xs">← principal</span>}
+              </Label>
+              <Input type="number" step="0.01" value={form.fixed_salary} onChange={(e) => set("fixed_salary", e.target.value)} />
+            </div>
+            <div className={form.remuneration_type === "hourly" ? "ring-2 ring-primary/30 rounded-md p-2 -m-2" : ""}>
+              <Label className={form.remuneration_type === "hourly" ? "font-semibold text-primary" : ""}>
+                Hora (R$) {form.remuneration_type === "hourly" && <span className="text-xs">← principal</span>}
+              </Label>
+              <Input type="number" step="0.01" value={form.hourly_rate} onChange={(e) => set("hourly_rate", e.target.value)} />
+            </div>
           </div>
-          <div>
-            <Label>Salário fixo (R$)</Label>
-            <Input type="number" step="0.01" value={form.fixed_salary} onChange={(e) => set("fixed_salary", e.target.value)} />
-          </div>
-          <div>
-            <Label>Frequência de pagamento</Label>
-            <Select value={form.payment_frequency} onValueChange={(v) => set("payment_frequency", v)}>
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="daily">Diária</SelectItem>
-                <SelectItem value="weekly">Semanal</SelectItem>
-                <SelectItem value="biweekly">Quinzenal</SelectItem>
-                <SelectItem value="monthly">Mensal</SelectItem>
-                <SelectItem value="per_event">Por evento</SelectItem>
-              </SelectContent>
-            </Select>
+
+          <div className="border-t pt-4 grid gap-4 grid-cols-1 sm:grid-cols-2">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="has_vt"
+                  checked={form.has_transport_allowance}
+                  onChange={(e) => set("has_transport_allowance", e.target.checked)}
+                  className="h-4 w-4 rounded border-input"
+                />
+                <Label htmlFor="has_vt" className="mb-0">Recebe vale-transporte (VT)</Label>
+              </div>
+              {form.has_transport_allowance && (
+                <div>
+                  <Label>Valor VT (R$)</Label>
+                  <Input type="number" step="0.01" value={form.transport_allowance} onChange={(e) => set("transport_allowance", e.target.value)} />
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="has_vr"
+                  checked={form.has_meal_allowance}
+                  onChange={(e) => set("has_meal_allowance", e.target.checked)}
+                  className="h-4 w-4 rounded border-input"
+                />
+                <Label htmlFor="has_vr" className="mb-0">Recebe vale-refeição/alimentação (VR/VA)</Label>
+              </div>
+              {form.has_meal_allowance && (
+                <div>
+                  <Label>Valor VR/VA (R$)</Label>
+                  <Input type="number" step="0.01" value={form.meal_allowance} onChange={(e) => set("meal_allowance", e.target.value)} />
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
