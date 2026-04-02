@@ -39,7 +39,9 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
+      <div className="w-full max-w-sm space-y-4">
+        <InstallAppBanner />
+        <Card>
         <CardHeader className="text-center">
           <CardTitle className="text-xl">Entrar no sistema</CardTitle>
           <CardDescription>Use seu e-mail e senha para acessar</CardDescription>
