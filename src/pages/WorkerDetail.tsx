@@ -22,6 +22,9 @@ export default function WorkerDetail() {
   const { data: worker, isLoading } = useWorker(id);
   const { hasAnyRole } = useAuth();
   const canEdit = hasAnyRole(["admin", "manager", "operator"]);
+  const canDelete = hasAnyRole(["admin", "manager"]);
+  const { deleteRecord, isDeleting } = useDeleteRecord("workers", ["workers", "worker", "dashboard-counts"]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const { data: docs } = useQuery({
     queryKey: ["worker-documents", id],
