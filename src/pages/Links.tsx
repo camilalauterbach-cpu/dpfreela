@@ -279,12 +279,18 @@ export default function Links() {
           <Input type="date" placeholder="Início" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="w-full sm:w-[140px]" />
           <Input type="date" placeholder="Fim" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="w-full sm:w-[140px]" />
         </div>
-        <div className="flex gap-1 justify-end">
-          <Button size="sm" variant="outline" onClick={exportCSV} disabled={!filteredLinks.length}>
+        <div className="flex flex-wrap gap-1 justify-end">
+          <Button size="sm" variant="outline" onClick={exportCSV} disabled={!filteredLinks.length || !!exporting}>
             <Download className="mr-1 h-3 w-3" /> CSV
           </Button>
-          <Button size="sm" variant="outline" onClick={exportPDF} disabled={!filteredLinks.length}>
+          <Button size="sm" variant="outline" onClick={exportPDF} disabled={!filteredLinks.length || !!exporting}>
             <FileText className="mr-1 h-3 w-3" /> PDF
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleAdmissionExport} disabled={!filteredLinks.length || !!exporting}>
+            {exporting === "xlsx" ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FileSpreadsheet className="mr-1 h-3 w-3" />} Admissão
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleDocsZip} disabled={!filteredLinks.length || !!exporting}>
+            {exporting === "zip" ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FolderArchive className="mr-1 h-3 w-3" />} Docs ZIP
           </Button>
         </div>
       </div>
