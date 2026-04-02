@@ -271,7 +271,7 @@ export default function LinkForm() {
       </Card>
 
       {/* Contrato */}
-      <Card>
+      <Card ref={contractSectionRef}>
         <CardHeader><CardTitle className="text-base">Contrato</CardTitle></CardHeader>
         <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2">
           <div>
@@ -302,12 +302,31 @@ export default function LinkForm() {
             </Select>
           </div>
           <div>
-            <Label>Data início *</Label>
-            <Input type="date" value={form.hire_date} onChange={(e) => set("hire_date", e.target.value)} required />
+            <Label className={highlightDates && !form.hire_date ? "text-destructive font-semibold" : ""}>
+              Data início *
+              {highlightDates && !form.hire_date && <span className="ml-1 text-xs font-normal">← preencha aqui</span>}
+            </Label>
+            <Input
+              ref={hireDateRef}
+              type="date"
+              value={form.hire_date}
+              onChange={(e) => { set("hire_date", e.target.value); if (e.target.value && form.end_date) setHighlightDates(false); }}
+              required
+              className={highlightDates && !form.hire_date ? "border-destructive ring-2 ring-destructive/30" : ""}
+            />
           </div>
           <div>
-            <Label>Data fim *</Label>
-            <Input type="date" value={form.end_date} onChange={(e) => set("end_date", e.target.value)} required />
+            <Label className={highlightDates && !form.end_date ? "text-destructive font-semibold" : ""}>
+              Data fim *
+              {highlightDates && !form.end_date && <span className="ml-1 text-xs font-normal">← preencha aqui</span>}
+            </Label>
+            <Input
+              type="date"
+              value={form.end_date}
+              onChange={(e) => { set("end_date", e.target.value); if (form.hire_date && e.target.value) setHighlightDates(false); }}
+              required
+              className={highlightDates && !form.end_date ? "border-destructive ring-2 ring-destructive/30" : ""}
+            />
           </div>
         </CardContent>
       </Card>
