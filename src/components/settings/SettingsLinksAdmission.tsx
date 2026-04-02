@@ -5,9 +5,10 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { getSystemSetting, saveSystemSetting } from "@/lib/system-settings";
-import { Loader2 } from "lucide-react";
+import { Loader2, Lock } from "lucide-react";
 
 interface LinkAdmissionConfig {
   remuneration_types: {
@@ -65,7 +66,11 @@ const requiredFieldLabels: Record<string, string> = {
   daily_hours: "Horas diárias", weekly_hours: "Horas semanais",
 };
 
-export function SettingsLinksAdmission() {
+interface Props {
+  readOnly?: boolean;
+}
+
+export function SettingsLinksAdmission({ readOnly = false }: Props) {
   const { toast } = useToast();
   const [config, setConfig] = useState<LinkAdmissionConfig>(defaultConfig);
   const [loading, setLoading] = useState(false);
@@ -90,6 +95,7 @@ export function SettingsLinksAdmission() {
   };
 
   const toggleRemType = (key: keyof LinkAdmissionConfig["remuneration_types"]) => {
+    if (readOnly) return;
     setConfig((prev) => ({
       ...prev,
       remuneration_types: { ...prev.remuneration_types, [key]: !prev.remuneration_types[key] },
@@ -97,6 +103,7 @@ export function SettingsLinksAdmission() {
   };
 
   const toggleRequiredField = (key: keyof LinkAdmissionConfig["required_fields"]) => {
+    if (readOnly) return;
     setConfig((prev) => ({
       ...prev,
       required_fields: { ...prev.required_fields, [key]: !prev.required_fields[key] },
@@ -107,6 +114,13 @@ export function SettingsLinksAdmission() {
 
   return (
     <div className="space-y-6">
+      {readOnly && (
+        <Alert>
+          <Lock className="h-4 w-4" />
+          <AlertDescription>Somente administradores e gerentes podem editar estas configurações.</AlertDescription>
+        </Alert>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Tipos de Remuneração</CardTitle>
@@ -116,7 +130,7 @@ export function SettingsLinksAdmission() {
           <div className="grid gap-3 sm:grid-cols-2">
             {(Object.keys(config.remuneration_types) as Array<keyof typeof config.remuneration_types>).map((key) => (
               <label key={key} className="flex items-center gap-2 cursor-pointer">
-                <Checkbox checked={config.remuneration_types[key]} onCheckedChange={() => toggleRemType(key)} />
+                <Checkbox checked={config.remuneration_types[key]} onCheckedChange={() => toggleRemType(key)} disabled={readOnly} />
                 <span className="text-sm">{remunerationLabels[key]}</span>
               </label>
             ))}
@@ -132,25 +146,25 @@ export function SettingsLinksAdmission() {
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-2 cursor-pointer">
-              <Checkbox checked={config.default_vt} onCheckedChange={(v) => setConfig((prev) => ({ ...prev, default_vt: !!v }))} />
+              <Checkbox checked={config.default_vt} onCheckedChange={(v) => !readOnly && setConfig((prev) => ({ ...prev, default_vt: !!v }))} disabled={readOnly} />
               <span className="text-sm font-medium">Vale-transporte (VT)</span>
             </label>
             {config.default_vt && (
               <div className="flex items-center gap-2">
                 <Label className="text-sm">R$</Label>
-                <Input className="w-28" value={config.default_vt_value} onChange={(e) => setConfig((prev) => ({ ...prev, default_vt_value: e.target.value }))} placeholder="0,00" />
+                <Input className="w-28" value={config.default_vt_value} onChange={(e) => setConfig((prev) => ({ ...prev, default_vt_value: e.target.value }))} placeholder="0,00" disabled={readOnly} />
               </div>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-2 cursor-pointer">
-              <Checkbox checked={config.default_vr_va} onCheckedChange={(v) => setConfig((prev) => ({ ...prev, default_vr_va: !!v }))} />
+              <Checkbox checked={config.default_vr_va} onCheckedChange={(v) => !readOnly && setConfig((prev) => ({ ...prev, default_vr_va: !!v }))} disabled={readOnly} />
               <span className="text-sm font-medium">Vale-refeição/alimentação (VR/VA)</span>
             </label>
             {config.default_vr_va && (
               <div className="flex items-center gap-2">
                 <Label className="text-sm">R$</Label>
-                <Input className="w-28" value={config.default_vr_va_value} onChange={(e) => setConfig((prev) => ({ ...prev, default_vr_va_value: e.target.value }))} placeholder="0,00" />
+                <Input className="w-28" value={config.default_vr_va_value} onChange={(e) => setConfig((prev) => ({ ...prev, default_vr_va_value: e.target.value }))} placeholder="0,00" disabled={readOnly} />
               </div>
             )}
           </div>
@@ -166,7 +180,7 @@ export function SettingsLinksAdmission() {
           <div className="grid gap-3 sm:grid-cols-2">
             {(Object.keys(config.required_fields) as Array<keyof typeof config.required_fields>).map((key) => (
               <label key={key} className="flex items-center gap-2 cursor-pointer">
-                <Checkbox checked={config.required_fields[key]} onCheckedChange={() => toggleRequiredField(key)} />
+                <Checkbox checked={config.required_fields[key]} onCheckedChange={() => toggleRequiredField(key)} disabled={readOnly} />
                 <span className="text-sm">{requiredFieldLabels[key]}</span>
               </label>
             ))}
@@ -182,19 +196,19 @@ export function SettingsLinksAdmission() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Uniforme (obs. padrão)</Label>
-            <Textarea value={config.default_uniform_notes} onChange={(e) => setConfig((prev) => ({ ...prev, default_uniform_notes: e.target.value }))} rows={2} placeholder="Ex: Camiseta preta, calça jeans..." />
+            <Textarea value={config.default_uniform_notes} onChange={(e) => setConfig((prev) => ({ ...prev, default_uniform_notes: e.target.value }))} rows={2} placeholder="Ex: Camiseta preta, calça jeans..." disabled={readOnly} />
           </div>
           <div className="space-y-2">
             <Label>Transporte (obs. padrão)</Label>
-            <Textarea value={config.default_transport_notes} onChange={(e) => setConfig((prev) => ({ ...prev, default_transport_notes: e.target.value }))} rows={2} />
+            <Textarea value={config.default_transport_notes} onChange={(e) => setConfig((prev) => ({ ...prev, default_transport_notes: e.target.value }))} rows={2} disabled={readOnly} />
           </div>
           <div className="space-y-2">
             <Label>Alimentação (obs. padrão)</Label>
-            <Textarea value={config.default_meal_entitlement} onChange={(e) => setConfig((prev) => ({ ...prev, default_meal_entitlement: e.target.value }))} rows={2} />
+            <Textarea value={config.default_meal_entitlement} onChange={(e) => setConfig((prev) => ({ ...prev, default_meal_entitlement: e.target.value }))} rows={2} disabled={readOnly} />
           </div>
           <div className="space-y-2">
             <Label>Observações gerais (padrão)</Label>
-            <Textarea value={config.default_notes} onChange={(e) => setConfig((prev) => ({ ...prev, default_notes: e.target.value }))} rows={2} />
+            <Textarea value={config.default_notes} onChange={(e) => setConfig((prev) => ({ ...prev, default_notes: e.target.value }))} rows={2} disabled={readOnly} />
           </div>
         </CardContent>
       </Card>
@@ -208,23 +222,25 @@ export function SettingsLinksAdmission() {
           <div className="space-y-2">
             <Label>Prefixo do nome do arquivo</Label>
             <div className="flex items-center gap-2">
-              <Input className="w-48" value={config.export_file_prefix} onChange={(e) => setConfig((prev) => ({ ...prev, export_file_prefix: e.target.value }))} />
+              <Input className="w-48" value={config.export_file_prefix} onChange={(e) => setConfig((prev) => ({ ...prev, export_file_prefix: e.target.value }))} disabled={readOnly} />
               <span className="text-xs text-muted-foreground">_AAAA-MM-DD.xlsx</span>
             </div>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
-            <Checkbox checked={config.export_include_empty_columns} onCheckedChange={(v) => setConfig((prev) => ({ ...prev, export_include_empty_columns: !!v }))} />
+            <Checkbox checked={config.export_include_empty_columns} onCheckedChange={(v) => !readOnly && setConfig((prev) => ({ ...prev, export_include_empty_columns: !!v }))} disabled={readOnly} />
             <span className="text-sm">Incluir colunas vazias na exportação</span>
           </label>
         </CardContent>
       </Card>
 
-      <div className="flex justify-end pb-4">
-        <Button onClick={handleSave} disabled={loading} size="lg">
-          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Salvar Configurações de Vínculos
-        </Button>
-      </div>
+      {!readOnly && (
+        <div className="flex justify-end pb-4">
+          <Button onClick={handleSave} disabled={loading} size="lg">
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Salvar Configurações de Vínculos
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

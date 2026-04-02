@@ -3,10 +3,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { getSystemSetting, saveSystemSetting } from "@/lib/system-settings";
-import { Loader2 } from "lucide-react";
+import { Loader2, Lock } from "lucide-react";
 
 interface CompanySettings {
   company_name: string;
@@ -25,7 +26,11 @@ const empty: CompanySettings = {
   city: "", state: "", phone: "", email: "", notes: "",
 };
 
-export function SettingsCompany() {
+interface Props {
+  readOnly?: boolean;
+}
+
+export function SettingsCompany({ readOnly = false }: Props) {
   const { toast } = useToast();
   const [data, setData] = useState<CompanySettings>(empty);
   const [loading, setLoading] = useState(false);
@@ -61,48 +66,56 @@ export function SettingsCompany() {
         <CardDescription>Informações da empresa que opera o sistema DPfreela. Configuração global — visível para todos.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {readOnly && (
+          <Alert>
+            <Lock className="h-4 w-4" />
+            <AlertDescription>Somente administradores e gerentes podem editar estas configurações.</AlertDescription>
+          </Alert>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label>Razão Social</Label>
-            <Input value={data.company_name} onChange={(e) => update("company_name", e.target.value)} />
+            <Input value={data.company_name} onChange={(e) => update("company_name", e.target.value)} disabled={readOnly} />
           </div>
           <div className="space-y-2">
             <Label>Nome Fantasia</Label>
-            <Input value={data.trade_name} onChange={(e) => update("trade_name", e.target.value)} />
+            <Input value={data.trade_name} onChange={(e) => update("trade_name", e.target.value)} disabled={readOnly} />
           </div>
           <div className="space-y-2">
             <Label>CNPJ</Label>
-            <Input value={data.cnpj} onChange={(e) => update("cnpj", e.target.value)} />
+            <Input value={data.cnpj} onChange={(e) => update("cnpj", e.target.value)} disabled={readOnly} />
           </div>
           <div className="space-y-2">
             <Label>Telefone</Label>
-            <Input value={data.phone} onChange={(e) => update("phone", e.target.value)} />
+            <Input value={data.phone} onChange={(e) => update("phone", e.target.value)} disabled={readOnly} />
           </div>
           <div className="space-y-2">
             <Label>E-mail</Label>
-            <Input value={data.email} onChange={(e) => update("email", e.target.value)} />
+            <Input value={data.email} onChange={(e) => update("email", e.target.value)} disabled={readOnly} />
           </div>
           <div className="space-y-2">
             <Label>Cidade</Label>
-            <Input value={data.city} onChange={(e) => update("city", e.target.value)} />
+            <Input value={data.city} onChange={(e) => update("city", e.target.value)} disabled={readOnly} />
           </div>
           <div className="space-y-2">
             <Label>UF</Label>
-            <Input value={data.state} onChange={(e) => update("state", e.target.value)} maxLength={2} />
+            <Input value={data.state} onChange={(e) => update("state", e.target.value)} maxLength={2} disabled={readOnly} />
           </div>
         </div>
         <div className="space-y-2">
           <Label>Endereço</Label>
-          <Input value={data.address} onChange={(e) => update("address", e.target.value)} />
+          <Input value={data.address} onChange={(e) => update("address", e.target.value)} disabled={readOnly} />
         </div>
         <div className="space-y-2">
           <Label>Observações</Label>
-          <Textarea value={data.notes} onChange={(e) => update("notes", e.target.value)} rows={3} />
+          <Textarea value={data.notes} onChange={(e) => update("notes", e.target.value)} rows={3} disabled={readOnly} />
         </div>
-        <Button onClick={handleSave} disabled={loading}>
-          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Salvar
-        </Button>
+        {!readOnly && (
+          <Button onClick={handleSave} disabled={loading}>
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Salvar
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

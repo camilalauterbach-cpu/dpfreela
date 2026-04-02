@@ -8,8 +8,9 @@ import { SettingsPreferences } from "@/components/settings/SettingsPreferences";
 import { SettingsLinksAdmission } from "@/components/settings/SettingsLinksAdmission";
 
 export default function SettingsPage() {
-  const { hasRole } = useAuth();
+  const { hasAnyRole, hasRole } = useAuth();
   const isAdmin = hasRole("admin");
+  const canEditGlobal = hasAnyRole(["admin", "manager"]);
 
   return (
     <div className="space-y-4">
@@ -52,11 +53,11 @@ export default function SettingsPage() {
         )}
 
         <TabsContent value="company">
-          <SettingsCompany />
+          <SettingsCompany readOnly={!canEditGlobal} />
         </TabsContent>
 
         <TabsContent value="links-admission">
-          <SettingsLinksAdmission />
+          <SettingsLinksAdmission readOnly={!canEditGlobal} />
         </TabsContent>
 
         <TabsContent value="preferences">
