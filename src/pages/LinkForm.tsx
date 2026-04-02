@@ -65,6 +65,34 @@ export default function LinkForm() {
     notes: "",
   });
 
+  const [globalConfig, setGlobalConfig] = useState<any>(null);
+  const [configLoaded, setConfigLoaded] = useState(false);
+
+  // Load global config
+  useEffect(() => {
+    getSystemSetting("links_admission_config").then((val) => {
+      setGlobalConfig(val);
+      setConfigLoaded(true);
+    });
+  }, []);
+
+  // Apply global defaults for NEW links only, after config is loaded
+  useEffect(() => {
+    if (isEdit || !configLoaded || !globalConfig) return;
+    // Only apply if form hasn't been touched (still default empty values)
+    setForm((prev) => ({
+      ...prev,
+      has_transport_allowance: prev.has_transport_allowance || globalConfig.default_vt || false,
+      transport_allowance: prev.transport_allowance || globalConfig.default_vt_value || "",
+      has_meal_allowance: prev.has_meal_allowance || globalConfig.default_vr_va || false,
+      meal_allowance: prev.meal_allowance || globalConfig.default_vr_va_value || "",
+      uniform_notes: prev.uniform_notes || globalConfig.default_uniform_notes || "",
+      transport_notes: prev.transport_notes || globalConfig.default_transport_notes || "",
+      meal_entitlement: prev.meal_entitlement || globalConfig.default_meal_entitlement || "",
+      notes: prev.notes || globalConfig.default_notes || "",
+    }));
+  }, [isEdit, configLoaded, globalConfig]);
+
   const [newDate, setNewDate] = useState("");
   const [highlightDates, setHighlightDates] = useState(false);
   const hireDateRef = useRef<HTMLInputElement>(null);
