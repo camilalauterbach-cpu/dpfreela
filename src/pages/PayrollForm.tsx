@@ -40,7 +40,7 @@ export default function PayrollForm() {
     mutationFn: async () => {
       const payload = {
         batch_name: batchName.trim(),
-        event_id: eventId || null,
+        event_id: eventId && eventId !== "none" ? eventId : null,
         reference_month: referenceMonth || null,
         notes: notes || null,
       };
