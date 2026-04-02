@@ -72,7 +72,7 @@ export default function Links() {
   // Build event→company map
   const eventCompanyMap = useMemo(() => {
     const m = new Map<string, string>();
-    (events as any[])?.forEach((ev) => {
+    ((events as any)?.data ?? []).forEach((ev: any) => {
       if (ev.company_id) m.set(ev.id, ev.company_id);
     });
     return m;
@@ -80,13 +80,13 @@ export default function Links() {
 
   const eventNameMap = useMemo(() => {
     const m = new Map<string, string>();
-    (events as any[])?.forEach((ev) => m.set(ev.id, ev.name));
+    ((events as any)?.data ?? []).forEach((ev: any) => m.set(ev.id, ev.name));
     return m;
   }, [events]);
 
   const companyNameMap = useMemo(() => {
     const m = new Map<string, string>();
-    (companies as any[])?.forEach((c) => m.set(c.id, c.trade_name || c.legal_name));
+    ((companies as any)?.data ?? []).forEach((c: any) => m.set(c.id, c.trade_name || c.legal_name));
     return m;
   }, [companies]);
 
@@ -270,7 +270,7 @@ export default function Links() {
             <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Empresa" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas empresas</SelectItem>
-              {(companies as any[])?.map((c) => (
+              {((companies as any)?.data ?? []).map((c: any) => (
                 <SelectItem key={c.id} value={c.id}>{c.trade_name || c.legal_name}</SelectItem>
               ))}
             </SelectContent>
@@ -279,7 +279,7 @@ export default function Links() {
             <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Evento" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos eventos</SelectItem>
-              {(events as any[])?.map((ev) => (
+              {((events as any)?.data ?? []).map((ev: any) => (
                 <SelectItem key={ev.id} value={ev.id}>{ev.name}</SelectItem>
               ))}
             </SelectContent>

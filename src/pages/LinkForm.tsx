@@ -323,7 +323,7 @@ export default function LinkForm() {
             <Select value={form.worker_id} onValueChange={(v) => set("worker_id", v)}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
-                {(workers as any[])?.map((w) => (
+                {(workers as any)?.data?.map((w: any) => (
                   <SelectItem key={w.id} value={w.id}>
                     {w.full_name}{w.nickname ? ` (${w.nickname})` : ""}
                   </SelectItem>
@@ -336,7 +336,7 @@ export default function LinkForm() {
             <Select value={form.event_id} onValueChange={(v) => set("event_id", v)}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
-                {(events as any[])?.map((ev) => (
+                {(events as any)?.data?.map((ev: any) => (
                   <SelectItem key={ev.id} value={ev.id}>{ev.name}</SelectItem>
                 ))}
               </SelectContent>
