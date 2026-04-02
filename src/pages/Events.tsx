@@ -62,6 +62,7 @@ export default function Events() {
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="planned">Planejado</SelectItem>
             <SelectItem value="active">Ativo</SelectItem>
+            <SelectItem value="confirmed">Confirmado</SelectItem>
             <SelectItem value="completed">Concluído</SelectItem>
             <SelectItem value="cancelled">Cancelado</SelectItem>
           </SelectContent>
