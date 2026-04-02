@@ -430,11 +430,11 @@ export default function LinkForm() {
             <Input type="time" value={form.call_time} onChange={(e) => set("call_time", e.target.value)} />
           </div>
           <div>
-            <Label>Horas diárias</Label>
+            <Label>Horas diárias{reqMark("daily_hours")}</Label>
             <Input type="number" step="0.5" value={form.daily_hours} onChange={(e) => set("daily_hours", e.target.value)} />
           </div>
           <div>
-            <Label>Horas semanais</Label>
+            <Label>Horas semanais{reqMark("weekly_hours")}</Label>
             <Input type="number" step="0.5" value={form.weekly_hours} onChange={(e) => set("weekly_hours", e.target.value)} />
           </div>
         </CardContent>
