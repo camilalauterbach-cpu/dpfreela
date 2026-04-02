@@ -1,6 +1,6 @@
 import { Users, Calendar, Building2, Link2, DollarSign, LayoutDashboard, LogOut, Settings } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Sidebar,
@@ -34,6 +34,7 @@ export function AppSidebar() {
   const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const navigate = useNavigate();
   const { signOut, hasAnyRole, user } = useAuth();
 
   const isActive = (path: string) => {
@@ -41,8 +42,13 @@ export function AppSidebar() {
     return location.pathname.startsWith(path);
   };
 
-  const handleNavClick = () => {
-    if (isMobile) setOpenMobile(false);
+  const handleNavClick = (e: React.MouseEvent, url: string) => {
+    if (isMobile) {
+      e.preventDefault();
+      setOpenMobile(false);
+      // Navigate after closing to ensure clean transition
+      setTimeout(() => navigate(url), 10);
+    }
   };
 
   return (
@@ -59,7 +65,7 @@ export function AppSidebar() {
               {mainItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink to={item.url} end={item.url === "/"} className="hover:bg-sidebar-accent/50" onClick={handleNavClick}>
+                    <NavLink to={item.url} end={item.url === "/"} className="hover:bg-sidebar-accent/50" onClick={(e) => handleNavClick(e, item.url)}>
                       <item.icon className="h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
@@ -85,7 +91,7 @@ export function AppSidebar() {
                 {adminItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                      <NavLink to={item.url} className="hover:bg-sidebar-accent/50" onClick={handleNavClick}>
+                      <NavLink to={item.url} className="hover:bg-sidebar-accent/50" onClick={(e) => handleNavClick(e, item.url)}>
                         <item.icon className="h-4 w-4" />
                         {!collapsed && <span>{item.title}</span>}
                       </NavLink>
