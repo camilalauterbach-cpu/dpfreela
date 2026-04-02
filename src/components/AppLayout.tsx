@@ -20,13 +20,16 @@ export function AppLayout() {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-12 flex items-center justify-between border-b px-4 bg-background">
+          <header className="h-12 flex items-center justify-between border-b px-4 bg-[#1a2744] sm:bg-background">
             <div className="flex items-center gap-2">
-              <SidebarTrigger className="sm:hidden h-9 w-auto px-2 gap-1.5">
+              <SidebarTrigger className="sm:hidden h-9 w-auto px-2 gap-1.5 text-white hover:bg-white/10 hover:text-white">
                 <span className="text-sm font-medium">Menu</span>
               </SidebarTrigger>
               <SidebarTrigger className="hidden sm:inline-flex" />
-              <span className="sm:hidden text-sm font-semibold text-foreground">DPfreela</span>
+              <span className="sm:hidden text-sm font-bold tracking-tight">
+                <span className="text-white">DP</span>
+                <span className="text-blue-400">freela</span>
+              </span>
             </div>
             <div className="flex items-center gap-2">
               {primaryRole && (
