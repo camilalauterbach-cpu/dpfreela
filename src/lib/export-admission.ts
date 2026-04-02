@@ -52,6 +52,7 @@ export function exportAdmissionXlsx({ links, companyNameMap, eventCompanyMap }: 
     "Tipo Contrato", "Status", "Data Início", "Data Fim",
     "Modo Dias", "Dias de Atuação", "Obs. Escala",
     "Diária (R$)", "Hora (R$)", "Salário Fixo (R$)", "Freq. Pagamento",
+    "Tipo Remuneração", "Recebe VT", "Valor VT (R$)", "Recebe VR/VA", "Valor VR/VA (R$)",
     "Horas Diárias", "Horas Semanais",
     "Turno", "Escala", "Horário", "Padrão Dias", "Padrão Folgas", "Hora Chamada",
     "Supervisor", "Ponto Encontro", "Uniforme", "Transporte", "Alimentação",
