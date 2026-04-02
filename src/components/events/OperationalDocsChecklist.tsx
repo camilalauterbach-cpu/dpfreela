@@ -140,7 +140,15 @@ export function OperationalDocsChecklist({ employmentLinkId, workerId, event }: 
     },
   });
 
-  if (requiredDocs.length === 0) return null;
+  if (requiredDocs.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-muted-foreground">
+          O evento vinculado não exige documentos operacionais (EPI, OS ou NRs).
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isLoading) {
     return <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
