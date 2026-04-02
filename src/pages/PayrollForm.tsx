@@ -40,7 +40,7 @@ export default function PayrollForm() {
     mutationFn: async () => {
       const payload = {
         batch_name: batchName.trim(),
-        event_id: eventId || null,
+        event_id: eventId && eventId !== "none" ? eventId : null,
         reference_month: referenceMonth || null,
         notes: notes || null,
       };
@@ -92,7 +92,7 @@ export default function PayrollForm() {
             <Select value={eventId} onValueChange={setEventId}>
               <SelectTrigger><SelectValue placeholder="Selecione um evento" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum</SelectItem>
+                <SelectItem value="none">Nenhum</SelectItem>
                 {events?.map((e) => (
                   <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
                 ))}
