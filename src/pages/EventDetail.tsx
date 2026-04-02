@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEvent } from "@/hooks/useEvents";
 import { useAuth } from "@/contexts/AuthContext";
@@ -5,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Pencil, Loader2 } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, Trash2 } from "lucide-react";
 import { EventLinksList } from "@/components/links/EventLinksList";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
+import { useDeleteRecord } from "@/hooks/useDeleteRecord";
 
 const statusLabels: Record<string, string> = {
   planned: "Planejado",
