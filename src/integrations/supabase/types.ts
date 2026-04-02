@@ -100,6 +100,7 @@ export type Database = {
       }
       employment_link_documents: {
         Row: {
+          category: string | null
           created_at: string
           deleted_at: string | null
           document_number: string | null
@@ -111,10 +112,12 @@ export type Database = {
           id: string
           mime_type: string | null
           notes: string | null
+          status: string
           updated_at: string
           worker_id: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
           deleted_at?: string | null
           document_number?: string | null
@@ -126,10 +129,12 @@ export type Database = {
           id?: string
           mime_type?: string | null
           notes?: string | null
+          status?: string
           updated_at?: string
           worker_id: string
         }
         Update: {
+          category?: string | null
           created_at?: string
           deleted_at?: string | null
           document_number?: string | null
@@ -141,6 +146,7 @@ export type Database = {
           id?: string
           mime_type?: string | null
           notes?: string | null
+          status?: string
           updated_at?: string
           worker_id?: string
         }
