@@ -25,19 +25,17 @@ const statusVariant = (s: string) => {
 };
 
 const contractLabels: Record<string, string> = {
-  clt: "CLT",
-  pj: "PJ",
-  freelancer: "Freelancer",
-  temporary: "Temporário",
-  intern: "Estagiário",
+  clt: "CLT", pj: "PJ", freelancer: "Freelancer", temporary: "Temporário", intern: "Estagiário",
 };
 
 const paymentLabels: Record<string, string> = {
-  daily: "Diária",
-  weekly: "Semanal",
-  biweekly: "Quinzenal",
-  monthly: "Mensal",
-  per_event: "Por evento",
+  daily: "Diária", weekly: "Semanal", biweekly: "Quinzenal", monthly: "Mensal", per_event: "Por evento",
+};
+
+const formatDateBR = (d: string | null) => {
+  if (!d) return "—";
+  const [y, m, day] = d.split("-");
+  return `${day}/${m}/${y}`;
 };
 
 export default function LinkDetail() {
@@ -76,6 +74,13 @@ export default function LinkDetail() {
   );
 
   const event = l.events;
+
+  const workDaysDisplay = () => {
+    if (l.work_days_mode === "specific_dates" && l.specific_work_dates?.length > 0) {
+      return l.specific_work_dates.map((d: string) => formatDateBR(d)).join(", ");
+    }
+    return "Contínuo";
+  };
 
   return (
     <div className="space-y-4 max-w-3xl">
@@ -124,8 +129,8 @@ export default function LinkDetail() {
             <CardContent className="grid gap-4 grid-cols-2">
               {info("Tipo de contrato", l.contract_type ? contractLabels[l.contract_type] || l.contract_type : null)}
               {info("Status", statusLabels[l.status] || l.status)}
-              {info("Data início", l.hire_date ? new Date(l.hire_date + "T12:00:00").toLocaleDateString("pt-BR") : null)}
-              {info("Data fim", l.end_date ? new Date(l.end_date + "T12:00:00").toLocaleDateString("pt-BR") : null)}
+              {info("Data início", formatDateBR(l.hire_date))}
+              {info("Data fim", formatDateBR(l.end_date))}
             </CardContent>
           </Card>
 
@@ -138,6 +143,24 @@ export default function LinkDetail() {
               {info("Horário de chamada", l.call_time)}
               {info("Horas diárias", l.daily_hours)}
               {info("Horas semanais", l.weekly_hours)}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-base">Dias de atuação</CardTitle></CardHeader>
+            <CardContent className="grid gap-4 grid-cols-1">
+              {info("Modo", l.work_days_mode === "specific_dates" ? "Datas específicas" : "Contínuo")}
+              {l.work_days_mode === "specific_dates" && l.specific_work_dates?.length > 0 && (
+                <div className="space-y-0.5">
+                  <p className="text-xs text-muted-foreground">Datas de atuação</p>
+                  <div className="flex flex-wrap gap-1">
+                    {l.specific_work_dates.map((d: string) => (
+                      <Badge key={d} variant="secondary">{formatDateBR(d)}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {info("Observações da escala", l.work_days_notes)}
             </CardContent>
           </Card>
 
@@ -172,11 +195,7 @@ export default function LinkDetail() {
 
         <TabsContent value="documentos" className="mt-4">
           {event ? (
-            <OperationalDocsChecklist
-              employmentLinkId={l.id}
-              workerId={l.worker_id}
-              event={event}
-            />
+            <OperationalDocsChecklist employmentLinkId={l.id} workerId={l.worker_id} event={event} />
           ) : (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
