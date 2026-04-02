@@ -244,17 +244,39 @@ export default function LinkForm() {
       toast({ title: "Data de fim deve ser posterior à data de início", variant: "destructive" });
       return;
     }
+    // Global required fields validation
+    const rf = globalConfig?.required_fields;
+    if (rf) {
+      if (rf.job_role && !form.job_role.trim()) {
+        toast({ title: "Função/Cargo é obrigatório", variant: "destructive" }); return;
+      }
+      if (rf.department && !form.department.trim()) {
+        toast({ title: "Departamento é obrigatório", variant: "destructive" }); return;
+      }
+      if (rf.contract_type && !form.contract_type) {
+        toast({ title: "Tipo de contrato é obrigatório", variant: "destructive" }); return;
+      }
+      if (rf.daily_hours && !form.daily_hours) {
+        toast({ title: "Horas diárias é obrigatório", variant: "destructive" }); return;
+      }
+      if (rf.weekly_hours && !form.weekly_hours) {
+        toast({ title: "Horas semanais é obrigatório", variant: "destructive" }); return;
+      }
+    }
     mutation.mutate();
   };
 
-  if (isEdit && loadingExisting) {
-    return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
-  }
-
-  const formatDateBR = (d: string) => {
-    const [y, m, day] = d.split("-");
-    return `${day}/${m}/${y}`;
-  };
+  // Enabled remuneration types from global config
+  const enabledRemTypes = useMemo(() => {
+    const allTypes = [
+      { value: "daily", label: "Diarista" },
+      { value: "monthly", label: "Mensalista" },
+      { value: "hourly", label: "Horista" },
+      { value: "per_event", label: "Por evento" },
+    ];
+    if (!globalConfig?.remuneration_types) return allTypes;
+    return allTypes.filter((t) => globalConfig.remuneration_types[t.value] !== false);
+  }, [globalConfig]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-3xl">
