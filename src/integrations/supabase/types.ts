@@ -320,6 +320,10 @@ export type Database = {
           location: string | null
           name: string
           notes: string | null
+          required_nrs: string[]
+          required_nrs_other: string | null
+          requires_epi_form: boolean
+          requires_service_order: boolean
           start_date: string | null
           state: string | null
           status: string
@@ -336,6 +340,10 @@ export type Database = {
           location?: string | null
           name: string
           notes?: string | null
+          required_nrs?: string[]
+          required_nrs_other?: string | null
+          requires_epi_form?: boolean
+          requires_service_order?: boolean
           start_date?: string | null
           state?: string | null
           status?: string
@@ -352,6 +360,10 @@ export type Database = {
           location?: string | null
           name?: string
           notes?: string | null
+          required_nrs?: string[]
+          required_nrs_other?: string | null
+          requires_epi_form?: boolean
+          requires_service_order?: boolean
           start_date?: string | null
           state?: string | null
           status?: string
