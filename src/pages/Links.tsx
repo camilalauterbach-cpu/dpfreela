@@ -199,6 +199,8 @@ export default function Links() {
         links: fullLinks || [],
         companyNameMap,
         eventCompanyMap,
+        filePrefix: exportConfig?.export_file_prefix || "admissao",
+        includeEmptyColumns: exportConfig?.export_include_empty_columns !== false,
       });
       toast.success("Planilha de admissão exportada!");
     } catch (err: any) {
