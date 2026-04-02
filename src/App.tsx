@@ -25,6 +25,8 @@ import Links from "./pages/Links";
 import LinkDetail from "./pages/LinkDetail";
 import LinkForm from "./pages/LinkForm";
 import Payroll from "./pages/Payroll";
+import PayrollForm from "./pages/PayrollForm";
+import PayrollDetail from "./pages/PayrollDetail";
 import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 
