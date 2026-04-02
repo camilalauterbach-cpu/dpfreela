@@ -33,6 +33,8 @@ export default function EventDetail() {
   const { data: event, isLoading } = useEvent(id);
   const { hasAnyRole } = useAuth();
   const canEdit = hasAnyRole(["admin", "manager"]);
+  const { deleteRecord, isDeleting } = useDeleteRecord("events", ["events", "event", "dashboard-counts"]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   if (isLoading) {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
