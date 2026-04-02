@@ -27,7 +27,6 @@ export function useDeleteRecord(tableName: TableName, invalidateKeys: string[]) 
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      setIsDeleting(true);
       // Check dependencies
       const checks = dependencyChecks[tableName] || [];
       for (const check of checks) {
@@ -62,5 +61,14 @@ export function useDeleteRecord(tableName: TableName, invalidateKeys: string[]) 
     },
   });
 
-  return { deleteRecord: deleteMutation.mutate, isDeleting };
+  const deleteRecord = (id: string, options?: { onSuccess?: () => void }) => {
+    setIsDeleting(true);
+    deleteMutation.mutate(id, {
+      onSuccess: () => {
+        options?.onSuccess?.();
+      },
+    });
+  };
+
+  return { deleteRecord, isDeleting };
 }
