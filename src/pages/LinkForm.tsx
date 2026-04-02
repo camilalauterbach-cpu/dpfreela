@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEmploymentLink } from "@/hooks/useEmploymentLinks";
+import { getSystemSetting } from "@/lib/system-settings";
 import { useWorkers } from "@/hooks/useWorkers";
 import { useEvents } from "@/hooks/useEvents";
 import { Button } from "@/components/ui/button";
