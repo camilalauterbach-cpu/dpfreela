@@ -80,7 +80,7 @@ export default function Links() {
 
   const eventNameMap = useMemo(() => {
     const m = new Map<string, string>();
-    (events as any[])?.forEach((ev) => m.set(ev.id, ev.name));
+    ((events as any)?.data ?? []).forEach((ev: any) => m.set(ev.id, ev.name));
     return m;
   }, [events]);
 
