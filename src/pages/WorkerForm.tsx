@@ -352,6 +352,7 @@ export default function WorkerForm() {
               <Label htmlFor="birth_country">País de nascimento</Label>
               <Input id="birth_country" value={form.birth_country} onChange={set("birth_country")} maxLength={50} />
             </div>
+          </CardContent>
         </Card>
 
         {/* Filiação */}
