@@ -176,7 +176,55 @@ export default function Links() {
     doc.save(`vinculos_${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
-  return (
+  const handleAdmissionExport = useCallback(async () => {
+    if (!filteredLinks.length) return;
+    setExporting("xlsx");
+    try {
+      // Fetch full worker data for filtered links
+      const workerIds = [...new Set(filteredLinks.map((l: any) => l.worker_id))];
+      const { data: fullLinks, error } = await supabase
+        .from("employment_links")
+        .select("*, workers(*), events(name)")
+        .in("id", filteredLinks.map((l: any) => l.id))
+        .is("deleted_at", null);
+      if (error) throw error;
+
+      exportAdmissionXlsx({
+        links: fullLinks || [],
+        companyNameMap,
+        eventCompanyMap,
+      });
+      toast.success("Planilha de admissão exportada!");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao exportar admissão.");
+    } finally {
+      setExporting(null);
+    }
+  }, [filteredLinks, companyNameMap, eventCompanyMap]);
+
+  const handleDocsZip = useCallback(async () => {
+    if (!filteredLinks.length) return;
+    setExporting("zip");
+    try {
+      const workerInfoMap = new Map<string, { full_name: string; cpf: string }>();
+      const workerIds: string[] = [];
+      filteredLinks.forEach((l: any) => {
+        const w = l.workers;
+        if (w && !workerInfoMap.has(l.worker_id)) {
+          workerInfoMap.set(l.worker_id, { full_name: w.full_name || "", cpf: w.cpf || "" });
+          workerIds.push(l.worker_id);
+        }
+      });
+      const count = await exportWorkerDocsZip({ workerIds, workerInfoMap });
+      toast.success(`ZIP com ${count} documento(s) baixado!`);
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao gerar ZIP.");
+    } finally {
+      setExporting(null);
+    }
+  }, [filteredLinks]);
+
+
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold text-foreground">Vínculos</h1>
