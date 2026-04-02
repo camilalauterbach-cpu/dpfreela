@@ -282,6 +282,9 @@ export default function LinkForm() {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
 
+  const isRequired = (field: string) => globalConfig?.required_fields?.[field] === true;
+  const reqMark = (field: string) => isRequired(field) ? " *" : "";
+
   const formatDateBR = (d: string) => {
     const [y, m, day] = d.split("-");
     return `${day}/${m}/${y}`;
