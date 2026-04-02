@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Calendar, Building2, Link2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { InstallAppBanner } from "@/components/InstallAppBanner";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -34,6 +35,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <InstallAppBanner />
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
         <p className="text-sm text-muted-foreground">Visão geral do sistema</p>

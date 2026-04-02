@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { InstallAppBanner } from "@/components/InstallAppBanner";
 
 export default function Login() {
   const { user, loading } = useAuth();
@@ -38,7 +39,9 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
+      <div className="w-full max-w-sm space-y-4">
+        <InstallAppBanner />
+        <Card>
         <CardHeader className="text-center">
           <CardTitle className="text-xl">Entrar no sistema</CardTitle>
           <CardDescription>Use seu e-mail e senha para acessar</CardDescription>
@@ -65,7 +68,8 @@ export default function Login() {
             </div>
           </CardFooter>
         </form>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }
