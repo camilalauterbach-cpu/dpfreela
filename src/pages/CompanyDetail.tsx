@@ -74,11 +74,25 @@ export default function CompanyDetail() {
           </div>
         </div>
         {canEdit && (
-          <Button size="sm" variant="outline" onClick={() => navigate(`/companies/${id}/edit`)}>
-            <Pencil className="mr-1 h-3 w-3" /> Editar
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant="outline" onClick={() => navigate(`/companies/${id}/edit`)}>
+              <Pencil className="mr-1 h-3 w-3" /> Editar
+            </Button>
+            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setShowDeleteDialog(true)}>
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
         )}
       </div>
+
+      <DeleteConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="Excluir empresa"
+        description={`Tem certeza que deseja excluir "${company.legal_name}"? Esta ação não pode ser desfeita.`}
+        onConfirm={() => deleteRecord(company.id, { onSuccess: () => navigate("/companies") })}
+        isDeleting={isDeleting}
+      />
 
       <Tabs defaultValue="dados" className="w-full">
         <TabsList className="w-full justify-start">
