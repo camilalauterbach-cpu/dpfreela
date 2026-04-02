@@ -278,6 +278,15 @@ export default function LinkForm() {
     return allTypes.filter((t) => globalConfig.remuneration_types[t.value] !== false);
   }, [globalConfig]);
 
+  if (isEdit && loadingExisting) {
+    return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  const formatDateBR = (d: string) => {
+    const [y, m, day] = d.split("-");
+    return `${day}/${m}/${y}`;
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-3xl">
       <div className="flex items-center gap-2">
