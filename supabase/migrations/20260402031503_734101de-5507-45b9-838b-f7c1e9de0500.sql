@@ -1,0 +1,1 @@
+UPDATE public.employment_links SET remuneration_type = 'daily', has_transport_allowance = true, transport_allowance = 18.50, has_meal_allowance = true, meal_allowance = 32.00, daily_rate = 250.00 WHERE id = 'd1b2c3d4-0003-4000-8000-000000000003';
