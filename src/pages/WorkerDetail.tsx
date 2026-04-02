@@ -84,7 +84,21 @@ export default function WorkerDetail() {
               <Pencil className="mr-1 h-3 w-3" /> Editar
             </Button>
           )}
+          {canDelete && (
+            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setShowDeleteDialog(true)}>
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          )}
         </div>
+
+        <DeleteConfirmDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          title="Excluir trabalhador"
+          description={`Tem certeza que deseja excluir "${worker.full_name}"? Esta ação não pode ser desfeita.`}
+          onConfirm={() => deleteRecord(worker.id, { onSuccess: () => navigate("/workers") })}
+          isDeleting={isDeleting}
+        />
       </div>
 
       <Tabs defaultValue="dados" className="w-full">
