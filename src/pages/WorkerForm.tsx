@@ -42,6 +42,8 @@ interface WorkerFormData {
   education_level: string;
   nationality: string;
   birth_country: string;
+  birth_city: string;
+  birth_state: string;
   mother_name: string;
   father_name: string;
   nis_pis: string;
