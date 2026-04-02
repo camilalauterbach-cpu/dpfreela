@@ -12,6 +12,7 @@ import { ArrowLeft, Pencil, Loader2 } from "lucide-react";
 import { PaymentMethodsList } from "@/components/workers/PaymentMethodsList";
 import { DocumentChecklist } from "@/components/workers/DocumentChecklist";
 import { DpReadinessBadge } from "@/components/workers/DpReadinessBadge";
+import { WorkerLinksList } from "@/components/links/WorkerLinksList";
 
 export default function WorkerDetail() {
   const { id } = useParams();
