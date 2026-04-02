@@ -809,8 +809,10 @@ export type Database = {
         Row: {
           address: string | null
           allergies: string | null
+          birth_city: string | null
           birth_country: string | null
           birth_date: string | null
+          birth_state: string | null
           blood_type: string | null
           city: string | null
           cpf: string
@@ -855,8 +857,10 @@ export type Database = {
         Insert: {
           address?: string | null
           allergies?: string | null
+          birth_city?: string | null
           birth_country?: string | null
           birth_date?: string | null
+          birth_state?: string | null
           blood_type?: string | null
           city?: string | null
           cpf: string
@@ -901,8 +905,10 @@ export type Database = {
         Update: {
           address?: string | null
           allergies?: string | null
+          birth_city?: string | null
           birth_country?: string | null
           birth_date?: string | null
+          birth_state?: string | null
           blood_type?: string | null
           city?: string | null
           cpf?: string

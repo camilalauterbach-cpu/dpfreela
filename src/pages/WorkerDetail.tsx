@@ -107,6 +107,8 @@ export default function WorkerDetail() {
               {info("Grau de instrução", w.education_level)}
               {info("Nome social", w.social_name)}
               {info("Nacionalidade", worker.nationality)}
+              {info("Naturalidade", w.birth_city)}
+              {info("UF da naturalidade", w.birth_state)}
               {info("País de nascimento", w.birth_country)}
             </CardContent>
           </Card>

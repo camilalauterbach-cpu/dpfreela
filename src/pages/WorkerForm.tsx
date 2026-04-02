@@ -42,6 +42,8 @@ interface WorkerFormData {
   education_level: string;
   nationality: string;
   birth_country: string;
+  birth_city: string;
+  birth_state: string;
   mother_name: string;
   father_name: string;
   nis_pis: string;
@@ -75,7 +77,7 @@ interface WorkerFormData {
 
 const emptyForm: WorkerFormData = {
   full_name: "", nickname: "", social_name: "", cpf: "", birth_date: "", gender: "",
-  race_color: "", education_level: "", nationality: "Brasileira", birth_country: "Brasil",
+  race_color: "", education_level: "", nationality: "Brasileira", birth_country: "Brasil", birth_city: "", birth_state: "",
   mother_name: "", father_name: "", nis_pis: "", rg: "", rg_issuer: "", rg_state: "",
   ctps_number: "", ctps_series: "", ctps_state: "", phone_main: "", email: "",
   address: "", neighborhood: "", city: "", state: "", zip_code: "",
@@ -109,6 +111,8 @@ export default function WorkerForm() {
         education_level: (existing as any).education_level || "",
         nationality: existing.nationality || "Brasileira",
         birth_country: (existing as any).birth_country || "Brasil",
+        birth_city: (existing as any).birth_city || "",
+        birth_state: (existing as any).birth_state || "",
         mother_name: (existing as any).mother_name || "",
         father_name: (existing as any).father_name || "",
         nis_pis: (existing as any).nis_pis || "",
@@ -185,6 +189,8 @@ export default function WorkerForm() {
         education_level: form.education_level || null,
         nationality: form.nationality || null,
         birth_country: form.birth_country || null,
+        birth_city: form.birth_city.trim() || null,
+        birth_state: form.birth_state || null,
         mother_name: form.mother_name.trim() || null,
         father_name: form.father_name.trim() || null,
         nis_pis: form.nis_pis.trim() || null,
@@ -328,6 +334,19 @@ export default function WorkerForm() {
             <div className="space-y-1">
               <Label htmlFor="nationality">Nacionalidade</Label>
               <Input id="nationality" value={form.nationality} onChange={set("nationality")} maxLength={50} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="birth_city">Naturalidade</Label>
+              <Input id="birth_city" value={form.birth_city} onChange={set("birth_city")} maxLength={100} placeholder="Cidade de nascimento" />
+            </div>
+            <div className="space-y-1">
+              <Label>UF da naturalidade</Label>
+              <Select value={form.birth_state} onValueChange={setSelect("birth_state")}>
+                <SelectTrigger><SelectValue placeholder="UF" /></SelectTrigger>
+                <SelectContent>
+                  {STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="birth_country">País de nascimento</Label>
