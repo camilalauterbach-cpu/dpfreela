@@ -390,7 +390,18 @@ export default function LinkForm() {
             <div className="space-y-2">
               <Label>Datas de atuação</Label>
               {!form.hire_date || !form.end_date ? (
-                <p className="text-xs text-muted-foreground">Preencha as datas de início e fim primeiro.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHighlightDates(true);
+                    contractSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    setTimeout(() => hireDateRef.current?.focus(), 400);
+                  }}
+                  className="flex items-center gap-2 rounded-md border border-dashed border-destructive/50 bg-destructive/5 px-3 py-2 text-xs text-destructive hover:bg-destructive/10 transition-colors w-full text-left"
+                >
+                  <span>⚠️ Preencha as datas de início e fim na seção Contrato.</span>
+                  <span className="underline whitespace-nowrap">Ir para lá →</span>
+                </button>
               ) : (
                 <>
                   <div className="flex gap-2">
