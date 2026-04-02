@@ -66,6 +66,9 @@ const App = () => (
               <Route path="/links/:id" element={<LinkDetail />} />
               <Route path="/links/:id/edit" element={<LinkForm />} />
               <Route path="/payroll" element={<Payroll />} />
+              <Route path="/payroll/new" element={<PayrollForm />} />
+              <Route path="/payroll/:id" element={<PayrollDetail />} />
+              <Route path="/payroll/:id/edit" element={<PayrollForm />} />
               <Route path="/settings" element={<ProtectedRoute requiredRoles={["admin", "manager"]}><SettingsPage /></ProtectedRoute>} />
             </Route>
 
