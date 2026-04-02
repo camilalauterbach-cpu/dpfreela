@@ -1,17 +1,21 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEmploymentLinks } from "@/hooks/useEmploymentLinks";
 import { useCompanies } from "@/hooks/useCompanies";
 import { useEvents } from "@/hooks/useEvents";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Plus, Search, Download, FileText } from "lucide-react";
+import { Loader2, Plus, Search, Download, FileText, FileSpreadsheet, FolderArchive } from "lucide-react";
+import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { exportAdmissionXlsx } from "@/lib/export-admission";
+import { exportWorkerDocsZip } from "@/lib/export-docs-zip";
 
 const statusLabels: Record<string, string> = {
   draft: "Rascunho",
@@ -50,6 +54,7 @@ export default function Links() {
   const [eventFilter, setEventFilter] = useState("all");
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
+  const [exporting, setExporting] = useState<string | null>(null);
 
   const { data: links, isLoading } = useEmploymentLinks(search, statusFilter);
   const { data: companies } = useCompanies("");
@@ -171,6 +176,54 @@ export default function Links() {
     doc.save(`vinculos_${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
+  const handleAdmissionExport = useCallback(async () => {
+    if (!filteredLinks.length) return;
+    setExporting("xlsx");
+    try {
+      // Fetch full worker data for filtered links
+      const workerIds = [...new Set(filteredLinks.map((l: any) => l.worker_id))];
+      const { data: fullLinks, error } = await supabase
+        .from("employment_links")
+        .select("*, workers(*), events(name)")
+        .in("id", filteredLinks.map((l: any) => l.id))
+        .is("deleted_at", null);
+      if (error) throw error;
+
+      exportAdmissionXlsx({
+        links: fullLinks || [],
+        companyNameMap,
+        eventCompanyMap,
+      });
+      toast.success("Planilha de admissão exportada!");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao exportar admissão.");
+    } finally {
+      setExporting(null);
+    }
+  }, [filteredLinks, companyNameMap, eventCompanyMap]);
+
+  const handleDocsZip = useCallback(async () => {
+    if (!filteredLinks.length) return;
+    setExporting("zip");
+    try {
+      const workerInfoMap = new Map<string, { full_name: string; cpf: string }>();
+      const workerIds: string[] = [];
+      filteredLinks.forEach((l: any) => {
+        const w = l.workers;
+        if (w && !workerInfoMap.has(l.worker_id)) {
+          workerInfoMap.set(l.worker_id, { full_name: w.full_name || "", cpf: w.cpf || "" });
+          workerIds.push(l.worker_id);
+        }
+      });
+      const count = await exportWorkerDocsZip({ workerIds, workerInfoMap });
+      toast.success(`ZIP com ${count} documento(s) baixado!`);
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao gerar ZIP.");
+    } finally {
+      setExporting(null);
+    }
+  }, [filteredLinks]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
@@ -226,12 +279,18 @@ export default function Links() {
           <Input type="date" placeholder="Início" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="w-full sm:w-[140px]" />
           <Input type="date" placeholder="Fim" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="w-full sm:w-[140px]" />
         </div>
-        <div className="flex gap-1 justify-end">
-          <Button size="sm" variant="outline" onClick={exportCSV} disabled={!filteredLinks.length}>
+        <div className="flex flex-wrap gap-1 justify-end">
+          <Button size="sm" variant="outline" onClick={exportCSV} disabled={!filteredLinks.length || !!exporting}>
             <Download className="mr-1 h-3 w-3" /> CSV
           </Button>
-          <Button size="sm" variant="outline" onClick={exportPDF} disabled={!filteredLinks.length}>
+          <Button size="sm" variant="outline" onClick={exportPDF} disabled={!filteredLinks.length || !!exporting}>
             <FileText className="mr-1 h-3 w-3" /> PDF
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleAdmissionExport} disabled={!filteredLinks.length || !!exporting}>
+            {exporting === "xlsx" ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FileSpreadsheet className="mr-1 h-3 w-3" />} Admissão
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleDocsZip} disabled={!filteredLinks.length || !!exporting}>
+            {exporting === "zip" ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FolderArchive className="mr-1 h-3 w-3" />} Docs ZIP
           </Button>
         </div>
       </div>
