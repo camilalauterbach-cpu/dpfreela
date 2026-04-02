@@ -189,6 +189,8 @@ export default function WorkerForm() {
         education_level: form.education_level || null,
         nationality: form.nationality || null,
         birth_country: form.birth_country || null,
+        birth_city: form.birth_city.trim() || null,
+        birth_state: form.birth_state || null,
         mother_name: form.mother_name.trim() || null,
         father_name: form.father_name.trim() || null,
         nis_pis: form.nis_pis.trim() || null,
