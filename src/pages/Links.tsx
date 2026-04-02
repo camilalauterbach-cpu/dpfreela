@@ -54,6 +54,13 @@ export default function Links() {
   const [eventFilter, setEventFilter] = useState("all");
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
+  const [exporting, setExporting] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [companyFilter, setCompanyFilter] = useState("all");
+  const [eventFilter, setEventFilter] = useState("all");
+  const [periodStart, setPeriodStart] = useState("");
+  const [periodEnd, setPeriodEnd] = useState("");
 
   const { data: links, isLoading } = useEmploymentLinks(search, statusFilter);
   const { data: companies } = useCompanies("");
