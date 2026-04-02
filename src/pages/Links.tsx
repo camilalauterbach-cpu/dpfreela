@@ -72,7 +72,7 @@ export default function Links() {
   // Build event→company map
   const eventCompanyMap = useMemo(() => {
     const m = new Map<string, string>();
-    (events as any[])?.forEach((ev) => {
+    ((events as any)?.data ?? []).forEach((ev: any) => {
       if (ev.company_id) m.set(ev.id, ev.company_id);
     });
     return m;
