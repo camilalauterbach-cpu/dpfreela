@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,10 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Save } from "lucide-react";
+import { ArrowLeft, Loader2, Save, X } from "lucide-react";
 
 export default function LinkForm() {
   const { id } = useParams();
@@ -43,6 +44,9 @@ export default function LinkForm() {
     call_time: "",
     daily_hours: "",
     weekly_hours: "",
+    work_days_mode: "continuous",
+    specific_work_dates: [] as string[],
+    work_days_notes: "",
     supervisor_name: "",
     assembly_point: "",
     uniform_notes: "",
@@ -54,6 +58,8 @@ export default function LinkForm() {
     payment_frequency: "",
     notes: "",
   });
+
+  const [newDate, setNewDate] = useState("");
 
   useEffect(() => {
     if (isEdit && existing) {
@@ -75,6 +81,9 @@ export default function LinkForm() {
         call_time: e.call_time || "",
         daily_hours: e.daily_hours != null ? String(e.daily_hours) : "",
         weekly_hours: e.weekly_hours != null ? String(e.weekly_hours) : "",
+        work_days_mode: e.work_days_mode || "continuous",
+        specific_work_dates: e.specific_work_dates || [],
+        work_days_notes: e.work_days_notes || "",
         supervisor_name: e.supervisor_name || "",
         assembly_point: e.assembly_point || "",
         uniform_notes: e.uniform_notes || "",
@@ -89,7 +98,30 @@ export default function LinkForm() {
     }
   }, [isEdit, existing]);
 
-  const set = (key: string, value: string) => setForm((p) => ({ ...p, [key]: value }));
+  const set = (key: string, value: any) => setForm((p) => ({ ...p, [key]: value }));
+
+  const addSpecificDate = () => {
+    if (!newDate) return;
+    if (form.hire_date && newDate < form.hire_date) {
+      toast({ title: "Data fora do período", description: "A data deve ser igual ou posterior à data de início.", variant: "destructive" });
+      return;
+    }
+    if (form.end_date && newDate > form.end_date) {
+      toast({ title: "Data fora do período", description: "A data deve ser igual ou anterior à data de fim.", variant: "destructive" });
+      return;
+    }
+    if (form.specific_work_dates.includes(newDate)) {
+      toast({ title: "Data duplicada", variant: "destructive" });
+      return;
+    }
+    const updated = [...form.specific_work_dates, newDate].sort();
+    set("specific_work_dates", updated);
+    setNewDate("");
+  };
+
+  const removeSpecificDate = (d: string) => {
+    set("specific_work_dates", form.specific_work_dates.filter((x: string) => x !== d));
+  };
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -110,6 +142,9 @@ export default function LinkForm() {
         call_time: form.call_time || null,
         daily_hours: form.daily_hours ? Number(form.daily_hours) : null,
         weekly_hours: form.weekly_hours ? Number(form.weekly_hours) : null,
+        work_days_mode: form.work_days_mode,
+        specific_work_dates: form.work_days_mode === "specific_dates" ? form.specific_work_dates : [],
+        work_days_notes: form.work_days_notes || null,
         supervisor_name: form.supervisor_name || null,
         assembly_point: form.assembly_point || null,
         uniform_notes: form.uniform_notes || null,
@@ -123,15 +158,10 @@ export default function LinkForm() {
       };
 
       if (isEdit) {
-        const { error } = await supabase
-          .from("employment_links")
-          .update(payload as any)
-          .eq("id", id!);
+        const { error } = await supabase.from("employment_links").update(payload as any).eq("id", id!);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from("employment_links")
-          .insert(payload as any);
+        const { error } = await supabase.from("employment_links").insert(payload as any);
         if (error) throw error;
       }
     },
@@ -156,12 +186,29 @@ export default function LinkForm() {
       toast({ title: "Selecione um trabalhador", variant: "destructive" });
       return;
     }
+    if (!form.hire_date) {
+      toast({ title: "Data de início é obrigatória", variant: "destructive" });
+      return;
+    }
+    if (!form.end_date) {
+      toast({ title: "Data de fim é obrigatória", variant: "destructive" });
+      return;
+    }
+    if (form.end_date < form.hire_date) {
+      toast({ title: "Data de fim deve ser posterior à data de início", variant: "destructive" });
+      return;
+    }
     mutation.mutate();
   };
 
   if (isEdit && loadingExisting) {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
+
+  const formatDateBR = (d: string) => {
+    const [y, m, day] = d.split("-");
+    return `${day}/${m}/${y}`;
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-3xl">
@@ -253,12 +300,12 @@ export default function LinkForm() {
             </Select>
           </div>
           <div>
-            <Label>Data início</Label>
-            <Input type="date" value={form.hire_date} onChange={(e) => set("hire_date", e.target.value)} />
+            <Label>Data início *</Label>
+            <Input type="date" value={form.hire_date} onChange={(e) => set("hire_date", e.target.value)} required />
           </div>
           <div>
-            <Label>Data fim</Label>
-            <Input type="date" value={form.end_date} onChange={(e) => set("end_date", e.target.value)} />
+            <Label>Data fim *</Label>
+            <Input type="date" value={form.end_date} onChange={(e) => set("end_date", e.target.value)} required />
           </div>
         </CardContent>
       </Card>
@@ -290,6 +337,65 @@ export default function LinkForm() {
           <div>
             <Label>Horas semanais</Label>
             <Input type="number" step="0.5" value={form.weekly_hours} onChange={(e) => set("weekly_hours", e.target.value)} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Modo de dias */}
+      <Card>
+        <CardHeader><CardTitle className="text-base">Dias de atuação</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label>Modo</Label>
+            <Select value={form.work_days_mode} onValueChange={(v) => set("work_days_mode", v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="continuous">Contínuo (todos os dias do período)</SelectItem>
+                <SelectItem value="specific_dates">Datas específicas</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {form.work_days_mode === "specific_dates" && (
+            <div className="space-y-2">
+              <Label>Datas de atuação</Label>
+              {!form.hire_date || !form.end_date ? (
+                <p className="text-xs text-muted-foreground">Preencha as datas de início e fim primeiro.</p>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <Input
+                      type="date"
+                      value={newDate}
+                      onChange={(e) => setNewDate(e.target.value)}
+                      min={form.hire_date}
+                      max={form.end_date}
+                      className="flex-1"
+                    />
+                    <Button type="button" size="sm" variant="outline" onClick={addSpecificDate}>
+                      Adicionar
+                    </Button>
+                  </div>
+                  {form.specific_work_dates.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {form.specific_work_dates.map((d: string) => (
+                        <Badge key={d} variant="secondary" className="gap-1">
+                          {formatDateBR(d)}
+                          <button type="button" onClick={() => removeSpecificDate(d)} className="hover:text-destructive">
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          <div>
+            <Label>Observações da escala</Label>
+            <Textarea value={form.work_days_notes} onChange={(e) => set("work_days_notes", e.target.value)} rows={2} placeholder="Ex: Folga nos dias de montagem" />
           </div>
         </CardContent>
       </Card>

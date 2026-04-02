@@ -7,7 +7,7 @@ export function useEmploymentLinks(search: string, statusFilter?: string) {
     queryFn: async () => {
       let query = supabase
         .from("employment_links")
-        .select("id, link_name, worker_id, event_id, job_role, status, hire_date, end_date, workers(full_name, nickname, cpf), events(name)")
+        .select("id, link_name, worker_id, event_id, job_role, status, hire_date, end_date, work_days_mode, specific_work_dates, workers(full_name, nickname, cpf), events(name)")
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
 
