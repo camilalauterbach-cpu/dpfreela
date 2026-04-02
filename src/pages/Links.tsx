@@ -86,7 +86,7 @@ export default function Links() {
 
   const companyNameMap = useMemo(() => {
     const m = new Map<string, string>();
-    (companies as any[])?.forEach((c) => m.set(c.id, c.trade_name || c.legal_name));
+    ((companies as any)?.data ?? []).forEach((c: any) => m.set(c.id, c.trade_name || c.legal_name));
     return m;
   }, [companies]);
 
