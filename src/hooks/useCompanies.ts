@@ -1,17 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export function useCompanies(search: string) {
+const PAGE_SIZE = 20;
+
+interface CompanyFilters {
+  search: string;
+  city?: string;
+  state?: string;
+}
+
+export function useCompanies(filters: CompanyFilters | string, page: number = 0) {
+  const normalizedFilters: CompanyFilters = typeof filters === "string" ? { search: filters } : filters;
+
   return useQuery({
-    queryKey: ["companies", search],
+    queryKey: ["companies", normalizedFilters, page],
     queryFn: async () => {
       let query = supabase
         .from("companies")
-        .select("id, legal_name, trade_name, cnpj, phone, email, city, state, created_at")
+        .select("id, legal_name, trade_name, cnpj, phone, email, city, state, created_at", { count: "exact" })
         .is("deleted_at", null)
         .order("legal_name");
 
-      if (search.trim()) {
+      const { search, city, state } = normalizedFilters;
+
+      if (search?.trim()) {
         const term = search.trim();
         const cleanTerm = term.replace(/\D/g, "");
         if (cleanTerm.length >= 3 && /^\d+$/.test(cleanTerm)) {
@@ -21,9 +33,18 @@ export function useCompanies(search: string) {
         }
       }
 
-      const { data, error } = await query.limit(100);
+      if (city?.trim()) {
+        query = query.ilike("city", `%${city.trim()}%`);
+      }
+      if (state?.trim()) {
+        query = query.eq("state", state.trim());
+      }
+
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+      const { data, error, count } = await query.range(from, to);
       if (error) throw error;
-      return data;
+      return { data: data ?? [], count: count ?? 0, pageSize: PAGE_SIZE };
     },
   });
 }
