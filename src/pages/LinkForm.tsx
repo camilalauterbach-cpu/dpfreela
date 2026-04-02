@@ -334,7 +334,7 @@ export default function LinkForm() {
             </Select>
           </div>
           <div>
-            <Label>Função/Cargo</Label>
+            <Label>Função/Cargo{reqMark("job_role")}</Label>
             <Input value={form.job_role} onChange={(e) => set("job_role", e.target.value)} />
           </div>
           <div>
@@ -342,7 +342,7 @@ export default function LinkForm() {
             <Input value={form.job_function} onChange={(e) => set("job_function", e.target.value)} />
           </div>
           <div>
-            <Label>Departamento</Label>
+            <Label>Departamento{reqMark("department")}</Label>
             <Input value={form.department} onChange={(e) => set("department", e.target.value)} />
           </div>
         </CardContent>
