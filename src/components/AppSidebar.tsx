@@ -54,6 +54,11 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
+        {!collapsed && (
+          <div className="px-3 pt-3 pb-1">
+            <h2 className="text-lg font-bold tracking-tight text-foreground">DPfreela</h2>
+          </div>
+        )}
         <SidebarGroup>
           {!collapsed && (
             <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider">

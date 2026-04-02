@@ -21,7 +21,10 @@ export function AppLayout() {
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-12 flex items-center justify-between border-b px-4 bg-background">
-            <SidebarTrigger />
+            <div className="flex items-center gap-2">
+              <SidebarTrigger />
+              <span className="sm:hidden text-sm font-semibold text-foreground">DPfreela</span>
+            </div>
             <div className="flex items-center gap-2">
               {primaryRole && (
                 <Badge variant="secondary" className="text-xs">
