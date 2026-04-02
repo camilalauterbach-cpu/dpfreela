@@ -9,11 +9,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
 const STATES = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
+
+const STANDARD_NRS = ["NR 1", "NR 6", "NR 10", "NR 18", "NR 35"];
 
 interface EventFormData {
   name: string;
@@ -26,12 +30,18 @@ interface EventFormData {
   end_date: string;
   status: string;
   notes: string;
+  requires_epi_form: boolean;
+  requires_service_order: boolean;
+  required_nrs: string[];
+  required_nrs_other: string;
 }
 
 const emptyForm: EventFormData = {
   name: "", description: "", company_id: "", location: "",
   city: "", state: "", start_date: "", end_date: "",
   status: "planned", notes: "",
+  requires_epi_form: false, requires_service_order: false,
+  required_nrs: [], required_nrs_other: "",
 };
 
 export default function EventForm() {
@@ -48,6 +58,7 @@ export default function EventForm() {
 
   useEffect(() => {
     if (existing) {
+      const ev = existing as any;
       setForm({
         name: existing.name || "",
         description: existing.description || "",
@@ -59,6 +70,10 @@ export default function EventForm() {
         end_date: existing.end_date || "",
         status: existing.status || "planned",
         notes: existing.notes || "",
+        requires_epi_form: ev.requires_epi_form ?? false,
+        requires_service_order: ev.requires_service_order ?? false,
+        required_nrs: ev.required_nrs ?? [],
+        required_nrs_other: ev.required_nrs_other ?? "",
       });
     }
   }, [existing]);
@@ -70,6 +85,15 @@ export default function EventForm() {
 
   const setSelect = (field: keyof EventFormData) => (value: string) => {
     setForm((f) => ({ ...f, [field]: value }));
+  };
+
+  const toggleNr = (nr: string) => {
+    setForm((f) => ({
+      ...f,
+      required_nrs: f.required_nrs.includes(nr)
+        ? f.required_nrs.filter((n) => n !== nr)
+        : [...f.required_nrs, nr],
+    }));
   };
 
   const validate = (): boolean => {
@@ -84,7 +108,7 @@ export default function EventForm() {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const payload = {
+      const payload: Record<string, any> = {
         name: form.name.trim(),
         description: form.description.trim() || null,
         company_id: form.company_id || null,
@@ -95,13 +119,17 @@ export default function EventForm() {
         end_date: form.end_date || null,
         status: form.status,
         notes: form.notes.trim() || null,
+        requires_epi_form: form.requires_epi_form,
+        requires_service_order: form.requires_service_order,
+        required_nrs: form.required_nrs,
+        required_nrs_other: form.required_nrs_other.trim() || null,
       };
 
       if (isEdit) {
-        const { error } = await supabase.from("events").update(payload).eq("id", id);
+        const { error } = await supabase.from("events").update(payload as any).eq("id", id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("events").insert(payload);
+        const { error } = await supabase.from("events").insert(payload as any);
         if (error) throw error;
       }
     },
@@ -202,6 +230,56 @@ export default function EventForm() {
                   {STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Requisitos documentais */}
+        <Card>
+          <CardHeader><CardTitle className="text-base">Requisitos documentais</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="requires_epi_form"
+                checked={form.requires_epi_form}
+                onCheckedChange={(v) => setForm((f) => ({ ...f, requires_epi_form: v }))}
+              />
+              <Label htmlFor="requires_epi_form">Exige ficha de entrega de EPI</Label>
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch
+                id="requires_service_order"
+                checked={form.requires_service_order}
+                onCheckedChange={(v) => setForm((f) => ({ ...f, requires_service_order: v }))}
+              />
+              <Label htmlFor="requires_service_order">Exige ordem de serviço</Label>
+            </div>
+
+            <div className="space-y-2">
+              <Label>NRs exigidas</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {STANDARD_NRS.map((nr) => (
+                  <div key={nr} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`nr-${nr}`}
+                      checked={form.required_nrs.includes(nr)}
+                      onCheckedChange={() => toggleNr(nr)}
+                    />
+                    <Label htmlFor={`nr-${nr}`} className="font-normal">{nr}</Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="required_nrs_other">Outras exigências</Label>
+              <Input
+                id="required_nrs_other"
+                value={form.required_nrs_other}
+                onChange={set("required_nrs_other")}
+                placeholder="Ex: NR 12, certificado de altura..."
+                maxLength={500}
+              />
             </div>
           </CardContent>
         </Card>
