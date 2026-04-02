@@ -32,9 +32,11 @@ interface ExportAdmissionParams {
   links: any[];
   companyNameMap: Map<string, string>;
   eventCompanyMap: Map<string, string>;
+  filePrefix?: string;
+  includeEmptyColumns?: boolean;
 }
 
-export function exportAdmissionXlsx({ links, companyNameMap, eventCompanyMap }: ExportAdmissionParams) {
+export function exportAdmissionXlsx({ links, companyNameMap, eventCompanyMap, filePrefix = "admissao", includeEmptyColumns = true }: ExportAdmissionParams) {
   const headers = [
     // Worker (1-42)
     "Nome Completo", "Nome Social", "Apelido", "CPF", "RG", "Órgão Emissor", "UF RG",
