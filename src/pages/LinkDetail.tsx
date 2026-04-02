@@ -180,12 +180,17 @@ export default function LinkDetail() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle className="text-base">Remuneração</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Remuneração e benefícios</CardTitle></CardHeader>
             <CardContent className="grid gap-4 grid-cols-2 sm:grid-cols-3">
+              {info("Tipo de remuneração", l.remuneration_type ? remunerationLabels[l.remuneration_type] || l.remuneration_type : null)}
               {currency("Diária", l.daily_rate)}
               {currency("Hora", l.hourly_rate)}
               {currency("Salário fixo", l.fixed_salary)}
               {info("Frequência pagamento", l.payment_frequency ? paymentLabels[l.payment_frequency] || l.payment_frequency : null)}
+              {info("Vale-transporte", l.has_transport_allowance ? "Sim" : "Não")}
+              {l.has_transport_allowance && currency("Valor VT", l.transport_allowance)}
+              {info("Vale-refeição/alimentação", l.has_meal_allowance ? "Sim" : "Não")}
+              {l.has_meal_allowance && currency("Valor VR/VA", l.meal_allowance)}
             </CardContent>
           </Card>
 
