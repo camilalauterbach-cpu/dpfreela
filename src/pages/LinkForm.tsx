@@ -553,10 +553,9 @@ export default function LinkForm() {
               <Select value={form.remuneration_type} onValueChange={(v) => set("remuneration_type", v)}>
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="daily">Diarista</SelectItem>
-                  <SelectItem value="monthly">Mensalista</SelectItem>
-                  <SelectItem value="hourly">Horista</SelectItem>
-                  <SelectItem value="per_event">Por evento</SelectItem>
+                  {enabledRemTypes.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
