@@ -196,11 +196,7 @@ export default function WorkerDetail() {
         </TabsContent>
 
         <TabsContent value="vinculos" className="mt-4">
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
-              Módulo de vínculos — disponível na próxima fase.
-            </CardContent>
-          </Card>
+          <WorkerLinksList workerId={worker.id} />
         </TabsContent>
       </Tabs>
     </div>
