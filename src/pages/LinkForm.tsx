@@ -56,6 +56,11 @@ export default function LinkForm() {
     hourly_rate: "",
     fixed_salary: "",
     payment_frequency: "",
+    remuneration_type: "",
+    has_transport_allowance: false,
+    transport_allowance: "",
+    has_meal_allowance: false,
+    meal_allowance: "",
     notes: "",
   });
 
