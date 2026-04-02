@@ -181,6 +181,7 @@ export type Database = {
           id: string
           job_function: string | null
           job_role: string | null
+          link_name: string | null
           locker_number: string | null
           meal_allowance: number | null
           meal_entitlement: string | null
@@ -224,6 +225,7 @@ export type Database = {
           id?: string
           job_function?: string | null
           job_role?: string | null
+          link_name?: string | null
           locker_number?: string | null
           meal_allowance?: number | null
           meal_entitlement?: string | null
@@ -267,6 +269,7 @@ export type Database = {
           id?: string
           job_function?: string | null
           job_role?: string | null
+          link_name?: string | null
           locker_number?: string | null
           meal_allowance?: number | null
           meal_entitlement?: string | null

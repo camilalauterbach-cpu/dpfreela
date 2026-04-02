@@ -1,0 +1,1 @@
+ALTER TABLE public.employment_links ADD COLUMN link_name text;
