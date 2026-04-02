@@ -12,12 +12,14 @@ import { Search, Plus, Loader2 } from "lucide-react";
 const statusLabels: Record<string, string> = {
   planned: "Planejado",
   active: "Ativo",
+  confirmed: "Confirmado",
   completed: "Concluído",
   cancelled: "Cancelado",
 };
 
 const statusVariant = (s: string) => {
   if (s === "active") return "default" as const;
+  if (s === "confirmed") return "default" as const;
   if (s === "completed") return "secondary" as const;
   if (s === "cancelled") return "destructive" as const;
   return "outline" as const;
@@ -60,6 +62,7 @@ export default function Events() {
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="planned">Planejado</SelectItem>
             <SelectItem value="active">Ativo</SelectItem>
+            <SelectItem value="confirmed">Confirmado</SelectItem>
             <SelectItem value="completed">Concluído</SelectItem>
             <SelectItem value="cancelled">Cancelado</SelectItem>
           </SelectContent>

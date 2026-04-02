@@ -20,12 +20,14 @@ function formatCnpj(cnpj: string | null): string {
 const statusLabels: Record<string, string> = {
   planned: "Planejado",
   active: "Ativo",
+  confirmed: "Confirmado",
   completed: "Concluído",
   cancelled: "Cancelado",
 };
 
 const statusVariant = (s: string) => {
   if (s === "active") return "default" as const;
+  if (s === "confirmed") return "default" as const;
   if (s === "completed") return "secondary" as const;
   if (s === "cancelled") return "destructive" as const;
   return "outline" as const;

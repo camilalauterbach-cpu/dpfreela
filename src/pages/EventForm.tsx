@@ -194,6 +194,7 @@ export default function EventForm() {
                 <SelectContent>
                   <SelectItem value="planned">Planejado</SelectItem>
                   <SelectItem value="active">Ativo</SelectItem>
+                  <SelectItem value="confirmed">Confirmado</SelectItem>
                   <SelectItem value="completed">Concluído</SelectItem>
                   <SelectItem value="cancelled">Cancelado</SelectItem>
                 </SelectContent>
