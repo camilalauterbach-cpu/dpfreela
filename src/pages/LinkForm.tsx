@@ -353,7 +353,7 @@ export default function LinkForm() {
         <CardHeader><CardTitle className="text-base">Contrato</CardTitle></CardHeader>
         <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2">
           <div>
-            <Label>Tipo de contrato</Label>
+            <Label>Tipo de contrato{reqMark("contract_type")}</Label>
             <Select value={form.contract_type} onValueChange={(v) => set("contract_type", v)}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
