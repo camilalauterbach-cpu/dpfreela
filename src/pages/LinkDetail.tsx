@@ -51,6 +51,9 @@ export default function LinkDetail() {
   const { data: link, isLoading } = useEmploymentLink(id);
   const { hasAnyRole } = useAuth();
   const canEdit = hasAnyRole(["admin", "manager", "operator"]);
+  const canDelete = hasAnyRole(["admin", "manager"]);
+  const { deleteRecord, isDeleting } = useDeleteRecord("employment_links", ["employment-links", "employment-link", "dashboard-counts"]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   if (isLoading) {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
