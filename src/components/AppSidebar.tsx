@@ -34,6 +34,7 @@ export function AppSidebar() {
   const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const navigate = useNavigate();
   const { signOut, hasAnyRole, user } = useAuth();
 
   const isActive = (path: string) => {
@@ -41,8 +42,13 @@ export function AppSidebar() {
     return location.pathname.startsWith(path);
   };
 
-  const handleNavClick = () => {
-    if (isMobile) setOpenMobile(false);
+  const handleNavClick = (e: React.MouseEvent, url: string) => {
+    if (isMobile) {
+      e.preventDefault();
+      setOpenMobile(false);
+      // Navigate after closing to ensure clean transition
+      setTimeout(() => navigate(url), 10);
+    }
   };
 
   return (
