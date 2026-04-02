@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEmploymentLink } from "@/hooks/useEmploymentLinks";
 import { useAuth } from "@/contexts/AuthContext";
@@ -5,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Pencil, Loader2 } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, Trash2 } from "lucide-react";
 import { OperationalDocsChecklist } from "@/components/events/OperationalDocsChecklist";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
+import { useDeleteRecord } from "@/hooks/useDeleteRecord";
 
 const statusLabels: Record<string, string> = {
   draft: "Rascunho",
@@ -48,6 +51,9 @@ export default function LinkDetail() {
   const { data: link, isLoading } = useEmploymentLink(id);
   const { hasAnyRole } = useAuth();
   const canEdit = hasAnyRole(["admin", "manager", "operator"]);
+  const canDelete = hasAnyRole(["admin", "manager"]);
+  const { deleteRecord, isDeleting } = useDeleteRecord("employment_links", ["employment-links", "employment-link", "dashboard-counts"]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   if (isLoading) {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -104,11 +110,27 @@ export default function LinkDetail() {
           </div>
         </div>
         {canEdit && (
-          <Button size="sm" variant="outline" onClick={() => navigate(`/links/${id}/edit`)}>
-            <Pencil className="mr-1 h-3 w-3" /> Editar
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant="outline" onClick={() => navigate(`/links/${id}/edit`)}>
+              <Pencil className="mr-1 h-3 w-3" /> Editar
+            </Button>
+            {canDelete && (
+              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setShowDeleteDialog(true)}>
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
         )}
       </div>
+
+      <DeleteConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="Excluir vínculo"
+        description={`Tem certeza que deseja excluir o vínculo "${displayName}"? Esta ação não pode ser desfeita.`}
+        onConfirm={() => deleteRecord(l.id, { onSuccess: () => navigate("/links") })}
+        isDeleting={isDeleting}
+      />
 
       <Tabs defaultValue="dados" className="w-full">
         <TabsList className="w-full justify-start">

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEvent } from "@/hooks/useEvents";
 import { useAuth } from "@/contexts/AuthContext";
@@ -5,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Pencil, Loader2 } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, Trash2 } from "lucide-react";
 import { EventLinksList } from "@/components/links/EventLinksList";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
+import { useDeleteRecord } from "@/hooks/useDeleteRecord";
 
 const statusLabels: Record<string, string> = {
   planned: "Planejado",
@@ -30,6 +33,8 @@ export default function EventDetail() {
   const { data: event, isLoading } = useEvent(id);
   const { hasAnyRole } = useAuth();
   const canEdit = hasAnyRole(["admin", "manager"]);
+  const { deleteRecord, isDeleting } = useDeleteRecord("events", ["events", "event", "dashboard-counts"]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   if (isLoading) {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -65,11 +70,25 @@ export default function EventDetail() {
           </div>
         </div>
         {canEdit && (
-          <Button size="sm" variant="outline" onClick={() => navigate(`/events/${id}/edit`)}>
-            <Pencil className="mr-1 h-3 w-3" /> Editar
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant="outline" onClick={() => navigate(`/events/${id}/edit`)}>
+              <Pencil className="mr-1 h-3 w-3" /> Editar
+            </Button>
+            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setShowDeleteDialog(true)}>
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
         )}
       </div>
+
+      <DeleteConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="Excluir evento"
+        description={`Tem certeza que deseja excluir "${event.name}"? Esta ação não pode ser desfeita.`}
+        onConfirm={() => deleteRecord(event.id, { onSuccess: () => navigate("/events") })}
+        isDeleting={isDeleting}
+      />
 
       <Tabs defaultValue="dados" className="w-full">
         <TabsList className="w-full justify-start">

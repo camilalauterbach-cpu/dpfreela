@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,7 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Pencil, Loader2 } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, Trash2 } from "lucide-react";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
+import { useDeleteRecord } from "@/hooks/useDeleteRecord";
 import { PaymentMethodsList } from "@/components/workers/PaymentMethodsList";
 import { DocumentChecklist } from "@/components/workers/DocumentChecklist";
 import { DpReadinessBadge } from "@/components/workers/DpReadinessBadge";
@@ -20,6 +23,9 @@ export default function WorkerDetail() {
   const { data: worker, isLoading } = useWorker(id);
   const { hasAnyRole } = useAuth();
   const canEdit = hasAnyRole(["admin", "manager", "operator"]);
+  const canDelete = hasAnyRole(["admin", "manager"]);
+  const { deleteRecord, isDeleting } = useDeleteRecord("workers", ["workers", "worker", "dashboard-counts"]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const { data: docs } = useQuery({
     queryKey: ["worker-documents", id],
@@ -78,7 +84,21 @@ export default function WorkerDetail() {
               <Pencil className="mr-1 h-3 w-3" /> Editar
             </Button>
           )}
+          {canDelete && (
+            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setShowDeleteDialog(true)}>
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          )}
         </div>
+
+        <DeleteConfirmDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          title="Excluir trabalhador"
+          description={`Tem certeza que deseja excluir "${worker.full_name}"? Esta ação não pode ser desfeita.`}
+          onConfirm={() => deleteRecord(worker.id, { onSuccess: () => navigate("/workers") })}
+          isDeleting={isDeleting}
+        />
       </div>
 
       <Tabs defaultValue="dados" className="w-full">
