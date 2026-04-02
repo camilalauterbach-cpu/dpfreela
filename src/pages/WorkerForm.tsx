@@ -336,10 +336,22 @@ export default function WorkerForm() {
               <Input id="nationality" value={form.nationality} onChange={set("nationality")} maxLength={50} />
             </div>
             <div className="space-y-1">
+              <Label htmlFor="birth_city">Naturalidade</Label>
+              <Input id="birth_city" value={form.birth_city} onChange={set("birth_city")} maxLength={100} placeholder="Cidade de nascimento" />
+            </div>
+            <div className="space-y-1">
+              <Label>UF da naturalidade</Label>
+              <Select value={form.birth_state} onValueChange={setSelect("birth_state")}>
+                <SelectTrigger><SelectValue placeholder="UF" /></SelectTrigger>
+                <SelectContent>
+                  {STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
               <Label htmlFor="birth_country">País de nascimento</Label>
               <Input id="birth_country" value={form.birth_country} onChange={set("birth_country")} maxLength={50} />
             </div>
-          </CardContent>
         </Card>
 
         {/* Filiação */}
