@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { getSystemSetting, saveSystemSetting } from "@/lib/system-settings";
 import { Loader2 } from "lucide-react";
 
 interface CompanySettings {
@@ -30,59 +30,23 @@ export function SettingsCompany() {
   const [data, setData] = useState<CompanySettings>(empty);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
-  const [filterId, setFilterId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Use saved_filters as key-value store for system settings
-    supabase
-      .from("saved_filters")
-      .select("*")
-      .eq("table_name", "__system_settings")
-      .eq("filter_name", "company_info")
-      .maybeSingle()
-      .then(({ data: row }) => {
-        if (row) {
-          setData(row.filter_config as unknown as CompanySettings);
-          setFilterId(row.id);
-        }
-        setFetching(false);
-      });
+    getSystemSetting<CompanySettings>("company_info").then((val) => {
+      if (val) setData({ ...empty, ...val });
+      setFetching(false);
+    });
   }, []);
 
   const handleSave = async () => {
     setLoading(true);
-    const userId = (await supabase.auth.getUser()).data.user?.id;
-    if (!userId) { setLoading(false); return; }
-
-    if (filterId) {
-      const { error } = await supabase
-        .from("saved_filters")
-        .update({ filter_config: data as any, updated_at: new Date().toISOString() })
-        .eq("id", filterId);
-      if (error) {
-        toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
-      } else {
-        toast({ title: "Dados da empresa salvos" });
-      }
-    } else {
-      const { data: inserted, error } = await supabase
-        .from("saved_filters")
-        .insert({
-          table_name: "__system_settings",
-          filter_name: "company_info",
-          filter_config: data as any,
-          user_id: userId,
-        })
-        .select()
-        .single();
-      if (error) {
-        toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
-      } else {
-        setFilterId(inserted.id);
-        toast({ title: "Dados da empresa salvos" });
-      }
-    }
+    const { error } = await saveSystemSetting("company_info", data);
     setLoading(false);
+    if (error) {
+      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Dados da empresa salvos" });
+    }
   };
 
   const update = (key: keyof CompanySettings, value: string) =>
@@ -94,7 +58,7 @@ export function SettingsCompany() {
     <Card>
       <CardHeader>
         <CardTitle>Dados da Empresa</CardTitle>
-        <CardDescription>Informações da empresa que opera o sistema DPfreela.</CardDescription>
+        <CardDescription>Informações da empresa que opera o sistema DPfreela. Configuração global — visível para todos.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
