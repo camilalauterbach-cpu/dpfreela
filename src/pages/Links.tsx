@@ -16,6 +16,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { exportAdmissionXlsx } from "@/lib/export-admission";
 import { exportWorkerDocsZip } from "@/lib/export-docs-zip";
+import { getSystemSetting } from "@/lib/system-settings";
 
 const statusLabels: Record<string, string> = {
   draft: "Rascunho",
