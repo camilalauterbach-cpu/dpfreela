@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Pencil, Loader2 } from "lucide-react";
+import { EventLinksList } from "@/components/links/EventLinksList";
 
 const statusLabels: Record<string, string> = {
   planned: "Planejado",
@@ -138,11 +139,7 @@ export default function EventDetail() {
         </TabsContent>
 
         <TabsContent value="vinculos" className="mt-4">
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
-              Módulo de vínculos — disponível na próxima fase.
-            </CardContent>
-          </Card>
+          <EventLinksList eventId={event.id} />
         </TabsContent>
       </Tabs>
     </div>

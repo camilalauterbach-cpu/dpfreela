@@ -100,6 +100,7 @@ export type Database = {
       }
       employment_link_documents: {
         Row: {
+          category: string | null
           created_at: string
           deleted_at: string | null
           document_number: string | null
@@ -111,10 +112,12 @@ export type Database = {
           id: string
           mime_type: string | null
           notes: string | null
+          status: string
           updated_at: string
           worker_id: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
           deleted_at?: string | null
           document_number?: string | null
@@ -126,10 +129,12 @@ export type Database = {
           id?: string
           mime_type?: string | null
           notes?: string | null
+          status?: string
           updated_at?: string
           worker_id: string
         }
         Update: {
+          category?: string | null
           created_at?: string
           deleted_at?: string | null
           document_number?: string | null
@@ -141,6 +146,7 @@ export type Database = {
           id?: string
           mime_type?: string | null
           notes?: string | null
+          status?: string
           updated_at?: string
           worker_id?: string
         }
@@ -181,6 +187,7 @@ export type Database = {
           id: string
           job_function: string | null
           job_role: string | null
+          link_name: string | null
           locker_number: string | null
           meal_allowance: number | null
           meal_entitlement: string | null
@@ -224,6 +231,7 @@ export type Database = {
           id?: string
           job_function?: string | null
           job_role?: string | null
+          link_name?: string | null
           locker_number?: string | null
           meal_allowance?: number | null
           meal_entitlement?: string | null
@@ -267,6 +275,7 @@ export type Database = {
           id?: string
           job_function?: string | null
           job_role?: string | null
+          link_name?: string | null
           locker_number?: string | null
           meal_allowance?: number | null
           meal_entitlement?: string | null

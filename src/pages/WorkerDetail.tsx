@@ -12,6 +12,7 @@ import { ArrowLeft, Pencil, Loader2 } from "lucide-react";
 import { PaymentMethodsList } from "@/components/workers/PaymentMethodsList";
 import { DocumentChecklist } from "@/components/workers/DocumentChecklist";
 import { DpReadinessBadge } from "@/components/workers/DpReadinessBadge";
+import { WorkerLinksList } from "@/components/links/WorkerLinksList";
 
 export default function WorkerDetail() {
   const { id } = useParams();
@@ -195,11 +196,7 @@ export default function WorkerDetail() {
         </TabsContent>
 
         <TabsContent value="vinculos" className="mt-4">
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
-              Módulo de vínculos — disponível na próxima fase.
-            </CardContent>
-          </Card>
+          <WorkerLinksList workerId={worker.id} />
         </TabsContent>
       </Tabs>
     </div>
