@@ -26,7 +26,10 @@ export function AppLayout() {
                 <span className="text-sm font-medium">Menu</span>
               </SidebarTrigger>
               <SidebarTrigger className="hidden sm:inline-flex" />
-              <span className="sm:hidden text-sm font-semibold text-foreground">DPfreela</span>
+              <span className="sm:hidden text-sm font-bold tracking-tight">
+                <span className="text-white">DP</span>
+                <span className="text-blue-400">freela</span>
+              </span>
             </div>
             <div className="flex items-center gap-2">
               {primaryRole && (
