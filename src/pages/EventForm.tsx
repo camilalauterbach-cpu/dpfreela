@@ -181,7 +181,7 @@ export default function EventForm() {
               <Select value={form.company_id} onValueChange={setSelect("company_id")}>
                 <SelectTrigger><SelectValue placeholder="Selecione uma empresa" /></SelectTrigger>
                 <SelectContent>
-                  {companies?.map((c) => (
+                  {(companies as any)?.data?.map((c: any) => (
                     <SelectItem key={c.id} value={c.id}>{c.legal_name}{c.trade_name ? ` (${c.trade_name})` : ""}</SelectItem>
                   ))}
                 </SelectContent>

@@ -68,7 +68,7 @@ export default function Payroll() {
           <SelectTrigger className="w-full sm:w-48"><SelectValue placeholder="Evento" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os eventos</SelectItem>
-            {events?.map((e) => (
+            {(events as any)?.data?.map((e: any) => (
               <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
             ))}
           </SelectContent>

@@ -279,7 +279,7 @@ export default function Links() {
             <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Evento" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos eventos</SelectItem>
-              {(events as any[])?.map((ev) => (
+              {((events as any)?.data ?? []).map((ev: any) => (
                 <SelectItem key={ev.id} value={ev.id}>{ev.name}</SelectItem>
               ))}
             </SelectContent>

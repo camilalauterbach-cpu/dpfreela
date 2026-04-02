@@ -336,7 +336,7 @@ export default function LinkForm() {
             <Select value={form.event_id} onValueChange={(v) => set("event_id", v)}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
-                {(events as any[])?.map((ev) => (
+                {(events as any)?.data?.map((ev: any) => (
                   <SelectItem key={ev.id} value={ev.id}>{ev.name}</SelectItem>
                 ))}
               </SelectContent>
