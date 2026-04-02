@@ -95,6 +95,38 @@ export default function EventDetail() {
             </CardContent>
           </Card>
 
+          {/* Requisitos documentais */}
+          {(() => {
+            const ev = event as any;
+            const hasRequirements = ev.requires_epi_form || ev.requires_service_order || (ev.required_nrs && ev.required_nrs.length > 0) || ev.required_nrs_other;
+            if (!hasRequirements) return null;
+            return (
+              <Card>
+                <CardHeader><CardTitle className="text-base">Requisitos documentais</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                  {ev.requires_epi_form && <p className="text-sm">✅ Exige ficha de entrega de EPI</p>}
+                  {ev.requires_service_order && <p className="text-sm">✅ Exige ordem de serviço</p>}
+                  {ev.required_nrs && ev.required_nrs.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">NRs exigidas</p>
+                      <div className="flex flex-wrap gap-1">
+                        {ev.required_nrs.map((nr: string) => (
+                          <Badge key={nr} variant="secondary">{nr}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {ev.required_nrs_other && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Outras exigências</p>
+                      <p className="text-sm">{ev.required_nrs_other}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
+
           {event.notes && (
             <Card>
               <CardHeader><CardTitle className="text-base">Observações</CardTitle></CardHeader>
