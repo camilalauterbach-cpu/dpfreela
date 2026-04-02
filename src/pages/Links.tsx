@@ -195,7 +195,7 @@ export default function Links() {
         .is("deleted_at", null);
       if (error) throw error;
 
-      exportAdmissionXlsx({
+      await exportAdmissionXlsx({
         links: fullLinks || [],
         companyNameMap,
         eventCompanyMap,
