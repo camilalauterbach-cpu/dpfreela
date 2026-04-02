@@ -32,9 +32,11 @@ interface ExportAdmissionParams {
   links: any[];
   companyNameMap: Map<string, string>;
   eventCompanyMap: Map<string, string>;
+  filePrefix?: string;
+  includeEmptyColumns?: boolean;
 }
 
-export function exportAdmissionXlsx({ links, companyNameMap, eventCompanyMap }: ExportAdmissionParams) {
+export function exportAdmissionXlsx({ links, companyNameMap, eventCompanyMap, filePrefix = "admissao", includeEmptyColumns = true }: ExportAdmissionParams) {
   const headers = [
     // Worker (1-42)
     "Nome Completo", "Nome Social", "Apelido", "CPF", "RG", "Órgão Emissor", "UF RG",
@@ -98,15 +100,24 @@ export function exportAdmissionXlsx({ links, companyNameMap, eventCompanyMap }: 
     ];
   });
 
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  let finalHeaders = headers;
+  let finalRows = rows;
 
-  // Auto-width columns
-  ws["!cols"] = headers.map((h, i) => {
-    const maxLen = Math.max(h.length, ...rows.map((r) => String(r[i] || "").length));
+  if (!includeEmptyColumns) {
+    // Remove columns where all rows are empty
+    const nonEmptyCols = headers.map((_, i) => rows.some((r) => r[i] !== "" && r[i] != null));
+    finalHeaders = headers.filter((_, i) => nonEmptyCols[i]);
+    finalRows = rows.map((r) => r.filter((_, i) => nonEmptyCols[i]));
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet([finalHeaders, ...finalRows]);
+
+  ws["!cols"] = finalHeaders.map((h, i) => {
+    const maxLen = Math.max(h.length, ...finalRows.map((r) => String(r[i] || "").length));
     return { wch: Math.min(maxLen + 2, 40) };
   });
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Admissão");
-  XLSX.writeFile(wb, `admissao_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.writeFile(wb, `${filePrefix}_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }

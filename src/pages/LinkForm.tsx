@@ -275,8 +275,17 @@ export default function LinkForm() {
       { value: "per_event", label: "Por evento" },
     ];
     if (!globalConfig?.remuneration_types) return allTypes;
-    return allTypes.filter((t) => globalConfig.remuneration_types[t.value] !== false);
-  }, [globalConfig]);
+    const filtered = allTypes.filter((t) => globalConfig.remuneration_types[t.value] !== false);
+    // In edit mode, always include the current value even if disabled globally
+    if (isEdit && form.remuneration_type) {
+      const currentExists = filtered.some((t) => t.value === form.remuneration_type);
+      if (!currentExists) {
+        const current = allTypes.find((t) => t.value === form.remuneration_type);
+        if (current) filtered.push({ ...current, label: `${current.label} (desabilitado)` });
+      }
+    }
+    return filtered;
+  }, [globalConfig, isEdit, form.remuneration_type]);
 
   if (isEdit && loadingExisting) {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;

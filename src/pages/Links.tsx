@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEmploymentLinks } from "@/hooks/useEmploymentLinks";
 import { useCompanies } from "@/hooks/useCompanies";
@@ -16,6 +16,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { exportAdmissionXlsx } from "@/lib/export-admission";
 import { exportWorkerDocsZip } from "@/lib/export-docs-zip";
+import { getSystemSetting } from "@/lib/system-settings";
 
 const statusLabels: Record<string, string> = {
   draft: "Rascunho",
@@ -55,6 +56,11 @@ export default function Links() {
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
+  const [exportConfig, setExportConfig] = useState<any>(null);
+
+  useEffect(() => {
+    getSystemSetting("links_admission_config").then((val) => setExportConfig(val));
+  }, []);
 
   const { data: links, isLoading } = useEmploymentLinks(search, statusFilter);
   const { data: companies } = useCompanies("");
@@ -193,6 +199,8 @@ export default function Links() {
         links: fullLinks || [],
         companyNameMap,
         eventCompanyMap,
+        filePrefix: exportConfig?.export_file_prefix || "admissao",
+        includeEmptyColumns: exportConfig?.export_include_empty_columns !== false,
       });
       toast.success("Planilha de admissão exportada!");
     } catch (err: any) {
