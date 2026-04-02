@@ -55,7 +55,7 @@ export default function EventDetail() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-semibold text-foreground">{event.name}</h1>
               <Badge variant={statusVariant(event.status)}>{statusLabels[event.status] || event.status}</Badge>
             </div>

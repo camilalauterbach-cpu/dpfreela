@@ -83,11 +83,11 @@ export default function Payroll() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
-                <TableHead>Evento</TableHead>
-                <TableHead>Mês Ref.</TableHead>
+                <TableHead className="hidden sm:table-cell">Evento</TableHead>
+                <TableHead className="hidden md:table-cell">Mês Ref.</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Total</TableHead>
-                <TableHead>Pago em</TableHead>
+                <TableHead className="hidden sm:table-cell">Pago em</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -97,12 +97,13 @@ export default function Payroll() {
                     <Link to={`/payroll/${b.id}`} className="font-medium text-primary hover:underline">
                       {b.batch_name}
                     </Link>
+                    <p className="sm:hidden text-xs text-muted-foreground">{(b.events as any)?.name || ""}</p>
                   </TableCell>
-                  <TableCell>{(b.events as any)?.name || "—"}</TableCell>
-                  <TableCell>{b.reference_month || "—"}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{(b.events as any)?.name || "—"}</TableCell>
+                  <TableCell className="hidden md:table-cell">{b.reference_month || "—"}</TableCell>
                   <TableCell><Badge variant={statusVariant[b.status] || "outline"}>{statusLabel[b.status] || b.status}</Badge></TableCell>
                   <TableCell className="text-right">{fmt(b.total_amount)}</TableCell>
-                  <TableCell>{b.paid_at ? new Date(b.paid_at).toLocaleDateString("pt-BR") : "—"}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{b.paid_at ? new Date(b.paid_at).toLocaleDateString("pt-BR") : "—"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
