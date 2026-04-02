@@ -92,7 +92,7 @@ export default function PayrollForm() {
             <Select value={eventId} onValueChange={setEventId}>
               <SelectTrigger><SelectValue placeholder="Selecione um evento" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum</SelectItem>
+                <SelectItem value="none">Nenhum</SelectItem>
                 {events?.map((e) => (
                   <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
                 ))}
