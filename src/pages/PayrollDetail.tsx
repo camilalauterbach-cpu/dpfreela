@@ -18,7 +18,7 @@ import { ReceiptsList } from "@/components/payroll/ReceiptsList";
 import { PayrollItemForm } from "@/components/payroll/PayrollItemForm";
 
 const statusLabel: Record<string, string> = { draft: "Rascunho", approved: "Aprovado", paid: "Pago", completed: "Concluído", cancelled: "Cancelado" };
-const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = { draft: "outline", approved: "secondary", paid: "default", cancelled: "destructive" };
+const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = { draft: "outline", approved: "secondary", paid: "default", completed: "secondary", cancelled: "destructive" };
 
 export default function PayrollDetail() {
   const { id } = useParams();

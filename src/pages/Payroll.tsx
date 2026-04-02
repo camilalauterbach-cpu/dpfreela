@@ -22,6 +22,7 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive" | "o
   draft: "outline",
   approved: "secondary",
   paid: "default",
+  completed: "secondary",
   cancelled: "destructive",
 };
 
