@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,7 +60,9 @@ export default function LinkForm() {
   });
 
   const [newDate, setNewDate] = useState("");
-
+  const [highlightDates, setHighlightDates] = useState(false);
+  const hireDateRef = useRef<HTMLInputElement>(null);
+  const contractSectionRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (isEdit && existing) {
       const e = existing as any;
@@ -269,7 +271,7 @@ export default function LinkForm() {
       </Card>
 
       {/* Contrato */}
-      <Card>
+      <Card ref={contractSectionRef}>
         <CardHeader><CardTitle className="text-base">Contrato</CardTitle></CardHeader>
         <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2">
           <div>
@@ -300,12 +302,31 @@ export default function LinkForm() {
             </Select>
           </div>
           <div>
-            <Label>Data início *</Label>
-            <Input type="date" value={form.hire_date} onChange={(e) => set("hire_date", e.target.value)} required />
+            <Label className={highlightDates && !form.hire_date ? "text-destructive font-semibold" : ""}>
+              Data início *
+              {highlightDates && !form.hire_date && <span className="ml-1 text-xs font-normal">← preencha aqui</span>}
+            </Label>
+            <Input
+              ref={hireDateRef}
+              type="date"
+              value={form.hire_date}
+              onChange={(e) => { set("hire_date", e.target.value); if (e.target.value && form.end_date) setHighlightDates(false); }}
+              required
+              className={highlightDates && !form.hire_date ? "border-destructive ring-2 ring-destructive/30" : ""}
+            />
           </div>
           <div>
-            <Label>Data fim *</Label>
-            <Input type="date" value={form.end_date} onChange={(e) => set("end_date", e.target.value)} required />
+            <Label className={highlightDates && !form.end_date ? "text-destructive font-semibold" : ""}>
+              Data fim *
+              {highlightDates && !form.end_date && <span className="ml-1 text-xs font-normal">← preencha aqui</span>}
+            </Label>
+            <Input
+              type="date"
+              value={form.end_date}
+              onChange={(e) => { set("end_date", e.target.value); if (form.hire_date && e.target.value) setHighlightDates(false); }}
+              required
+              className={highlightDates && !form.end_date ? "border-destructive ring-2 ring-destructive/30" : ""}
+            />
           </div>
         </CardContent>
       </Card>
@@ -347,7 +368,16 @@ export default function LinkForm() {
         <CardContent className="space-y-4">
           <div>
             <Label>Modo</Label>
-            <Select value={form.work_days_mode} onValueChange={(v) => set("work_days_mode", v)}>
+            <Select value={form.work_days_mode} onValueChange={(v) => {
+              set("work_days_mode", v);
+              if (v === "specific_dates" && (!form.hire_date || !form.end_date)) {
+                setHighlightDates(true);
+                setTimeout(() => {
+                  contractSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  setTimeout(() => hireDateRef.current?.focus(), 400);
+                }, 50);
+              }
+            }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="continuous">Contínuo (todos os dias do período)</SelectItem>
@@ -360,7 +390,18 @@ export default function LinkForm() {
             <div className="space-y-2">
               <Label>Datas de atuação</Label>
               {!form.hire_date || !form.end_date ? (
-                <p className="text-xs text-muted-foreground">Preencha as datas de início e fim primeiro.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHighlightDates(true);
+                    contractSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    setTimeout(() => hireDateRef.current?.focus(), 400);
+                  }}
+                  className="flex items-center gap-2 rounded-md border border-dashed border-destructive/50 bg-destructive/5 px-3 py-2 text-xs text-destructive hover:bg-destructive/10 transition-colors w-full text-left"
+                >
+                  <span>⚠️ Preencha as datas de início e fim na seção Contrato.</span>
+                  <span className="underline whitespace-nowrap">Ir para lá →</span>
+                </button>
               ) : (
                 <>
                   <div className="flex gap-2">
