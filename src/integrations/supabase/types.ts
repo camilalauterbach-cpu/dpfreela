@@ -199,6 +199,7 @@ export type Database = {
           payment_frequency: string | null
           rest_days_pattern: string | null
           shift_type: string | null
+          specific_work_dates: string[]
           status: string
           supervisor_contact: string | null
           supervisor_name: string | null
@@ -207,6 +208,8 @@ export type Database = {
           uniform_notes: string | null
           updated_at: string
           weekly_hours: number | null
+          work_days_mode: string
+          work_days_notes: string | null
           work_days_pattern: string | null
           work_schedule: string | null
           work_shift: string | null
@@ -243,6 +246,7 @@ export type Database = {
           payment_frequency?: string | null
           rest_days_pattern?: string | null
           shift_type?: string | null
+          specific_work_dates?: string[]
           status?: string
           supervisor_contact?: string | null
           supervisor_name?: string | null
@@ -251,6 +255,8 @@ export type Database = {
           uniform_notes?: string | null
           updated_at?: string
           weekly_hours?: number | null
+          work_days_mode?: string
+          work_days_notes?: string | null
           work_days_pattern?: string | null
           work_schedule?: string | null
           work_shift?: string | null
@@ -287,6 +293,7 @@ export type Database = {
           payment_frequency?: string | null
           rest_days_pattern?: string | null
           shift_type?: string | null
+          specific_work_dates?: string[]
           status?: string
           supervisor_contact?: string | null
           supervisor_name?: string | null
@@ -295,6 +302,8 @@ export type Database = {
           uniform_notes?: string | null
           updated_at?: string
           weekly_hours?: number | null
+          work_days_mode?: string
+          work_days_notes?: string | null
           work_days_pattern?: string | null
           work_schedule?: string | null
           work_shift?: string | null
