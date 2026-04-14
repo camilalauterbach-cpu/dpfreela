@@ -424,8 +424,11 @@ export type Database = {
       }
       link_group_workers: {
         Row: {
+          call_time: string | null
+          category_reference_rate: number | null
           contract_type: string | null
           created_at: string
+          daily_hours: number | null
           daily_rate: number | null
           deleted_at: string | null
           department: string | null
@@ -443,14 +446,21 @@ export type Database = {
           notes: string | null
           payment_frequency: string | null
           remuneration_type: string | null
+          shift_type: string | null
           status: string
           transport_allowance: number | null
           updated_at: string
+          weekly_hours: number | null
+          work_schedule: string | null
+          work_shift: string | null
           worker_id: string
         }
         Insert: {
+          call_time?: string | null
+          category_reference_rate?: number | null
           contract_type?: string | null
           created_at?: string
+          daily_hours?: number | null
           daily_rate?: number | null
           deleted_at?: string | null
           department?: string | null
@@ -468,14 +478,21 @@ export type Database = {
           notes?: string | null
           payment_frequency?: string | null
           remuneration_type?: string | null
+          shift_type?: string | null
           status?: string
           transport_allowance?: number | null
           updated_at?: string
+          weekly_hours?: number | null
+          work_schedule?: string | null
+          work_shift?: string | null
           worker_id: string
         }
         Update: {
+          call_time?: string | null
+          category_reference_rate?: number | null
           contract_type?: string | null
           created_at?: string
+          daily_hours?: number | null
           daily_rate?: number | null
           deleted_at?: string | null
           department?: string | null
@@ -493,9 +510,13 @@ export type Database = {
           notes?: string | null
           payment_frequency?: string | null
           remuneration_type?: string | null
+          shift_type?: string | null
           status?: string
           transport_allowance?: number | null
           updated_at?: string
+          weekly_hours?: number | null
+          work_schedule?: string | null
+          work_shift?: string | null
           worker_id?: string
         }
         Relationships: [
@@ -517,6 +538,7 @@ export type Database = {
       }
       link_groups: {
         Row: {
+          allowed_contract_types: string
           assembly_point: string | null
           call_time: string | null
           company_id: string | null
@@ -545,6 +567,7 @@ export type Database = {
           work_shift: string | null
         }
         Insert: {
+          allowed_contract_types?: string
           assembly_point?: string | null
           call_time?: string | null
           company_id?: string | null
@@ -573,6 +596,7 @@ export type Database = {
           work_shift?: string | null
         }
         Update: {
+          allowed_contract_types?: string
           assembly_point?: string | null
           call_time?: string | null
           company_id?: string | null
