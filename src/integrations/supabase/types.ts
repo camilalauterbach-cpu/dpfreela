@@ -422,6 +422,186 @@ export type Database = {
           },
         ]
       }
+      link_group_workers: {
+        Row: {
+          contract_type: string | null
+          created_at: string
+          daily_rate: number | null
+          deleted_at: string | null
+          department: string | null
+          end_date: string | null
+          fixed_salary: number | null
+          has_meal_allowance: boolean
+          has_transport_allowance: boolean
+          hire_date: string | null
+          hourly_rate: number | null
+          id: string
+          job_function: string | null
+          job_role: string | null
+          link_group_id: string
+          meal_allowance: number | null
+          notes: string | null
+          payment_frequency: string | null
+          remuneration_type: string | null
+          status: string
+          transport_allowance: number | null
+          updated_at: string
+          worker_id: string
+        }
+        Insert: {
+          contract_type?: string | null
+          created_at?: string
+          daily_rate?: number | null
+          deleted_at?: string | null
+          department?: string | null
+          end_date?: string | null
+          fixed_salary?: number | null
+          has_meal_allowance?: boolean
+          has_transport_allowance?: boolean
+          hire_date?: string | null
+          hourly_rate?: number | null
+          id?: string
+          job_function?: string | null
+          job_role?: string | null
+          link_group_id: string
+          meal_allowance?: number | null
+          notes?: string | null
+          payment_frequency?: string | null
+          remuneration_type?: string | null
+          status?: string
+          transport_allowance?: number | null
+          updated_at?: string
+          worker_id: string
+        }
+        Update: {
+          contract_type?: string | null
+          created_at?: string
+          daily_rate?: number | null
+          deleted_at?: string | null
+          department?: string | null
+          end_date?: string | null
+          fixed_salary?: number | null
+          has_meal_allowance?: boolean
+          has_transport_allowance?: boolean
+          hire_date?: string | null
+          hourly_rate?: number | null
+          id?: string
+          job_function?: string | null
+          job_role?: string | null
+          link_group_id?: string
+          meal_allowance?: number | null
+          notes?: string | null
+          payment_frequency?: string | null
+          remuneration_type?: string | null
+          status?: string
+          transport_allowance?: number | null
+          updated_at?: string
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "link_group_workers_link_group_id_fkey"
+            columns: ["link_group_id"]
+            isOneToOne: false
+            referencedRelation: "link_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "link_group_workers_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      link_groups: {
+        Row: {
+          assembly_point: string | null
+          call_time: string | null
+          company_id: string | null
+          created_at: string
+          daily_hours: number | null
+          deleted_at: string | null
+          end_date: string | null
+          event_id: string
+          group_name: string
+          hire_date: string | null
+          id: string
+          meal_entitlement: string | null
+          notes: string | null
+          required_documents: Json
+          shift_type: string | null
+          specific_work_dates: string[]
+          status: string
+          supervisor_name: string | null
+          transport_notes: string | null
+          uniform_notes: string | null
+          updated_at: string
+          weekly_hours: number | null
+          work_days_mode: string
+          work_days_notes: string | null
+          work_schedule: string | null
+          work_shift: string | null
+        }
+        Insert: {
+          assembly_point?: string | null
+          call_time?: string | null
+          company_id?: string | null
+          created_at?: string
+          daily_hours?: number | null
+          deleted_at?: string | null
+          end_date?: string | null
+          event_id: string
+          group_name: string
+          hire_date?: string | null
+          id?: string
+          meal_entitlement?: string | null
+          notes?: string | null
+          required_documents?: Json
+          shift_type?: string | null
+          specific_work_dates?: string[]
+          status?: string
+          supervisor_name?: string | null
+          transport_notes?: string | null
+          uniform_notes?: string | null
+          updated_at?: string
+          weekly_hours?: number | null
+          work_days_mode?: string
+          work_days_notes?: string | null
+          work_schedule?: string | null
+          work_shift?: string | null
+        }
+        Update: {
+          assembly_point?: string | null
+          call_time?: string | null
+          company_id?: string | null
+          created_at?: string
+          daily_hours?: number | null
+          deleted_at?: string | null
+          end_date?: string | null
+          event_id?: string
+          group_name?: string
+          hire_date?: string | null
+          id?: string
+          meal_entitlement?: string | null
+          notes?: string | null
+          required_documents?: Json
+          shift_type?: string | null
+          specific_work_dates?: string[]
+          status?: string
+          supervisor_name?: string | null
+          transport_notes?: string | null
+          uniform_notes?: string | null
+          updated_at?: string
+          weekly_hours?: number | null
+          work_days_mode?: string
+          work_days_notes?: string | null
+          work_schedule?: string | null
+          work_shift?: string | null
+        }
+        Relationships: []
+      }
       payment_receipts: {
         Row: {
           batch_id: string | null
