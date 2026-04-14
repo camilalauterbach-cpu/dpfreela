@@ -210,7 +210,7 @@ export default function WorkerDetail() {
         </TabsContent>
 
         <TabsContent value="documentos" className="mt-4">
-          <DocumentChecklist workerId={worker.id} />
+          <DocumentChecklist workerId={worker.id} workerName={worker.full_name} workerCpf={worker.cpf} />
         </TabsContent>
 
         <TabsContent value="pagamento" className="mt-4">
