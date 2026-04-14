@@ -569,30 +569,51 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
             <p className="text-sm text-muted-foreground truncate -mt-2">{previewFileName}</p>
           )}
           {previewUrl && (
-            previewError || (!previewMime?.startsWith("image/") && !previewMime?.includes("pdf")) ? (
+            previewError ? (
               <div className="flex flex-col items-center gap-4 py-8 px-4 rounded-md border border-dashed border-border bg-muted/30">
                 <AlertCircle className="h-10 w-10 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground text-center">
-                  {previewError
-                    ? "Não foi possível carregar o preview deste documento."
-                    : "Este tipo de arquivo não suporta preview inline."}
+                  Não foi possível carregar o preview deste documento.
                 </p>
-                {!previewError && previewUrl !== "error" && (
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => window.open(previewUrl!, "_blank")}>
-                      <ExternalLink className="mr-1 h-3 w-3" /> Abrir em nova aba
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => { const a = document.createElement("a"); a.href = previewUrl!; a.download = previewFileName; a.click(); }}>
-                      <FileDown className="mr-1 h-3 w-3" /> Baixar arquivo
-                    </Button>
-                  </div>
-                )}
               </div>
+            ) : previewMime?.startsWith("video/") ? (
+              <video src={previewUrl} controls preload="metadata" className="w-full rounded max-h-[70vh]"
+                onError={(e) => {
+                  (e.target as HTMLVideoElement).style.display = "none";
+                  setPreviewError(true);
+                }}
+              />
             ) : previewMime?.startsWith("image/") ? (
               <img src={previewUrl} alt="Documento" className="w-full rounded" />
-            ) : (
+            ) : previewMime?.includes("pdf") ? (
               <iframe src={previewUrl} className="w-full h-[70vh] rounded" />
+            ) : (
+              <div className="flex flex-col items-center gap-4 py-8 px-4 rounded-md border border-dashed border-border bg-muted/30">
+                <AlertCircle className="h-10 w-10 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground text-center">
+                  Este tipo de arquivo não suporta preview inline.
+                </p>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => window.open(previewUrl!, "_blank")}>
+                    <ExternalLink className="mr-1 h-3 w-3" /> Abrir em nova aba
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => { const a = document.createElement("a"); a.href = previewUrl!; a.download = previewFileName; a.click(); }}>
+                    <FileDown className="mr-1 h-3 w-3" /> Baixar arquivo
+                  </Button>
+                </div>
+              </div>
             )
+          )}
+          {/* Fallback buttons always visible when not error */}
+          {previewUrl && previewUrl !== "error" && !previewError && (
+            <div className="flex gap-2 justify-end pt-2 border-t border-border">
+              <Button size="sm" variant="outline" onClick={() => window.open(previewUrl!, "_blank")}>
+                <ExternalLink className="mr-1 h-3 w-3" /> Abrir em nova aba
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { const a = document.createElement("a"); a.href = previewUrl!; a.download = previewFileName; a.click(); }}>
+                <FileDown className="mr-1 h-3 w-3" /> Baixar arquivo
+              </Button>
+            </div>
           )}
         </DialogContent>
       </Dialog>
