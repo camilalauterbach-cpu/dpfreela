@@ -16,7 +16,7 @@ export const REQUIRED_DOC_CATEGORIES = [
 ] as const;
 
 export const CONDITIONAL_DOC_CATEGORIES = [
-  "ctps", "nis_pis_proof", "voter_id", "military_service", "cnh", "aso",
+  "ctps", "nis_pis_proof", "voter_id", "military_service", "cnh", "aso", "outros",
 ] as const;
 
 export const DOC_CATEGORY_LABELS: Record<string, string> = {
@@ -32,6 +32,7 @@ export const DOC_CATEGORY_LABELS: Record<string, string> = {
   military_service: "Reservista",
   cnh: "CNH",
   aso: "ASO",
+  outros: "Outros (complementares)",
 };
 
 export const DOC_STATUS_LABELS: Record<string, string> = {

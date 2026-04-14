@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Pencil, Loader2, Trash2 } from "lucide-react";
 import { OperationalDocsChecklist } from "@/components/events/OperationalDocsChecklist";
+import { LinkDocumentsTab } from "@/components/links/LinkDocumentsTab";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useDeleteRecord } from "@/hooks/useDeleteRecord";
 
@@ -227,15 +228,13 @@ export default function LinkDetail() {
         </TabsContent>
 
         <TabsContent value="documentos" className="mt-4">
-          {event ? (
-            <OperationalDocsChecklist employmentLinkId={l.id} workerId={l.worker_id} event={event} />
-          ) : (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                Nenhum evento vinculado — documentos operacionais não aplicáveis.
-              </CardContent>
-            </Card>
-          )}
+          <LinkDocumentsTab
+            workerId={l.worker_id}
+            employmentLinkId={l.id}
+            event={event}
+            workerName={workerName}
+            workerCpf={l.workers?.cpf}
+          />
         </TabsContent>
       </Tabs>
     </div>
