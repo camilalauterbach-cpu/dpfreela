@@ -80,7 +80,7 @@ export function useLinkGroupWorkers(groupId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("link_group_workers")
-        .select("*, workers(full_name, nickname, cpf, phone_main), shift_type, work_shift, work_schedule, call_time, daily_hours, weekly_hours, category_reference_rate")
+        .select("*, workers(full_name, nickname, cpf, phone_main)")
         .eq("link_group_id", groupId!)
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
