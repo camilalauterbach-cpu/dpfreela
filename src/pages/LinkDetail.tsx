@@ -361,7 +361,7 @@ export default function LinkDetail() {
                     const wNick = w.workers?.nickname;
                     const effectiveVal = getWorkerEffectiveValue(w);
                     return (
-                      <TableRow key={w.id}>
+                      <TableRow key={w.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/links/${id}/workers/${w.worker_id}`)}>
                         <TableCell>
                           <p className="text-sm font-medium">{wName}{wNick ? ` (${wNick})` : ""}</p>
                           <p className="text-xs text-muted-foreground sm:hidden">{w.job_role || ""}</p>

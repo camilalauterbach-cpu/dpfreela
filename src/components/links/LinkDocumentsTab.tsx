@@ -189,7 +189,8 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
     try {
       const count = await exportLinkDocsZip({
         workerId,
-        employmentLinkId,
+        employmentLinkId: useNewModel ? "" : employmentLinkId,
+        linkGroupWorkerId: useNewModel ? linkGroupWorkerId : undefined,
         workerName,
         cpf: workerCpf || "",
         mode,
