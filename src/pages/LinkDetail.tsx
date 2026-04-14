@@ -10,9 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Pencil, Loader2, Trash2, Plus, UserMinus } from "lucide-react";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useDeleteRecord } from "@/hooks/useDeleteRecord";
@@ -30,10 +33,28 @@ const statusVariant = (s: string) => {
   return "outline" as const;
 };
 
+const contractTypeLabels: Record<string, string> = {
+  clt: "CLT",
+  service: "Prestação de serviço",
+  both: "Ambos (CLT e Prestação)",
+};
+
+const remunerationTypeOptions = [
+  { value: "cache", label: "Cachê" },
+  { value: "daily", label: "Diária" },
+  { value: "hourly", label: "Hora" },
+  { value: "fixed", label: "Salário fixo" },
+];
+
 const formatDateBR = (d: string | null) => {
   if (!d) return "—";
   const [y, m, day] = d.split("-");
   return `${day}/${m}/${y}`;
+};
+
+const formatCurrency = (v: number | null | undefined) => {
+  if (v == null) return "—";
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
 };
 
 function useAllWorkers() {
@@ -53,6 +74,53 @@ function useAllWorkers() {
   });
 }
 
+function getContractOptions(allowed: string) {
+  if (allowed === "clt") return [{ value: "clt", label: "CLT" }];
+  if (allowed === "service") return [{ value: "service", label: "Prestação de serviço" }];
+  return [{ value: "clt", label: "CLT" }, { value: "service", label: "Prestação de serviço" }];
+}
+
+function getEffectiveValueLabel(remunerationType: string) {
+  switch (remunerationType) {
+    case "cache": return "Valor do cachê";
+    case "daily": return "Valor da diária";
+    case "hourly": return "Valor da hora";
+    case "fixed": return "Valor do salário fixo";
+    default: return "Valor efetivo";
+  }
+}
+
+function getEffectiveValueField(remunerationType: string) {
+  switch (remunerationType) {
+    case "daily": return "daily_rate";
+    case "hourly": return "hourly_rate";
+    case "fixed": return "fixed_salary";
+    default: return "daily_rate"; // cachê uses daily_rate
+  }
+}
+
+const INITIAL_ALLOC = {
+  worker_id: "",
+  job_role: "",
+  job_function: "",
+  department: "",
+  contract_type: "",
+  shift_type: "",
+  work_shift: "",
+  work_schedule: "",
+  call_time: "",
+  daily_hours: "",
+  weekly_hours: "",
+  remuneration_type: "",
+  effective_value: "",
+  category_reference_rate: "",
+  has_transport_allowance: false,
+  transport_allowance: "",
+  has_meal_allowance: false,
+  meal_allowance: "",
+  notes: "",
+};
+
 export default function LinkDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -64,12 +132,13 @@ export default function LinkDetail() {
   const { deleteRecord, isDeleting } = useDeleteRecord("link_groups", ["link-groups", "link-group", "dashboard-counts"]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAllocate, setShowAllocate] = useState(false);
-  const [allocWorker, setAllocWorker] = useState("");
-  const [allocRole, setAllocRole] = useState("");
-  const [allocFunction, setAllocFunction] = useState("");
+  const [alloc, setAlloc] = useState({ ...INITIAL_ALLOC });
   const allocateMutation = useAllocateWorker();
   const removeMutation = useRemoveGroupWorker();
   const { data: allWorkers } = useAllWorkers();
+
+  // Remove worker modal
+  const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
 
   if (isLoading) {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -82,6 +151,8 @@ export default function LinkDetail() {
   const g = group as any;
   const eventName = g.events?.name || "—";
   const companyName = g.companies?.trade_name || g.companies?.legal_name || "—";
+  const allowedContracts = g.allowed_contract_types || "both";
+  const contractOptions = getContractOptions(allowedContracts);
 
   const info = (label: string, value: string | number | null | undefined) => (
     <div className="space-y-0.5">
@@ -93,34 +164,67 @@ export default function LinkDetail() {
   const allocatedWorkerIds = new Set((workers ?? []).map((w: any) => w.worker_id));
   const availableWorkers = (allWorkers ?? []).filter((w: any) => !allocatedWorkerIds.has(w.id));
 
+  const setA = (key: string, value: any) => setAlloc((p) => ({ ...p, [key]: value }));
+
   const handleAllocate = () => {
-    if (!allocWorker) {
+    if (!alloc.worker_id) {
       toast.error("Selecione um trabalhador");
       return;
     }
-    allocateMutation.mutate({
+
+    const effectiveField = getEffectiveValueField(alloc.remuneration_type);
+    const effectiveValue = alloc.effective_value ? Number(alloc.effective_value) : null;
+
+    const payload: Record<string, any> = {
       link_group_id: id!,
-      worker_id: allocWorker,
-      job_role: allocRole || null,
-      job_function: allocFunction || null,
-    }, {
+      worker_id: alloc.worker_id,
+      job_role: alloc.job_role || null,
+      job_function: alloc.job_function || null,
+      department: alloc.department || null,
+      contract_type: alloc.contract_type || null,
+      shift_type: alloc.shift_type || null,
+      work_shift: alloc.work_shift || null,
+      work_schedule: alloc.work_schedule || null,
+      call_time: alloc.call_time || null,
+      daily_hours: alloc.daily_hours ? Number(alloc.daily_hours) : null,
+      weekly_hours: alloc.weekly_hours ? Number(alloc.weekly_hours) : null,
+      remuneration_type: alloc.remuneration_type || null,
+      daily_rate: effectiveField === "daily_rate" ? effectiveValue : null,
+      hourly_rate: effectiveField === "hourly_rate" ? effectiveValue : null,
+      fixed_salary: effectiveField === "fixed_salary" ? effectiveValue : null,
+      category_reference_rate: alloc.category_reference_rate ? Number(alloc.category_reference_rate) : null,
+      has_transport_allowance: alloc.has_transport_allowance,
+      transport_allowance: alloc.has_transport_allowance && alloc.transport_allowance ? Number(alloc.transport_allowance) : null,
+      has_meal_allowance: alloc.has_meal_allowance,
+      meal_allowance: alloc.has_meal_allowance && alloc.meal_allowance ? Number(alloc.meal_allowance) : null,
+      notes: alloc.notes || null,
+    };
+
+    allocateMutation.mutate(payload, {
       onSuccess: () => {
         toast.success("Trabalhador alocado");
         setShowAllocate(false);
-        setAllocWorker("");
-        setAllocRole("");
-        setAllocFunction("");
+        setAlloc({ ...INITIAL_ALLOC });
       },
       onError: (err: any) => toast.error(err.message || "Erro ao alocar"),
     });
   };
 
-  const handleRemoveWorker = (workerId: string, workerName: string, recordId: string) => {
-    if (!confirm(`Remover ${workerName} do grupo?`)) return;
-    removeMutation.mutate({ id: recordId, link_group_id: id! }, {
-      onSuccess: () => toast.success(`${workerName} removido do grupo`),
+  const handleConfirmRemove = () => {
+    if (!removeTarget) return;
+    removeMutation.mutate({ id: removeTarget.id, link_group_id: id! }, {
+      onSuccess: () => {
+        toast.success(`${removeTarget.name} removido do grupo`);
+        setRemoveTarget(null);
+      },
       onError: (err: any) => toast.error(err.message || "Erro ao remover"),
     });
+  };
+
+  const getWorkerEffectiveValue = (w: any) => {
+    if (w.remuneration_type === "hourly") return w.hourly_rate;
+    if (w.remuneration_type === "fixed") return w.fixed_salary;
+    return w.daily_rate; // cachê or daily
   };
 
   return (
@@ -183,20 +287,9 @@ export default function LinkDetail() {
             <CardHeader><CardTitle className="text-base">Contrato</CardTitle></CardHeader>
             <CardContent className="grid gap-4 grid-cols-2">
               {info("Status", statusLabels[g.status] || g.status)}
+              {info("Tipo de contratação", contractTypeLabels[allowedContracts] || allowedContracts)}
               {info("Data início", formatDateBR(g.hire_date))}
               {info("Data fim", formatDateBR(g.end_date))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle className="text-base">Jornada</CardTitle></CardHeader>
-            <CardContent className="grid gap-4 grid-cols-2 sm:grid-cols-3">
-              {info("Turno", g.shift_type)}
-              {info("Escala", g.work_shift)}
-              {info("Horário", g.work_schedule)}
-              {info("Horário de chamada", g.call_time)}
-              {info("Horas diárias", g.daily_hours)}
-              {info("Horas semanais", g.weekly_hours)}
             </CardContent>
           </Card>
 
@@ -257,7 +350,7 @@ export default function LinkDetail() {
                   <TableRow>
                     <TableHead>Trabalhador</TableHead>
                     <TableHead className="hidden sm:table-cell">Função</TableHead>
-                    <TableHead className="hidden md:table-cell">Atividade</TableHead>
+                    <TableHead className="hidden md:table-cell">Valor efetivo</TableHead>
                     <TableHead>Status</TableHead>
                     {canEdit && <TableHead className="w-10" />}
                   </TableRow>
@@ -266,6 +359,7 @@ export default function LinkDetail() {
                   {workers.map((w: any) => {
                     const wName = w.workers?.full_name || "—";
                     const wNick = w.workers?.nickname;
+                    const effectiveVal = getWorkerEffectiveValue(w);
                     return (
                       <TableRow key={w.id}>
                         <TableCell>
@@ -273,14 +367,14 @@ export default function LinkDetail() {
                           <p className="text-xs text-muted-foreground sm:hidden">{w.job_role || ""}</p>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">{w.job_role || "—"}</TableCell>
-                        <TableCell className="hidden md:table-cell">{w.job_function || "—"}</TableCell>
+                        <TableCell className="hidden md:table-cell">{formatCurrency(effectiveVal)}</TableCell>
                         <TableCell>
                           <Badge variant={statusVariant(w.status)}>{statusLabels[w.status] || w.status}</Badge>
                         </TableCell>
                         {canEdit && (
                           <TableCell>
                             <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => handleRemoveWorker(w.worker_id, wName, w.id)}
+                              onClick={() => setRemoveTarget({ id: w.id, name: wName })}
                               disabled={removeMutation.isPending}
                             >
                               <UserMinus className="h-3 w-3" />
@@ -297,33 +391,172 @@ export default function LinkDetail() {
         </TabsContent>
       </Tabs>
 
+      {/* Remove Worker Modal */}
+      <DeleteConfirmDialog
+        open={!!removeTarget}
+        onOpenChange={(open) => { if (!open) setRemoveTarget(null); }}
+        title="Remover do grupo"
+        description={`Tem certeza que deseja remover "${removeTarget?.name}" deste grupo? O trabalhador não será excluído do sistema, apenas desvinculado.`}
+        onConfirm={handleConfirmRemove}
+        isDeleting={removeMutation.isPending}
+      />
+
       {/* Allocate Worker Dialog */}
       <Dialog open={showAllocate} onOpenChange={setShowAllocate}>
-        <DialogContent>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Alocar trabalhador</DialogTitle>
+            <DialogDescription>Preencha os dados individuais do trabalhador neste grupo.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Trabalhador *</Label>
-              <Select value={allocWorker} onValueChange={setAllocWorker}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  {availableWorkers.map((w: any) => (
-                    <SelectItem key={w.id} value={w.id}>
-                      {w.full_name}{w.nickname ? ` (${w.nickname})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="space-y-5">
+            {/* Identificação */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-foreground">Identificação</h4>
+              <div>
+                <Label>Trabalhador *</Label>
+                <Select value={alloc.worker_id} onValueChange={(v) => setA("worker_id", v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    {availableWorkers.map((w: any) => (
+                      <SelectItem key={w.id} value={w.id}>
+                        {w.full_name}{w.nickname ? ` (${w.nickname})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Função/Cargo</Label>
+                  <Input value={alloc.job_role} onChange={(e) => setA("job_role", e.target.value)} />
+                </div>
+                <div>
+                  <Label>Atividade</Label>
+                  <Input value={alloc.job_function} onChange={(e) => setA("job_function", e.target.value)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Departamento</Label>
+                  <Input value={alloc.department} onChange={(e) => setA("department", e.target.value)} />
+                </div>
+                <div>
+                  <Label>Tipo de contrato</Label>
+                  <Select value={alloc.contract_type} onValueChange={(v) => setA("contract_type", v)}>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      {contractOptions.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
-            <div>
-              <Label>Função/Cargo</Label>
-              <Input value={allocRole} onChange={(e) => setAllocRole(e.target.value)} />
+
+            <Separator />
+
+            {/* Jornada */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-foreground">Jornada</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Turno</Label>
+                  <Input value={alloc.shift_type} onChange={(e) => setA("shift_type", e.target.value)} placeholder="Ex: Diurno" />
+                </div>
+                <div>
+                  <Label>Escala</Label>
+                  <Input value={alloc.work_shift} onChange={(e) => setA("work_shift", e.target.value)} placeholder="Ex: 6x1" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Horário</Label>
+                  <Input value={alloc.work_schedule} onChange={(e) => setA("work_schedule", e.target.value)} placeholder="Ex: 08:00-17:00" />
+                </div>
+                <div>
+                  <Label>Horário de chamada</Label>
+                  <Input type="time" value={alloc.call_time} onChange={(e) => setA("call_time", e.target.value)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Horas diárias</Label>
+                  <Input type="number" step="0.5" value={alloc.daily_hours} onChange={(e) => setA("daily_hours", e.target.value)} />
+                </div>
+                <div>
+                  <Label>Horas semanais</Label>
+                  <Input type="number" step="0.5" value={alloc.weekly_hours} onChange={(e) => setA("weekly_hours", e.target.value)} />
+                </div>
+              </div>
             </div>
+
+            <Separator />
+
+            {/* Remuneração */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-foreground">Remuneração</h4>
+              <div>
+                <Label>Tipo de remuneração</Label>
+                <Select value={alloc.remuneration_type} onValueChange={(v) => setA("remuneration_type", v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    {remunerationTypeOptions.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>{alloc.remuneration_type ? getEffectiveValueLabel(alloc.remuneration_type) : "Valor efetivo do evento"}</Label>
+                <Input type="number" step="0.01" min="0" value={alloc.effective_value} onChange={(e) => setA("effective_value", e.target.value)} placeholder="R$ 0,00" />
+                <p className="text-xs text-muted-foreground mt-1">Valor que o trabalhador vai receber neste evento.</p>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Referência */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-foreground">Referência da categoria/cargo</h4>
+              <div>
+                <Label>Valor de referência</Label>
+                <Input type="number" step="0.01" min="0" value={alloc.category_reference_rate} onChange={(e) => setA("category_reference_rate", e.target.value)} placeholder="R$ 0,00" />
+                <p className="text-xs text-muted-foreground mt-1">Salário/cachê de referência da função — não é o pagamento real.</p>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Benefícios */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-foreground">Benefícios</h4>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Vale-transporte (VT)</Label>
+                  <Switch checked={alloc.has_transport_allowance} onCheckedChange={(v) => setA("has_transport_allowance", v)} />
+                </div>
+                {alloc.has_transport_allowance && (
+                  <Input type="number" step="0.01" min="0" value={alloc.transport_allowance} onChange={(e) => setA("transport_allowance", e.target.value)} placeholder="Valor do VT" />
+                )}
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Vale-refeição / alimentação (VR/VA)</Label>
+                  <Switch checked={alloc.has_meal_allowance} onCheckedChange={(v) => setA("has_meal_allowance", v)} />
+                </div>
+                {alloc.has_meal_allowance && (
+                  <Input type="number" step="0.01" min="0" value={alloc.meal_allowance} onChange={(e) => setA("meal_allowance", e.target.value)} placeholder="Valor do VR/VA" />
+                )}
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Observações */}
             <div>
-              <Label>Atividade</Label>
-              <Input value={allocFunction} onChange={(e) => setAllocFunction(e.target.value)} />
+              <Label>Observações</Label>
+              <Textarea value={alloc.notes} onChange={(e) => setA("notes", e.target.value)} rows={2} />
             </div>
           </div>
           <DialogFooter>

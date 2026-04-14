@@ -58,6 +58,12 @@ const statusOptions = [
   { value: "cancelled", label: "Cancelado", description: "Cancelado antes de iniciar." },
 ];
 
+const contractTypeOptions = [
+  { value: "clt", label: "CLT" },
+  { value: "service", label: "Prestação de serviço" },
+  { value: "both", label: "Ambos (CLT e Prestação)" },
+];
+
 export default function LinkForm() {
   const { id } = useParams();
   const isEdit = !!id;
@@ -77,12 +83,7 @@ export default function LinkForm() {
     status: "draft",
     hire_date: "",
     end_date: "",
-    shift_type: "",
-    work_shift: "",
-    work_schedule: "",
-    call_time: "",
-    daily_hours: "",
-    weekly_hours: "",
+    allowed_contract_types: "both",
     work_days_mode: "continuous",
     specific_work_dates: [] as string[],
     work_days_notes: "",
@@ -110,12 +111,7 @@ export default function LinkForm() {
         status: e.status || "draft",
         hire_date: e.hire_date || "",
         end_date: e.end_date || "",
-        shift_type: e.shift_type || "",
-        work_shift: e.work_shift || "",
-        work_schedule: e.work_schedule || "",
-        call_time: e.call_time || "",
-        daily_hours: e.daily_hours != null ? String(e.daily_hours) : "",
-        weekly_hours: e.weekly_hours != null ? String(e.weekly_hours) : "",
+        allowed_contract_types: e.allowed_contract_types || "both",
         work_days_mode: e.work_days_mode || "continuous",
         specific_work_dates: e.specific_work_dates || [],
         work_days_notes: e.work_days_notes || "",
@@ -181,12 +177,7 @@ export default function LinkForm() {
       status: form.status,
       hire_date: form.hire_date || null,
       end_date: form.end_date || null,
-      shift_type: form.shift_type || null,
-      work_shift: form.work_shift || null,
-      work_schedule: form.work_schedule || null,
-      call_time: form.call_time || null,
-      daily_hours: form.daily_hours ? Number(form.daily_hours) : null,
-      weekly_hours: form.weekly_hours ? Number(form.weekly_hours) : null,
+      allowed_contract_types: form.allowed_contract_types,
       work_days_mode: form.work_days_mode,
       specific_work_dates: form.work_days_mode === "specific_dates" ? form.specific_work_dates : [],
       work_days_notes: form.work_days_notes || null,
@@ -311,7 +302,23 @@ export default function LinkForm() {
               </p>
             )}
           </div>
-          <div />
+          <div>
+            <Label>Tipo de contratação</Label>
+            <Select value={form.allowed_contract_types} onValueChange={(v) => set("allowed_contract_types", v)}>
+              <SelectTrigger>
+                <SelectValue>{contractTypeOptions.find((o) => o.value === form.allowed_contract_types)?.label}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {contractTypeOptions.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
+              <Info className="h-3 w-3 mt-0.5 shrink-0" />
+              Define os tipos de contrato permitidos para os trabalhadores deste grupo.
+            </p>
+          </div>
           <div>
             <Label className={highlightDates && !form.hire_date ? "text-destructive font-semibold" : ""}>
               Data início
@@ -329,37 +336,6 @@ export default function LinkForm() {
               onChange={(e) => { set("end_date", e.target.value); if (form.hire_date && e.target.value) setHighlightDates(false); }}
               className={highlightDates && !form.end_date ? "border-destructive ring-2 ring-destructive/30" : ""}
             />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Jornada */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">Jornada</CardTitle></CardHeader>
-        <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <Label>Turno</Label>
-            <Input value={form.shift_type} onChange={(e) => set("shift_type", e.target.value)} placeholder="Ex: Diurno" />
-          </div>
-          <div>
-            <Label>Escala</Label>
-            <Input value={form.work_shift} onChange={(e) => set("work_shift", e.target.value)} placeholder="Ex: 6x1" />
-          </div>
-          <div>
-            <Label>Horário</Label>
-            <Input value={form.work_schedule} onChange={(e) => set("work_schedule", e.target.value)} placeholder="Ex: 08:00-17:00" />
-          </div>
-          <div>
-            <Label>Horário de chamada</Label>
-            <Input type="time" value={form.call_time} onChange={(e) => set("call_time", e.target.value)} />
-          </div>
-          <div>
-            <Label>Horas diárias</Label>
-            <Input type="number" step="0.5" value={form.daily_hours} onChange={(e) => set("daily_hours", e.target.value)} />
-          </div>
-          <div>
-            <Label>Horas semanais</Label>
-            <Input type="number" step="0.5" value={form.weekly_hours} onChange={(e) => set("weekly_hours", e.target.value)} />
           </div>
         </CardContent>
       </Card>
