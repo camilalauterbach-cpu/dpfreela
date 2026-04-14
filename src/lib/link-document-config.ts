@@ -2,6 +2,7 @@
 
 export interface LinkDocumentConfig {
   operational: string[];   // e.g. ["ficha_epi", "ordem_servico", "aso_vinculo"]
+  operational_custom?: string; // free text for "outros operacionais"
   nrs: string[];           // e.g. ["nr_6", "nr_10", "nr_35"]
   nr_custom?: string;      // free text for custom NR
   company: string[];       // e.g. ["apr", "ltcat", "pcmso", "pgr"]
@@ -9,6 +10,7 @@ export interface LinkDocumentConfig {
 
 export const EMPTY_CONFIG: LinkDocumentConfig = {
   operational: [],
+  operational_custom: "",
   nrs: [],
   nr_custom: "",
   company: [],
