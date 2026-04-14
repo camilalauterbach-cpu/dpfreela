@@ -831,6 +831,8 @@ export type Database = {
           bank_name: string | null
           created_at: string
           deleted_at: string | null
+          holder_cpf: string | null
+          holder_name: string | null
           id: string
           is_preferred: boolean
           method_type: string
@@ -848,6 +850,8 @@ export type Database = {
           bank_name?: string | null
           created_at?: string
           deleted_at?: string | null
+          holder_cpf?: string | null
+          holder_name?: string | null
           id?: string
           is_preferred?: boolean
           method_type: string
@@ -865,6 +869,8 @@ export type Database = {
           bank_name?: string | null
           created_at?: string
           deleted_at?: string | null
+          holder_cpf?: string | null
+          holder_name?: string | null
           id?: string
           is_preferred?: boolean
           method_type?: string
