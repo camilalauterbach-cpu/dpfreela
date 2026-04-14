@@ -22,7 +22,7 @@ interface Props {
 
 export function BankDataForm({ workerId, workerName, workerCpf, onSuccess }: Props) {
   const { toast } = useToast();
-  const { profile } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const [pixKeyType, setPixKeyType] = useState("cpf");
@@ -69,7 +69,7 @@ export function BankDataForm({ workerId, workerName, workerCpf, onSuccess }: Pro
         holderName: holderName || undefined,
         holderCpf: holderCpf ? (formatCpf(holderCpf) || holderCpf) : undefined,
         isSelfHolder,
-        generatedByUserName: profile?.full_name || "Usuário do sistema",
+        generatedByUserName: user?.user_metadata?.full_name || user?.email || "Usuário do sistema",
       });
 
       // 3. Upload PDF
