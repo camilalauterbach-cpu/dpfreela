@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Download, CheckCircle2, Clock, XCircle, RefreshCw, FileText, Info, Upload, AlertCircle, Eye } from "lucide-react";
+import { Loader2, Download, CheckCircle2, Clock, XCircle, RefreshCw, FileText, Info, Upload, AlertCircle, Eye, ExternalLink, FileDown } from "lucide-react";
 import {
   REQUIRED_DOC_CATEGORIES,
   CONDITIONAL_DOC_CATEGORIES,
@@ -56,6 +56,8 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
   const [downloading, setDownloading] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewMime, setPreviewMime] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState(false);
+  const [previewFileName, setPreviewFileName] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadCategoryRef = useRef<string>("");
 
@@ -174,13 +176,23 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
     fileInputRef.current?.click();
   };
 
-  const handlePreview = async (filePath: string, mimeType: string | null, bucket: string) => {
-    const { data } = await supabase.storage
-      .from(bucket)
-      .createSignedUrl(filePath, 300);
-    if (data?.signedUrl) {
+  const handlePreview = async (filePath: string, mimeType: string | null, bucket: string, fileName?: string) => {
+    const resolvedName = fileName || filePath.split("/").pop() || "documento";
+    try {
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(filePath, 300);
+      if (error || !data?.signedUrl) throw new Error("Falha ao gerar URL");
       setPreviewUrl(data.signedUrl);
       setPreviewMime(mimeType);
+      setPreviewFileName(resolvedName);
+      setPreviewError(false);
+    } catch {
+      setPreviewError(true);
+      setPreviewFileName(resolvedName);
+      // store a placeholder so dialog opens
+      setPreviewUrl("error");
+      toast({ title: "Erro no preview", description: "Não foi possível carregar o preview deste documento.", variant: "destructive" });
     }
   };
 
@@ -254,9 +266,9 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
             <span className="ml-1">{DOC_STATUS_LABELS[status] || status}</span>
           </Badge>
           {doc?.file_path && (
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handlePreview(doc.file_path, doc.mime_type, "link-documents")}>
-              <Eye className="h-3 w-3" />
-            </Button>
+             <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handlePreview(doc.file_path, doc.mime_type, "link-documents", doc.file_name)}>
+               <Eye className="h-3 w-3" />
+             </Button>
           )}
           {canManage && doc && (
             <Select value={status} onValueChange={(v) => statusMutation.mutate({ docId: doc.id, status: v })}>
@@ -359,7 +371,7 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
                     <span className="ml-1">{DOC_STATUS_LABELS[status] || status}</span>
                   </Badge>
                   {doc?.file_path && (
-                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handlePreview(doc.file_path, doc.mime_type, "worker-documents")}>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handlePreview(doc.file_path, doc.mime_type, "worker-documents", doc.file_name)}>
                       <Eye className="h-3 w-3" />
                     </Button>
                   )}
@@ -388,7 +400,7 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
                         <span className="ml-1">{DOC_STATUS_LABELS[status] || status}</span>
                       </Badge>
                       {doc.file_path && (
-                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handlePreview(doc.file_path, doc.mime_type, "worker-documents")}>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handlePreview(doc.file_path, doc.mime_type, "worker-documents", doc.file_name)}>
                           <Eye className="h-3 w-3" />
                         </Button>
                       )}
@@ -469,7 +481,7 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
                             <span className="ml-1">{DOC_STATUS_LABELS[status] || status}</span>
                           </Badge>
                           {doc?.file_path && (
-                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handlePreview(doc.file_path, doc.mime_type, "link-documents")}>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handlePreview(doc.file_path, doc.mime_type, "link-documents", doc.file_name)}>
                               <Eye className="h-3 w-3" />
                             </Button>
                           )}
@@ -491,13 +503,35 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
       )}
 
       {/* Preview dialog */}
-      <Dialog open={!!previewUrl} onOpenChange={() => setPreviewUrl(null)}>
+      <Dialog open={!!previewUrl} onOpenChange={() => { setPreviewUrl(null); setPreviewError(false); }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Preview do documento</DialogTitle>
           </DialogHeader>
+          {previewFileName && (
+            <p className="text-sm text-muted-foreground truncate -mt-2">{previewFileName}</p>
+          )}
           {previewUrl && (
-            previewMime?.startsWith("image/") ? (
+            previewError || (!previewMime?.startsWith("image/") && !previewMime?.includes("pdf")) ? (
+              <div className="flex flex-col items-center gap-4 py-8 px-4 rounded-md border border-dashed border-border bg-muted/30">
+                <AlertCircle className="h-10 w-10 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground text-center">
+                  {previewError
+                    ? "Não foi possível carregar o preview deste documento."
+                    : "Este tipo de arquivo não suporta preview inline."}
+                </p>
+                {!previewError && previewUrl !== "error" && (
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => window.open(previewUrl!, "_blank")}>
+                      <ExternalLink className="mr-1 h-3 w-3" /> Abrir em nova aba
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => { const a = document.createElement("a"); a.href = previewUrl!; a.download = previewFileName; a.click(); }}>
+                      <FileDown className="mr-1 h-3 w-3" /> Baixar arquivo
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : previewMime?.startsWith("image/") ? (
               <img src={previewUrl} alt="Documento" className="w-full rounded" />
             ) : (
               <iframe src={previewUrl} className="w-full h-[70vh] rounded" />

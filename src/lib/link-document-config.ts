@@ -57,11 +57,17 @@ export function getConfiguredDocs(config: LinkDocumentConfig) {
   const docs: { category: string; label: string; group: "operational" | "nrs" | "company" }[] = [];
 
   for (const cat of config.operational) {
-    const opt = OPERATIONAL_OPTIONS.find((o) => o.value === cat);
-    docs.push({ category: cat, label: opt?.label || cat, group: "operational" });
+    if (cat === "outros_operacionais" && config.operational_custom) {
+      // Use the custom text as label instead of generic "Outros operacionais"
+      docs.push({ category: cat, label: config.operational_custom, group: "operational" });
+    } else {
+      const opt = OPERATIONAL_OPTIONS.find((o) => o.value === cat);
+      docs.push({ category: cat, label: opt?.label || cat, group: "operational" });
+    }
   }
 
-  if (config.operational_custom) {
+  // Only add operational_custom as separate item if "outros_operacionais" is NOT selected
+  if (config.operational_custom && !config.operational.includes("outros_operacionais")) {
     docs.push({ category: "operational_custom", label: config.operational_custom, group: "operational" });
   }
 
@@ -70,6 +76,7 @@ export function getConfiguredDocs(config: LinkDocumentConfig) {
     docs.push({ category: cat, label: opt?.label || cat, group: "nrs" });
   }
 
+  // Only add nr_custom as separate item if not already represented
   if (config.nr_custom) {
     docs.push({ category: "nr_custom", label: config.nr_custom, group: "nrs" });
   }
