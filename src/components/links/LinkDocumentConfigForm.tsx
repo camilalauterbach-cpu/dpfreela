@@ -62,12 +62,23 @@ export function LinkDocumentConfigForm({ config, onChange }: Props) {
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
-        <CheckboxGroup
-          title="A) Documentos operacionais do vínculo/evento"
-          options={OPERATIONAL_OPTIONS}
-          selected={config.operational}
-          onToggle={(v) => toggle("operational", v)}
-        />
+        <div className="space-y-2">
+          <CheckboxGroup
+            title="A) Documentos operacionais do vínculo/evento"
+            options={OPERATIONAL_OPTIONS}
+            selected={config.operational}
+            onToggle={(v) => toggle("operational", v)}
+          />
+          <div className="pl-6">
+            <Label className="text-xs">Outros documentos operacionais (complementar)</Label>
+            <Input
+              value={config.operational_custom || ""}
+              onChange={(e) => onChange({ ...config, operational_custom: e.target.value })}
+              placeholder="Ex: Declaração de comparecimento, Termo de responsabilidade"
+              className="max-w-sm"
+            />
+          </div>
+        </div>
 
         <div className="border-t pt-4 space-y-2">
           <CheckboxGroup
