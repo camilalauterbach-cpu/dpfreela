@@ -1,61 +1,42 @@
 
 
-## Etapa 2 — Migração dos 27 trabalhadores do evento da Shakira
+## Etapa 3 — Execução: Hook `useLinkGroups.ts`
 
-### Passo 1: Criar 1 link_group
+Criar o arquivo `src/hooks/useLinkGroups.ts` seguindo o padrão exato de `useEmploymentLinks.ts`.
 
-```sql
-INSERT INTO link_groups (group_name, event_id, company_id, hire_date, end_date, status)
-VALUES (
-  'Equipe - Show da Shakira no RJ',
-  'b1b2c3d4-0002-4000-8000-000000000002',
-  'a1b2c3d4-0001-4000-8000-000000000001',
-  '2026-04-26',
-  '2026-05-04',
-  'draft'
-);
-```
+### Arquivo a criar
 
-- `company_id` extraído do evento (confirmado: `a1b2c3d4-0001-4000-8000-000000000001`)
+**`src/hooks/useLinkGroups.ts`** — um único arquivo com:
 
-### Passo 2: Buscar o ID do grupo recém-criado
+#### Queries
 
-```sql
-SELECT id FROM link_groups
-WHERE event_id = 'b1b2c3d4-0002-4000-8000-000000000002'
-LIMIT 1;
-```
+1. **`useLinkGroups(search, statusFilter)`** — select de `link_groups` com joins `events(name)`, `companies(legal_name, trade_name)`. Busca client-side por `group_name` e `events.name` (mesmo padrão do legado). Filtro por status. Limit 200. `events.name` acessível via cast `(g.events as any)?.name`.
 
-### Passo 3: Inserir os 27 trabalhadores no link_group_workers
+2. **`useLinkGroup(id)`** — select `*` com joins `events(id, name, requires_epi_form, requires_service_order, required_nrs, required_nrs_other)`, `companies(legal_name, trade_name)`. Usa `.single()`.
 
-```sql
-INSERT INTO link_group_workers (link_group_id, worker_id, job_role, job_function, contract_type, status)
-SELECT
-  '<id_do_grupo_criado_no_passo_2>',
-  worker_id,
-  job_role,
-  job_function,
-  contract_type,
-  'active'
-FROM employment_links
-WHERE deleted_at IS NULL
-  AND event_id = 'b1b2c3d4-0002-4000-8000-000000000002';
-```
+3. **`useLinkGroupWorkers(groupId)`** — select de `link_group_workers` por `link_group_id`, com join `workers(full_name, nickname, cpf, phone_main)`. `deleted_at IS NULL`. Ordenado por `created_at desc`.
 
-- Filtro explícito por `event_id` — migra apenas os 27 do Shakira
-- `hire_date`/`end_date` individuais não preenchidos (iguais ao grupo)
-- Campos financeiros todos nulos nos registros atuais — ficam nulos
+4. **`useLinkGroupsByEvent(eventId)`** — select de `link_groups` por `event_id`, `deleted_at IS NULL`. Inclui contagem de workers ativos via query separada (select count de `link_group_workers` com `deleted_at IS NULL` filtrado pelo grupo).
 
-### Validação após execução
+#### Mutations
 
-Confirmar:
-- 1 registro em `link_groups`
-- 27 registros em `link_group_workers` com o `link_group_id` correto
-- Dados de `job_role`, `job_function`, `contract_type` preservados
+5. **`useCreateLinkGroup()`** — insert em `link_groups`, invalida `["link-groups"]`.
+
+6. **`useUpdateLinkGroup()`** — update em `link_groups` por id, invalida `["link-groups"]`, `["link-group", id]`, `["link-groups-event"]`.
+
+7. **`useAllocateWorker()`** — insert em `link_group_workers` com todos os campos individuais. Invalida `["link-group-workers", groupId]`, `["link-groups"]`, `["link-groups-event"]`.
+
+8. **`useUpdateGroupWorker()`** — update em `link_group_workers` por id. Mesmas invalidações.
+
+9. **`useRemoveGroupWorker()`** — soft-delete (`deleted_at = now()`). Mesmas invalidações.
+
+### Validação pós-execução
+
+Após criar o arquivo, rodar queries de teste via Supabase para confirmar que os dados do grupo Shakira e seus 27 trabalhadores são retornados corretamente pelas queries definidas.
 
 ### O que NÃO será feito
 
-- Nenhuma alteração nos 27 registros de `employment_links`
-- Nenhuma alteração de frontend
-- Nenhum soft-delete
+- Nenhuma alteração em telas/componentes
+- Nenhuma alteração em `useEmploymentLinks.ts`
+- Nenhuma migração SQL
 
