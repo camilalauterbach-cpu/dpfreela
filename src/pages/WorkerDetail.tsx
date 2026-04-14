@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorker } from "@/hooks/useWorkers";
@@ -20,6 +20,8 @@ import { WorkerLinksList } from "@/components/links/WorkerLinksList";
 export default function WorkerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab") || "dados";
   const { data: worker, isLoading } = useWorker(id);
   const { hasAnyRole } = useAuth();
   const canEdit = hasAnyRole(["admin", "manager", "operator"]);
@@ -101,7 +103,7 @@ export default function WorkerDetail() {
         />
       </div>
 
-      <Tabs defaultValue="dados" className="w-full">
+      <Tabs defaultValue={initialTab} className="w-full">
         <TabsList className="w-full justify-start">
           <TabsTrigger value="dados">Dados</TabsTrigger>
           <TabsTrigger value="documentos">Documentos</TabsTrigger>

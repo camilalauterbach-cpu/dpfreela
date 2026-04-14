@@ -6,11 +6,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Upload, FileText, Image as ImageIcon, CheckCircle2, XCircle, AlertCircle, Clock, RefreshCw, Loader2, Eye,
+  Upload, FileText, Image as ImageIcon, CheckCircle2, XCircle, AlertCircle, Clock, RefreshCw, Loader2, Eye, Plus,
 } from "lucide-react";
 import {
   REQUIRED_DOC_CATEGORIES,
@@ -66,7 +64,7 @@ export function DocumentChecklist({ workerId }: Props) {
   const [previewMime, setPreviewMime] = useState<string | null>(null);
 
   const uploadMutation = useMutation({
-    mutationFn: async ({ category, file }: { category: string; file: File }) => {
+    mutationFn: async ({ category, file, alwaysInsert }: { category: string; file: File; alwaysInsert?: boolean }) => {
       const ext = file.name.split(".").pop();
       const path = `${workerId}/${category}/${Date.now()}.${ext}`;
 
@@ -74,6 +72,24 @@ export function DocumentChecklist({ workerId }: Props) {
         .from("worker-documents")
         .upload(path, file, { upsert: true });
       if (uploadErr) throw uploadErr;
+
+      // For "outros" category, always insert a new record
+      if (alwaysInsert) {
+        const { error } = await supabase
+          .from("worker_documents")
+          .insert({
+            worker_id: workerId,
+            document_type: category,
+            category,
+            file_path: path,
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+            status: "uploaded",
+          });
+        if (error) throw error;
+        return;
+      }
 
       // Check if there's already a doc for this category
       const existing = docs?.find((d) => d.category === category);
@@ -130,7 +146,7 @@ export function DocumentChecklist({ workerId }: Props) {
     },
   });
 
-  const handleFileSelect = (category: string) => {
+  const handleFileSelect = (category: string, alwaysInsert = false) => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*,.pdf";
@@ -141,7 +157,7 @@ export function DocumentChecklist({ workerId }: Props) {
           toast({ title: "Arquivo muito grande", description: "Máximo 10MB", variant: "destructive" });
           return;
         }
-        uploadMutation.mutate({ category, file });
+        uploadMutation.mutate({ category, file, alwaysInsert });
         setUploadingCategory(category);
       }
     };
@@ -251,9 +267,101 @@ export function DocumentChecklist({ workerId }: Props) {
     );
   };
 
+  // Render "Outros" section with multiple files
+  const renderOutrosSection = () => {
+    const outrosDocs = docs?.filter((d) => d.category === "outros") || [];
+
+    return (
+      <Card className="overflow-hidden">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">{DOC_CATEGORY_LABELS["outros"]}</span>
+            </div>
+            {canEdit && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                onClick={() => handleFileSelect("outros", true)}
+                disabled={uploadMutation.isPending && uploadingCategory === "outros"}
+              >
+                {uploadMutation.isPending && uploadingCategory === "outros" ? (
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                ) : (
+                  <Plus className="mr-1 h-3 w-3" />
+                )}
+                Adicionar documento
+              </Button>
+            )}
+          </div>
+
+          <p className="text-xs text-muted-foreground italic">
+            Documentos de filhos, declaração racial, comprovantes complementares, etc.
+          </p>
+
+          {outrosDocs.length === 0 && (
+            <p className="text-xs text-muted-foreground">Nenhum documento complementar enviado.</p>
+          )}
+
+          {outrosDocs.map((doc) => {
+            const status = doc.status || "pending";
+            return (
+              <div key={doc.id} className="flex items-center justify-between gap-2 py-2 border-t border-border">
+                <div className="flex items-center gap-2 min-w-0">
+                  {doc.mime_type?.startsWith("image/") ? (
+                    <ImageIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  ) : (
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm truncate">{doc.file_name || "Arquivo"}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(doc.created_at).toLocaleDateString("pt-BR")}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Badge variant="outline" className={`text-xs ${STATUS_VARIANT[status]}`}>
+                    {STATUS_ICON[status]}
+                    <span className="ml-1">{DOC_STATUS_LABELS[status]}</span>
+                  </Badge>
+                  {doc.file_path && (
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handlePreview(doc)}>
+                      <Eye className="h-3 w-3" />
+                    </Button>
+                  )}
+                  {canEdit && (
+                    <Select
+                      value={status}
+                      onValueChange={(v) => statusMutation.mutate({ docId: doc.id, status: v })}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-auto min-w-[90px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pendente</SelectItem>
+                        <SelectItem value="uploaded">Enviado</SelectItem>
+                        <SelectItem value="approved">Aprovado</SelectItem>
+                        <SelectItem value="rejected">Rejeitado</SelectItem>
+                        <SelectItem value="replace">Substituir</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+    );
+  };
+
   if (isLoading) {
     return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
+
+  // Filter out "outros" from conditional categories since it has its own section
+  const conditionalWithoutOutros = CONDITIONAL_DOC_CATEGORIES.filter((c) => c !== "outros");
 
   return (
     <div className="space-y-6">
@@ -267,8 +375,13 @@ export function DocumentChecklist({ workerId }: Props) {
       <div>
         <h3 className="text-sm font-semibold text-foreground mb-3">Documentos condicionais</h3>
         <div className="grid gap-3 sm:grid-cols-2">
-          {CONDITIONAL_DOC_CATEGORIES.map((c) => renderDocCard(c, false))}
+          {conditionalWithoutOutros.map((c) => renderDocCard(c, false))}
         </div>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold text-foreground mb-3">Outros documentos</h3>
+        {renderOutrosSection()}
       </div>
 
       <Dialog open={!!previewUrl} onOpenChange={() => setPreviewUrl(null)}>
