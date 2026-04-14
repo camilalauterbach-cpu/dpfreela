@@ -65,6 +65,7 @@ const App = () => (
               <Route path="/links" element={<Links />} />
               <Route path="/links/new" element={<LinkForm key="new" />} />
               <Route path="/links/:id" element={<LinkDetail />} />
+              <Route path="/links/:groupId/workers/:workerId" element={<LinkWorkerDetail />} />
               <Route path="/links/:id/edit" element={<LinkForm key="edit" />} />
               <Route path="/payroll" element={<Payroll />} />
               <Route path="/payroll/new" element={<PayrollForm />} />

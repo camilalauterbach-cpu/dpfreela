@@ -22,10 +22,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 interface Props {
   workerId: string;
   employmentLinkId: string;
+  linkGroupWorkerId?: string;
   event: any;
   workerName: string;
   workerCpf?: string;
-  requiredDocuments?: any; // raw JSONB from employment_links
+  requiredDocuments?: any;
 }
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
