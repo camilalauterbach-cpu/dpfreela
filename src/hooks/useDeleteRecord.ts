@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-type TableName = "workers" | "companies" | "events" | "employment_links";
+type TableName = "workers" | "companies" | "events" | "employment_links" | "link_groups";
 
 const dependencyChecks: Record<TableName, { table: string; column: string; label: string }[]> = {
   workers: [
@@ -17,6 +17,9 @@ const dependencyChecks: Record<TableName, { table: string; column: string; label
   ],
   employment_links: [
     { table: "employment_link_documents", column: "employment_link_id", label: "documentos" },
+  ],
+  link_groups: [
+    { table: "link_group_workers", column: "link_group_id", label: "trabalhadores alocados" },
   ],
 };
 
