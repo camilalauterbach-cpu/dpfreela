@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Upload, FileText, Image as ImageIcon, CheckCircle2, XCircle, AlertCircle, Clock, RefreshCw, Loader2, Eye, Plus, CreditCard,
+  Upload, FileText, Image as ImageIcon, CheckCircle2, XCircle, AlertCircle, Clock, RefreshCw, Loader2, Eye, Plus, CreditCard, ExternalLink, FileDown,
 } from "lucide-react";
 import {
   REQUIRED_DOC_CATEGORIES,
@@ -69,6 +69,8 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
   const [uploadingCategory, setUploadingCategory] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewMime, setPreviewMime] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState(false);
+  const [previewFileName, setPreviewFileName] = useState<string>("");
   const [showBankForm, setShowBankForm] = useState(false);
   const [bankReplaceAction, setBankReplaceAction] = useState<"upload" | "form" | null>(null);
 
@@ -188,12 +190,21 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
 
   const handlePreview = async (doc: any) => {
     if (!doc.file_path) return;
-    const { data } = await supabase.storage
-      .from("worker-documents")
-      .createSignedUrl(doc.file_path, 300);
-    if (data?.signedUrl) {
+    const resolvedName = doc.file_name || doc.file_path.split("/").pop() || "documento";
+    try {
+      const { data, error } = await supabase.storage
+        .from("worker-documents")
+        .createSignedUrl(doc.file_path, 300);
+      if (error || !data?.signedUrl) throw new Error("Falha ao gerar URL");
       setPreviewUrl(data.signedUrl);
       setPreviewMime(doc.mime_type);
+      setPreviewFileName(resolvedName);
+      setPreviewError(false);
+    } catch {
+      setPreviewError(true);
+      setPreviewFileName(resolvedName);
+      setPreviewUrl("error");
+      toast({ title: "Erro no preview", description: "Não foi possível carregar o preview deste documento.", variant: "destructive" });
     }
   };
 
@@ -549,13 +560,35 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
       </div>
 
       {/* Preview dialog */}
-      <Dialog open={!!previewUrl} onOpenChange={() => setPreviewUrl(null)}>
+      <Dialog open={!!previewUrl} onOpenChange={() => { setPreviewUrl(null); setPreviewError(false); }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Preview do documento</DialogTitle>
           </DialogHeader>
+          {previewFileName && (
+            <p className="text-sm text-muted-foreground truncate -mt-2">{previewFileName}</p>
+          )}
           {previewUrl && (
-            previewMime?.startsWith("image/") ? (
+            previewError || (!previewMime?.startsWith("image/") && !previewMime?.includes("pdf")) ? (
+              <div className="flex flex-col items-center gap-4 py-8 px-4 rounded-md border border-dashed border-border bg-muted/30">
+                <AlertCircle className="h-10 w-10 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground text-center">
+                  {previewError
+                    ? "Não foi possível carregar o preview deste documento."
+                    : "Este tipo de arquivo não suporta preview inline."}
+                </p>
+                {!previewError && previewUrl !== "error" && (
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => window.open(previewUrl!, "_blank")}>
+                      <ExternalLink className="mr-1 h-3 w-3" /> Abrir em nova aba
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => { const a = document.createElement("a"); a.href = previewUrl!; a.download = previewFileName; a.click(); }}>
+                      <FileDown className="mr-1 h-3 w-3" /> Baixar arquivo
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : previewMime?.startsWith("image/") ? (
               <img src={previewUrl} alt="Documento" className="w-full rounded" />
             ) : (
               <iframe src={previewUrl} className="w-full h-[70vh] rounded" />
