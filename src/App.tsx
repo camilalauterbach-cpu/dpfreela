@@ -50,9 +50,9 @@ const App = () => (
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/workers" element={<Workers />} />
-              <Route path="/workers/new" element={<WorkerForm />} />
+              <Route path="/workers/new" element={<WorkerForm key="new" />} />
               <Route path="/workers/:id" element={<WorkerDetail />} />
-              <Route path="/workers/:id/edit" element={<WorkerForm />} />
+              <Route path="/workers/:id/edit" element={<WorkerForm key="edit" />} />
               <Route path="/events" element={<Events />} />
               <Route path="/events/new" element={<EventForm />} />
               <Route path="/events/:id" element={<EventDetail />} />
