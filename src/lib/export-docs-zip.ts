@@ -61,6 +61,7 @@ export async function exportWorkerDocsZip({ workerIds, workerInfoMap }: WorkerDo
 interface LinkDocZipParams {
   workerId: string;
   employmentLinkId: string;
+  linkGroupWorkerId?: string;
   workerName: string;
   cpf: string;
   mode: "worker" | "event" | "all";
