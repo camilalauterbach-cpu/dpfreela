@@ -1,42 +1,71 @@
 
 
-## Etapa 3 — Execução: Hook `useLinkGroups.ts`
+## Etapa 4 — Reescrita das telas principais para link_groups
 
-Criar o arquivo `src/hooks/useLinkGroups.ts` seguindo o padrão exato de `useEmploymentLinks.ts`.
+### Ajustes pendentes no hook (pré-requisito)
 
-### Arquivo a criar
+Dois ajustes no `useLinkGroups.ts` antes das telas:
 
-**`src/hooks/useLinkGroups.ts`** — um único arquivo com:
+1. **`useLinkGroupWorkers`**: trocar `.order("created_at", { ascending: false })` por ordenação pelo nome do trabalhador (via join, client-side sort por `workers.full_name`)
+2. **Mutations de worker** (`useAllocateWorker`, `useUpdateGroupWorker`, `useRemoveGroupWorker`): adicionar invalidação de `["link-group", vars.link_group_id]` no `onSuccess`
 
-#### Queries
+### Tela 1: Links.tsx (listagem)
 
-1. **`useLinkGroups(search, statusFilter)`** — select de `link_groups` com joins `events(name)`, `companies(legal_name, trade_name)`. Busca client-side por `group_name` e `events.name` (mesmo padrão do legado). Filtro por status. Limit 200. `events.name` acessível via cast `(g.events as any)?.name`.
+Substituir o uso de `useEmploymentLinks` por `useLinkGroups`. A tabela passa a listar **grupos**, não vínculos individuais.
 
-2. **`useLinkGroup(id)`** — select `*` com joins `events(id, name, requires_epi_form, requires_service_order, required_nrs, required_nrs_other)`, `companies(legal_name, trade_name)`. Usa `.single()`.
+Colunas: Nome do grupo, Evento, Empresa, Trabalhadores (count), Período, Status.
 
-3. **`useLinkGroupWorkers(groupId)`** — select de `link_group_workers` por `link_group_id`, com join `workers(full_name, nickname, cpf, phone_main)`. `deleted_at IS NULL`. Ordenado por `created_at desc`.
+Filtros mantidos: busca, status, empresa, evento, período.
+Exportações (CSV, PDF, Admissão, ZIP): mantidas mas adaptadas para ler de `link_groups` + `link_group_workers`.
+Click na row navega para `/links/:groupId` (detalhe do grupo).
+Botao "Novo" navega para `/links/new` (criar grupo).
 
-4. **`useLinkGroupsByEvent(eventId)`** — select de `link_groups` por `event_id`, `deleted_at IS NULL`. Inclui contagem de workers ativos via query separada (select count de `link_group_workers` com `deleted_at IS NULL` filtrado pelo grupo).
+### Tela 2: LinkForm.tsx (criar/editar grupo)
 
-#### Mutations
+Formulario de **grupo**, nao de vinculo individual. Campos do grupo:
 
-5. **`useCreateLinkGroup()`** — insert em `link_groups`, invalida `["link-groups"]`.
+- `group_name` (obrigatório)
+- `event_id` (select, auto-preenche `company_id`)
+- `company_id` (select)
+- `status`, `hire_date`, `end_date`
+- Jornada: `shift_type`, `work_shift`, `work_schedule`, `call_time`, `daily_hours`, `weekly_hours`
+- Dias de atuacao: `work_days_mode`, `specific_work_dates`, `work_days_notes`
+- Operacional: `supervisor_name`, `assembly_point`, `uniform_notes`, `transport_notes`, `meal_entitlement`
+- `required_documents` (config de documentos)
+- `notes`
 
-6. **`useUpdateLinkGroup()`** — update em `link_groups` por id, invalida `["link-groups"]`, `["link-group", id]`, `["link-groups-event"]`.
+Sem campos de remuneração no grupo (fica no worker individual).
+Sem seleção de trabalhador (alocação é feita no detalhe do grupo).
+Usa `useCreateLinkGroup` / `useUpdateLinkGroup`.
 
-7. **`useAllocateWorker()`** — insert em `link_group_workers` com todos os campos individuais. Invalida `["link-group-workers", groupId]`, `["link-groups"]`, `["link-groups-event"]`.
+### Tela 3: LinkDetail.tsx (detalhe do grupo)
 
-8. **`useUpdateGroupWorker()`** — update em `link_group_workers` por id. Mesmas invalidações.
+Header com nome do grupo, badge de status, evento, empresa.
 
-9. **`useRemoveGroupWorker()`** — soft-delete (`deleted_at = now()`). Mesmas invalidações.
+Tabs:
+- **Dados**: cards com informações do grupo (mesma estrutura atual, sem remuneração)
+- **Trabalhadores**: lista de `link_group_workers` com nome, função, status. Botão "Alocar trabalhador" abre dialog/inline para adicionar worker ao grupo. Cada worker com ações de editar/remover.
+- **Documentos**: mantido, adaptado para usar `link_group_workers` em vez de `employment_links`
 
-### Validação pós-execução
+Usa `useLinkGroup(id)`, `useLinkGroupWorkers(id)`, `useAllocateWorker`, `useRemoveGroupWorker`.
 
-Após criar o arquivo, rodar queries de teste via Supabase para confirmar que os dados do grupo Shakira e seus 27 trabalhadores são retornados corretamente pelas queries definidas.
+### Rotas (App.tsx)
 
-### O que NÃO será feito
+Sem alteração de rotas. As rotas `/links`, `/links/new`, `/links/:id`, `/links/:id/edit` continuam existindo, apontando para os mesmos componentes reescritos.
 
-- Nenhuma alteração em telas/componentes
-- Nenhuma alteração em `useEmploymentLinks.ts`
+### O que NAO sera feito nesta etapa
+
+- Nenhuma alteração em `EventLinksList`, `WorkerLinksList`, `ImportLinksDialog`, `Dashboard` (etapa 5)
 - Nenhuma migração SQL
+- Nenhum soft-delete do legado
+- `useEmploymentLinks.ts` permanece intacto
+
+### Arquivos alterados
+
+| Arquivo | Acao |
+|---|---|
+| `src/hooks/useLinkGroups.ts` | Ajustar ordenacao e invalidacao |
+| `src/pages/Links.tsx` | Reescrever para listar `link_groups` |
+| `src/pages/LinkForm.tsx` | Reescrever para criar/editar grupo |
+| `src/pages/LinkDetail.tsx` | Reescrever para detalhe de grupo + tab trabalhadores |
 
