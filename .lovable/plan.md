@@ -1,58 +1,38 @@
 
 
-## Implementação: 3 correções funcionais + modelagem contratação/remuneração
+## Tela operacional do trabalhador alocado no grupo/evento
 
-### 1. Migração SQL
-
-**`link_groups`**: adicionar `allowed_contract_types text not null default 'both'`
-
-**`link_group_workers`**: adicionar 7 colunas:
-- `shift_type text`, `work_shift text`, `work_schedule text`, `call_time time`, `daily_hours numeric`, `weekly_hours numeric`
-- `category_reference_rate numeric`
-
-Nenhuma coluna existente removida. Dados dos 27 trabalhadores intactos.
-
-### 2. `src/pages/LinkForm.tsx`
-
-- **Adicionar** select `allowed_contract_types` na seção Contrato (CLT / Prestação de serviço / Ambos)
-- **Remover** seção Jornada inteira (linhas 336-365) — turno, escala, horário passam para o trabalhador
-- Remover campos de jornada do state/payload, adicionar `allowed_contract_types`
-
-### 3. `src/pages/LinkDetail.tsx`
-
-**Tab Dados**:
-- Remover card Jornada (linhas 191-201)
-- Adicionar "Tipo de contratação permitido" no card Contrato
-
-**Dialog de alocação** — expandir com seções completas:
-- **Identificação**: trabalhador, função/cargo, atividade, departamento, tipo de contrato (filtrado por `allowed_contract_types` do grupo: `clt` → só CLT, `service` → só prestação, `both` → ambas)
-- **Jornada**: turno, escala, horário, horário de chamada, horas diárias, horas semanais
-- **Remuneração**: tipo de remuneração (cachê/diária/hora/fixo) + valor efetivo do evento (campos separados e claros)
-- **Referência**: valor de referência da categoria/cargo (campo `category_reference_rate`, separado do efetivo)
-- **Benefícios**: VT (toggle + valor), VR/VA (toggle + valor)
-- **Observações**
-
-**Remoção de trabalhador**: substituir `confirm()` nativo por `DeleteConfirmDialog`
-
-### 4. `src/components/links/EventLinksList.tsx`
-
-Reescrever para usar `useLinkGroupsByEvent(eventId)`:
-- Cards listam **grupos** (nome, worker_count, status)
-- Click navega para `/links/{group.id}`
-- Botão "Novo grupo" navega para `/links/new?event={eventId}`
-- Remover imports/queries de `employment_links`
-
-### 5. `src/hooks/useLinkGroups.ts`
-
-Expandir `useLinkGroupWorkers` select para incluir os 7 novos campos.
+### Migração SQL
+Adicionar `link_group_worker_id uuid` à tabela `employment_link_documents`. Dados existentes intactos.
 
 ### Arquivos alterados
 
 | Arquivo | Ação |
 |---|---|
-| Migração SQL | 1 coluna em `link_groups`, 7 em `link_group_workers` |
-| `src/hooks/useLinkGroups.ts` | Expandir select |
-| `src/pages/LinkForm.tsx` | Tipo contratação, remover Jornada |
-| `src/pages/LinkDetail.tsx` | Dialog expandido, modal remoção, remover Jornada |
-| `src/components/links/EventLinksList.tsx` | Reescrever para link_groups |
+| Migração SQL | 1 coluna `link_group_worker_id` em `employment_link_documents` |
+| `src/App.tsx` | Nova rota `/links/:groupId/workers/:workerId` |
+| `src/pages/LinkWorkerDetail.tsx` | **Novo** — tela operacional com abas (Dados + Documentos) |
+| `src/hooks/useLinkGroups.ts` | Novo hook `useLinkGroupWorker(groupId, workerId)` |
+| `src/components/links/LinkDocumentsTab.tsx` | Novo prop `linkGroupWorkerId`, queries e inserts condicionais, storage path separado |
+| `src/pages/LinkDetail.tsx` | Linhas da tabela de trabalhadores clicáveis → navegam para a tela operacional |
+| `src/lib/export-docs-zip.ts` | Suporte a `linkGroupWorkerId` nos downloads |
+
+### Detalhes técnicos
+
+**LinkDocumentsTab** — quando `linkGroupWorkerId` presente:
+- Queries filtram por `link_group_worker_id` em vez de `employment_link_id`
+- Inserts preenchem `link_group_worker_id` (sem preencher `employment_link_id`)
+- Storage path: `{workerId}/{linkGroupWorkerId}/{category}_{timestamp}.ext`
+- Quando ausente: comportamento legado inalterado
+
+**LinkWorkerDetail** — layout:
+- Header com breadcrumb (Grupo → Trabalhador)
+- Aba "Dados": cards de Identificação, Contrato, Jornada, Remuneração (tipo + valor efetivo + valor referência), Benefícios
+- Aba "Documentos": `LinkDocumentsTab` com `linkGroupWorkerId` + `requiredDocuments` do grupo
+
+**Regra de dono do documento**:
+- Documento legado → `employment_link_id`
+- Documento novo (modelo grupo) → `link_group_worker_id`
+- Documento do evento → `event_id`
+- Sem ambiguidade entre os três
 
