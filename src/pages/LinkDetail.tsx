@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Pencil, Loader2, Trash2 } from "lucide-react";
-import { OperationalDocsChecklist } from "@/components/events/OperationalDocsChecklist";
+
 import { LinkDocumentsTab } from "@/components/links/LinkDocumentsTab";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useDeleteRecord } from "@/hooks/useDeleteRecord";
