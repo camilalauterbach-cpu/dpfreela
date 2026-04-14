@@ -1,20 +1,23 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Download, CheckCircle2, Clock, XCircle, AlertCircle, RefreshCw, FileText, Info } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Download, CheckCircle2, Clock, XCircle, RefreshCw, FileText, Info, Upload, AlertCircle, Eye } from "lucide-react";
 import {
   REQUIRED_DOC_CATEGORIES,
   CONDITIONAL_DOC_CATEGORIES,
   DOC_CATEGORY_LABELS,
   DOC_STATUS_LABELS,
 } from "@/lib/worker-completeness";
-import { OperationalDocsChecklist } from "@/components/events/OperationalDocsChecklist";
+import { LinkDocumentConfig, parseConfig, getConfiguredDocs, getCategoryLabel } from "@/lib/link-document-config";
 import { exportLinkDocsZip } from "@/lib/export-docs-zip";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Props {
   workerId: string;
@@ -22,6 +25,7 @@ interface Props {
   event: any;
   workerName: string;
   workerCpf?: string;
+  requiredDocuments?: any; // raw JSONB from employment_links
 }
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
@@ -33,30 +37,27 @@ const STATUS_ICON: Record<string, React.ReactNode> = {
 };
 
 const STATUS_VARIANT: Record<string, string> = {
-  pending: "bg-muted text-muted-foreground",
+  pending: "bg-destructive/10 text-destructive border-destructive/30",
   uploaded: "bg-blue-50 text-blue-700 border-blue-200",
   approved: "bg-green-50 text-green-700 border-green-200",
-  rejected: "bg-red-50 text-red-700 border-red-200",
+  rejected: "bg-destructive/10 text-destructive border-destructive/30",
   replace: "bg-yellow-50 text-yellow-700 border-yellow-200",
 };
 
-function getEventRequiredCategories(event: any): string[] {
-  const cats: string[] = [];
-  if (event?.requires_epi_form) cats.push("ficha_epi");
-  if (event?.requires_service_order) cats.push("ordem_servico");
-  if (event?.required_nrs) {
-    for (const nr of event.required_nrs) {
-      cats.push(nr.toLowerCase().replace(" ", "_"));
-    }
-  }
-  if (event?.required_nrs_other) cats.push("nr_custom");
-  return cats;
-}
-
-export function LinkDocumentsTab({ workerId, employmentLinkId, event, workerName, workerCpf }: Props) {
+export function LinkDocumentsTab({ workerId, employmentLinkId, event, workerName, workerCpf, requiredDocuments }: Props) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { hasAnyRole } = useAuth();
+  const canManage = hasAnyRole(["admin", "manager", "operator"]);
+  const queryClient = useQueryClient();
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewMime, setPreviewMime] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadCategoryRef = useRef<string>("");
+
+  const config = parseConfig(requiredDocuments);
+  const configuredDocs = getConfiguredDocs(config);
 
   const { data: workerDocs, isLoading: loadingWorkerDocs } = useQuery({
     queryKey: ["worker-documents", workerId],
@@ -85,6 +86,91 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, event, workerName
     },
   });
 
+  const uploadMutation = useMutation({
+    mutationFn: async ({ file, category }: { file: File; category: string }) => {
+      const ext = file.name.split(".").pop();
+      const path = `${workerId}/${employmentLinkId}/${category}_${Date.now()}.${ext}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from("link-documents")
+        .upload(path, file);
+      if (uploadErr) throw uploadErr;
+
+      const existing = linkDocs?.find((d: any) => d.category === category);
+      if (existing) {
+        const { error } = await supabase
+          .from("employment_link_documents")
+          .update({
+            file_path: path,
+            file_name: file.name,
+            mime_type: file.type,
+            file_size: file.size,
+            status: "uploaded",
+          } as any)
+          .eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("employment_link_documents")
+          .insert({
+            employment_link_id: employmentLinkId,
+            worker_id: workerId,
+            document_type: "operacional_vinculo",
+            category,
+            file_path: path,
+            file_name: file.name,
+            mime_type: file.type,
+            file_size: file.size,
+            status: "uploaded",
+          } as any);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["link-docs", employmentLinkId] });
+      toast({ title: "Documento enviado" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro no upload", description: err?.message, variant: "destructive" });
+    },
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: async ({ docId, status }: { docId: string; status: string }) => {
+      const { error } = await supabase
+        .from("employment_link_documents")
+        .update({ status } as any)
+        .eq("id", docId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["link-docs", employmentLinkId] });
+    },
+  });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && uploadCategoryRef.current) {
+      uploadMutation.mutate({ file, category: uploadCategoryRef.current });
+    }
+    e.target.value = "";
+  };
+
+  const triggerUpload = (category: string) => {
+    uploadCategoryRef.current = category;
+    fileInputRef.current?.click();
+  };
+
+  const handlePreview = async (filePath: string, mimeType: string | null, bucket: string) => {
+    const { data } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(filePath, 300);
+    if (data?.signedUrl) {
+      setPreviewUrl(data.signedUrl);
+      setPreviewMime(mimeType);
+    }
+  };
+
   const handleDownload = async (mode: "worker" | "event" | "all") => {
     setDownloading(mode);
     try {
@@ -107,6 +193,7 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, event, workerName
     return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
 
+  // Worker doc map (most recent per category, except "outros")
   const workerDocMap = new Map<string, any>();
   const outrosDocs: any[] = [];
   workerDocs?.forEach((d) => {
@@ -120,59 +207,103 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, event, workerName
     }
   });
 
+  // Link doc map
   const linkDocMap = new Map<string, any>();
   linkDocs?.forEach((d: any) => {
     if (d.category) linkDocMap.set(d.category, d);
   });
 
-  const eventCategories = getEventRequiredCategories(event);
+  const allWorkerCategories = [...REQUIRED_DOC_CATEGORIES, ...CONDITIONAL_DOC_CATEGORIES.filter(c => c !== "outros")];
 
-  const workerPendencies = REQUIRED_DOC_CATEGORIES.filter((cat) => {
-    const doc = workerDocMap.get(cat);
-    return !doc || doc.status !== "approved";
-  });
+  // Group configured docs
+  const operationalDocs = configuredDocs.filter((d) => d.group === "operational");
+  const nrDocs = configuredDocs.filter((d) => d.group === "nrs");
+  const companyDocs = configuredDocs.filter((d) => d.group === "company");
+  const hasConfiguredDocs = configuredDocs.length > 0;
 
-  const eventPendencies = eventCategories.filter((cat) => {
-    const doc = linkDocMap.get(cat);
-    return !doc || doc.status !== "approved";
-  });
+  const renderLinkDocRow = (category: string, label: string) => {
+    const doc = linkDocMap.get(category);
+    const status = doc?.status || "pending";
 
-  const allCategories = [...REQUIRED_DOC_CATEGORIES, ...CONDITIONAL_DOC_CATEGORIES.filter(c => c !== "outros")];
+    return (
+      <div key={category} className="flex items-center justify-between gap-2 py-2 border-b border-border last:border-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm truncate">{label}</p>
+            {doc?.file_name && <p className="text-xs text-muted-foreground truncate">{doc.file_name}</p>}
+          </div>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <Badge variant="outline" className={`text-xs ${STATUS_VARIANT[status]}`}>
+            {STATUS_ICON[status]}
+            <span className="ml-1">{DOC_STATUS_LABELS[status] || status}</span>
+          </Badge>
+          {doc?.file_path && (
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handlePreview(doc.file_path, doc.mime_type, "link-documents")}>
+              <Eye className="h-3 w-3" />
+            </Button>
+          )}
+          {canManage && doc && (
+            <Select value={status} onValueChange={(v) => statusMutation.mutate({ docId: doc.id, status: v })}>
+              <SelectTrigger className="h-7 w-[110px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pendente</SelectItem>
+                <SelectItem value="uploaded">Enviado</SelectItem>
+                <SelectItem value="approved">Aprovado</SelectItem>
+                <SelectItem value="rejected">Rejeitado</SelectItem>
+                <SelectItem value="replace">Substituir</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+          {canManage && (!doc || status === "pending" || status === "rejected" || status === "replace") && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={() => triggerUpload(category)}
+              disabled={uploadMutation.isPending}
+            >
+              {uploadMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        accept=".pdf,.jpg,.jpeg,.png,.webp"
+        onChange={handleFileChange}
+      />
+
+      {/* Download buttons */}
       <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => handleDownload("worker")}
-          disabled={!!downloading}
-        >
+        <Button size="sm" variant="outline" onClick={() => handleDownload("worker")} disabled={!!downloading}>
           {downloading === "worker" ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Download className="mr-1 h-3 w-3" />}
           Baixar docs do trabalhador
         </Button>
-        {eventCategories.length > 0 && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleDownload("event")}
-            disabled={!!downloading}
-          >
+        {hasConfiguredDocs && (
+          <Button size="sm" variant="outline" onClick={() => handleDownload("event")} disabled={!!downloading}>
             {downloading === "event" ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Download className="mr-1 h-3 w-3" />}
-            Baixar docs do evento
+            Baixar docs do vínculo
           </Button>
         )}
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => handleDownload("all")}
-          disabled={!!downloading}
-        >
+        <Button size="sm" variant="outline" onClick={() => handleDownload("all")} disabled={!!downloading}>
           {downloading === "all" ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Download className="mr-1 h-3 w-3" />}
           Baixar todos
         </Button>
       </div>
 
+      {/* Section A: Worker documents (read-only) */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Documentos do trabalhador</CardTitle>
@@ -190,7 +321,7 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, event, workerName
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
-          {allCategories.map((cat) => {
+          {allWorkerCategories.map((cat) => {
             const doc = workerDocMap.get(cat);
             const status = doc?.status || "pending";
             const isRequired = (REQUIRED_DOC_CATEGORIES as readonly string[]).includes(cat);
@@ -207,10 +338,17 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, event, workerName
                     {doc?.file_name && <p className="text-xs text-muted-foreground truncate">{doc.file_name}</p>}
                   </div>
                 </div>
-                <Badge variant="outline" className={`text-xs shrink-0 ${STATUS_VARIANT[status]}`}>
-                  {STATUS_ICON[status]}
-                  <span className="ml-1">{DOC_STATUS_LABELS[status] || status}</span>
-                </Badge>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Badge variant="outline" className={`text-xs ${STATUS_VARIANT[status]}`}>
+                    {STATUS_ICON[status]}
+                    <span className="ml-1">{DOC_STATUS_LABELS[status] || status}</span>
+                  </Badge>
+                  {doc?.file_path && (
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handlePreview(doc.file_path, doc.mime_type, "worker-documents")}>
+                      <Eye className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -241,81 +379,65 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, event, workerName
         </CardContent>
       </Card>
 
-      {event ? (
-        <OperationalDocsChecklist employmentLinkId={employmentLinkId} workerId={workerId} event={event} />
-      ) : (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            Nenhum evento vinculado — documentos operacionais não aplicáveis.
-          </CardContent>
-        </Card>
-      )}
-
-      {(workerPendencies.length > 0 || eventPendencies.length > 0) && (
+      {/* Section B: Configured link/event documents */}
+      {hasConfiguredDocs ? (
         <div className="space-y-4">
-          {workerPendencies.length > 0 && (
-            <Card className="border-yellow-200">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-yellow-700 flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4" />
-                  Pendências do trabalhador
-                </CardTitle>
+          {operationalDocs.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Documentos operacionais do vínculo/evento</CardTitle>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-1">
-                  {workerPendencies.map((cat) => {
-                    const doc = workerDocMap.get(cat);
-                    const status = doc?.status || "pending";
-                    return (
-                      <li key={cat} className="flex items-center justify-between text-sm py-1">
-                        <span>{DOC_CATEGORY_LABELS[cat] || cat}</span>
-                        <Badge variant="outline" className={`text-xs ${STATUS_VARIANT[status]}`}>
-                          {STATUS_ICON[status]}
-                          <span className="ml-1">{doc ? DOC_STATUS_LABELS[status] : "Faltante"}</span>
-                        </Badge>
-                      </li>
-                    );
-                  })}
-                </ul>
+                {operationalDocs.map((d) => renderLinkDocRow(d.category, d.label))}
               </CardContent>
             </Card>
           )}
 
-          {eventPendencies.length > 0 && (
-            <Card className="border-yellow-200">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-yellow-700 flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4" />
-                  Pendências do evento
-                </CardTitle>
+          {nrDocs.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">NRs aplicáveis</CardTitle>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-1">
-                  {eventPendencies.map((cat) => {
-                    const doc = linkDocMap.get(cat);
-                    const status = doc?.status || "pending";
-                    const NR_LABELS: Record<string, string> = {
-                      ficha_epi: "Ficha de entrega de EPI",
-                      ordem_servico: "Ordem de serviço",
-                      nr_custom: event?.required_nrs_other || "NR personalizada",
-                    };
-                    const label = NR_LABELS[cat] || cat.replace("_", " ").toUpperCase();
-                    return (
-                      <li key={cat} className="flex items-center justify-between text-sm py-1">
-                        <span>{label}</span>
-                        <Badge variant="outline" className={`text-xs ${STATUS_VARIANT[status]}`}>
-                          {STATUS_ICON[status]}
-                          <span className="ml-1">{doc ? DOC_STATUS_LABELS[status] : "Faltante"}</span>
-                        </Badge>
-                      </li>
-                    );
-                  })}
-                </ul>
+                {nrDocs.map((d) => renderLinkDocRow(d.category, d.label))}
+              </CardContent>
+            </Card>
+          )}
+
+          {companyDocs.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Documentos da empresa/operação</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {companyDocs.map((d) => renderLinkDocRow(d.category, d.label))}
               </CardContent>
             </Card>
           )}
         </div>
+      ) : (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            Nenhum documento operacional foi configurado para este vínculo. Para definir documentos obrigatórios, edite o vínculo.
+          </CardContent>
+        </Card>
       )}
+
+      {/* Preview dialog */}
+      <Dialog open={!!previewUrl} onOpenChange={() => setPreviewUrl(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Preview do documento</DialogTitle>
+          </DialogHeader>
+          {previewUrl && (
+            previewMime?.startsWith("image/") ? (
+              <img src={previewUrl} alt="Documento" className="w-full rounded" />
+            ) : (
+              <iframe src={previewUrl} className="w-full h-[70vh] rounded" />
+            )
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
