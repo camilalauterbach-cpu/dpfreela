@@ -361,7 +361,7 @@ export default function LinkDetail() {
                     const wNick = w.workers?.nickname;
                     const effectiveVal = getWorkerEffectiveValue(w);
                     return (
-                      <TableRow key={w.id}>
+                      <TableRow key={w.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/links/${id}/workers/${w.worker_id}`)}>
                         <TableCell>
                           <p className="text-sm font-medium">{wName}{wNick ? ` (${wNick})` : ""}</p>
                           <p className="text-xs text-muted-foreground sm:hidden">{w.job_role || ""}</p>
@@ -374,7 +374,7 @@ export default function LinkDetail() {
                         {canEdit && (
                           <TableCell>
                             <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => setRemoveTarget({ id: w.id, name: wName })}
+                              onClick={(e) => { e.stopPropagation(); setRemoveTarget({ id: w.id, name: wName }); }}
                               disabled={removeMutation.isPending}
                             >
                               <UserMinus className="h-3 w-3" />

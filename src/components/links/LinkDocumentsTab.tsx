@@ -22,10 +22,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 interface Props {
   workerId: string;
   employmentLinkId: string;
+  linkGroupWorkerId?: string;
   event: any;
   workerName: string;
   workerCpf?: string;
-  requiredDocuments?: any; // raw JSONB from employment_links
+  requiredDocuments?: any;
 }
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
@@ -44,7 +45,9 @@ const STATUS_VARIANT: Record<string, string> = {
   replace: "bg-yellow-50 text-yellow-700 border-yellow-200",
 };
 
-export function LinkDocumentsTab({ workerId, employmentLinkId, event, workerName, workerCpf, requiredDocuments }: Props) {
+export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId, event, workerName, workerCpf, requiredDocuments }: Props) {
+  const useNewModel = !!linkGroupWorkerId;
+  const docOwnerId = useNewModel ? linkGroupWorkerId : employmentLinkId;
   const navigate = useNavigate();
   const { toast } = useToast();
   const { hasAnyRole } = useAuth();
@@ -73,13 +76,16 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, event, workerName
   });
 
   const { data: linkDocs, isLoading: loadingLinkDocs } = useQuery({
-    queryKey: ["link-docs", employmentLinkId],
-    enabled: !!employmentLinkId,
+    queryKey: ["link-docs", docOwnerId],
+    enabled: !!docOwnerId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const filterCol = useNewModel ? "link_group_worker_id" : "employment_link_id";
+      const filterVal = useNewModel ? linkGroupWorkerId! : employmentLinkId;
+
+      const { data, error } = await (supabase
         .from("employment_link_documents")
-        .select("*")
-        .eq("employment_link_id", employmentLinkId)
+        .select("*") as any)
+        .eq(filterCol, filterVal)
         .is("deleted_at", null);
       if (error) throw error;
       return data;
@@ -89,11 +95,13 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, event, workerName
   const uploadMutation = useMutation({
     mutationFn: async ({ file, category }: { file: File; category: string }) => {
       const ext = file.name.split(".").pop();
-      const path = `${workerId}/${employmentLinkId}/${category}_${Date.now()}.${ext}`;
+      const storagePath = useNewModel
+        ? `${workerId}/${linkGroupWorkerId}/${category}_${Date.now()}.${ext}`
+        : `${workerId}/${employmentLinkId}/${category}_${Date.now()}.${ext}`;
 
       const { error: uploadErr } = await supabase.storage
         .from("link-documents")
-        .upload(path, file);
+        .upload(storagePath, file);
       if (uploadErr) throw uploadErr;
 
       const existing = linkDocs?.find((d: any) => d.category === category);
@@ -101,7 +109,7 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, event, workerName
         const { error } = await supabase
           .from("employment_link_documents")
           .update({
-            file_path: path,
+            file_path: storagePath,
             file_name: file.name,
             mime_type: file.type,
             file_size: file.size,
@@ -110,24 +118,29 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, event, workerName
           .eq("id", existing.id);
         if (error) throw error;
       } else {
+        const insertPayload: Record<string, any> = {
+          worker_id: workerId,
+          document_type: "operacional_vinculo",
+          category,
+          file_path: storagePath,
+          file_name: file.name,
+          mime_type: file.type,
+          file_size: file.size,
+          status: "uploaded",
+        };
+        if (useNewModel) {
+          insertPayload.link_group_worker_id = linkGroupWorkerId;
+        } else {
+          insertPayload.employment_link_id = employmentLinkId;
+        }
         const { error } = await supabase
           .from("employment_link_documents")
-          .insert({
-            employment_link_id: employmentLinkId,
-            worker_id: workerId,
-            document_type: "operacional_vinculo",
-            category,
-            file_path: path,
-            file_name: file.name,
-            mime_type: file.type,
-            file_size: file.size,
-            status: "uploaded",
-          } as any);
+          .insert(insertPayload as any);
         if (error) throw error;
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["link-docs", employmentLinkId] });
+      queryClient.invalidateQueries({ queryKey: ["link-docs", docOwnerId] });
       toast({ title: "Documento enviado" });
     },
     onError: (err: any) => {
@@ -144,7 +157,7 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, event, workerName
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["link-docs", employmentLinkId] });
+      queryClient.invalidateQueries({ queryKey: ["link-docs", docOwnerId] });
     },
   });
 
@@ -176,7 +189,8 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, event, workerName
     try {
       const count = await exportLinkDocsZip({
         workerId,
-        employmentLinkId,
+        employmentLinkId: useNewModel ? "" : employmentLinkId,
+        linkGroupWorkerId: useNewModel ? linkGroupWorkerId : undefined,
         workerName,
         cpf: workerCpf || "",
         mode,

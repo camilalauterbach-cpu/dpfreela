@@ -61,12 +61,13 @@ export async function exportWorkerDocsZip({ workerIds, workerInfoMap }: WorkerDo
 interface LinkDocZipParams {
   workerId: string;
   employmentLinkId: string;
+  linkGroupWorkerId?: string;
   workerName: string;
   cpf: string;
   mode: "worker" | "event" | "all";
 }
 
-export async function exportLinkDocsZip({ workerId, employmentLinkId, workerName, cpf, mode }: LinkDocZipParams) {
+export async function exportLinkDocsZip({ workerId, employmentLinkId, linkGroupWorkerId, workerName, cpf, mode }: LinkDocZipParams) {
   const zip = new JSZip();
   let fileCount = 0;
 
@@ -108,11 +109,18 @@ export async function exportLinkDocsZip({ workerId, employmentLinkId, workerName
 
   // Event/link docs
   if (mode === "event" || mode === "all") {
-    const { data: eDocs } = await supabase
+    let eQuery = supabase
       .from("employment_link_documents")
       .select("id, document_type, category, file_path, file_name")
-      .eq("employment_link_id", employmentLinkId)
       .is("deleted_at", null);
+
+    if (linkGroupWorkerId) {
+      eQuery = (eQuery as any).eq("link_group_worker_id", linkGroupWorkerId);
+    } else {
+      eQuery = eQuery.eq("employment_link_id", employmentLinkId);
+    }
+
+    const { data: eDocs } = await eQuery;
 
     const subFolder = mode === "all" ? "documentos_evento" : "";
 

@@ -24,6 +24,7 @@ import CompanyDetail from "./pages/CompanyDetail";
 import Links from "./pages/Links";
 import LinkDetail from "./pages/LinkDetail";
 import LinkForm from "./pages/LinkForm";
+import LinkWorkerDetail from "./pages/LinkWorkerDetail";
 import Payroll from "./pages/Payroll";
 import PayrollForm from "./pages/PayrollForm";
 import PayrollDetail from "./pages/PayrollDetail";
@@ -64,6 +65,7 @@ const App = () => (
               <Route path="/links" element={<Links />} />
               <Route path="/links/new" element={<LinkForm key="new" />} />
               <Route path="/links/:id" element={<LinkDetail />} />
+              <Route path="/links/:groupId/workers/:workerId" element={<LinkWorkerDetail />} />
               <Route path="/links/:id/edit" element={<LinkForm key="edit" />} />
               <Route path="/payroll" element={<Payroll />} />
               <Route path="/payroll/new" element={<PayrollForm />} />

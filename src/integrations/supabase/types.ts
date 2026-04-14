@@ -111,6 +111,7 @@ export type Database = {
           file_path: string | null
           file_size: number | null
           id: string
+          link_group_worker_id: string | null
           mime_type: string | null
           notes: string | null
           status: string
@@ -129,6 +130,7 @@ export type Database = {
           file_path?: string | null
           file_size?: number | null
           id?: string
+          link_group_worker_id?: string | null
           mime_type?: string | null
           notes?: string | null
           status?: string
@@ -147,6 +149,7 @@ export type Database = {
           file_path?: string | null
           file_size?: number | null
           id?: string
+          link_group_worker_id?: string | null
           mime_type?: string | null
           notes?: string | null
           status?: string
