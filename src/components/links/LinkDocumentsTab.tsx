@@ -157,7 +157,7 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["link-docs", employmentLinkId] });
+      queryClient.invalidateQueries({ queryKey: ["link-docs", docOwnerId] });
     },
   });
 
