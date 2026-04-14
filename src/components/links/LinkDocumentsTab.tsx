@@ -82,10 +82,10 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
       const filterCol = useNewModel ? "link_group_worker_id" : "employment_link_id";
       const filterVal = useNewModel ? linkGroupWorkerId! : employmentLinkId;
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
         .from("employment_link_documents")
-        .select("*")
-        .eq(filterCol as any, filterVal)
+        .select("*") as any)
+        .eq(filterCol, filterVal)
         .is("deleted_at", null);
       if (error) throw error;
       return data;
