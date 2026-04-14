@@ -600,7 +600,22 @@ export type Database = {
           work_schedule?: string | null
           work_shift?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "link_groups_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "link_groups_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payment_receipts: {
         Row: {
