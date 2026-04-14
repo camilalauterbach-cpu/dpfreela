@@ -93,8 +93,6 @@ export function useLinkGroupWorkers(groupId: string | undefined) {
         return nameA.localeCompare(nameB, "pt-BR");
       });
       return sorted;
-      if (error) throw error;
-      return data;
     },
   });
 }
