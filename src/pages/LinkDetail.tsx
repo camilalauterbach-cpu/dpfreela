@@ -146,6 +146,7 @@ export default function LinkDetail() {
               {info("Trabalhador", `${workerName}${workerNick ? ` (${workerNick})` : ""}`)}
               {info("Evento", eventName)}
               {info("Função/Cargo", l.job_role)}
+              {info("Empresa", companyName)}
               {info("Atividade", l.job_function)}
               {info("Departamento", l.department)}
             </CardContent>
