@@ -61,6 +61,10 @@ export function getConfiguredDocs(config: LinkDocumentConfig) {
     docs.push({ category: cat, label: opt?.label || cat, group: "operational" });
   }
 
+  if (config.operational_custom) {
+    docs.push({ category: "operational_custom", label: config.operational_custom, group: "operational" });
+  }
+
   for (const cat of config.nrs) {
     const opt = NR_OPTIONS.find((o) => o.value === cat);
     docs.push({ category: cat, label: opt?.label || cat, group: "nrs" });
@@ -84,5 +88,6 @@ export function getCategoryLabel(category: string, config?: LinkDocumentConfig):
   const found = allOptions.find((o) => o.value === category);
   if (found) return found.label;
   if (category === "nr_custom" && config?.nr_custom) return config.nr_custom;
+  if (category === "operational_custom" && config?.operational_custom) return config.operational_custom;
   return category;
 }
