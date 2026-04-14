@@ -67,6 +67,7 @@ export default function LinkDetail() {
   const workerName = l.workers?.full_name || "—";
   const workerNick = l.workers?.nickname;
   const eventName = l.events?.name || "—";
+  const companyName = l.companies?.trade_name || l.companies?.legal_name || null;
   const displayName = l.link_name || `${workerName} — ${eventName}`;
 
   const info = (label: string, value: string | number | null | undefined) => (

@@ -7,7 +7,7 @@ export function useEmploymentLinks(search: string, statusFilter?: string) {
     queryFn: async () => {
       let query = supabase
         .from("employment_links")
-        .select("id, link_name, worker_id, event_id, job_role, status, hire_date, end_date, work_days_mode, specific_work_dates, workers(full_name, nickname, cpf), events(name)")
+        .select("id, link_name, worker_id, event_id, company_id, job_role, status, hire_date, end_date, work_days_mode, specific_work_dates, workers(full_name, nickname, cpf), events(name), companies(legal_name, trade_name)")
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
 
@@ -40,7 +40,7 @@ export function useEmploymentLink(id: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employment_links")
-        .select("*, workers(full_name, nickname, cpf), events(id, name, requires_epi_form, requires_service_order, required_nrs, required_nrs_other)")
+        .select("*, workers(full_name, nickname, cpf), events(id, name, requires_epi_form, requires_service_order, required_nrs, required_nrs_other), companies(legal_name, trade_name)")
         .eq("id", id!)
         .is("deleted_at", null)
         .single();
