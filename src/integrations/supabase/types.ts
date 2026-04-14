@@ -172,6 +172,7 @@ export type Database = {
           assembly_point: string | null
           badge_number: string | null
           call_time: string | null
+          company_id: string | null
           contract_type: string | null
           created_at: string
           daily_hours: number | null
@@ -222,6 +223,7 @@ export type Database = {
           assembly_point?: string | null
           badge_number?: string | null
           call_time?: string | null
+          company_id?: string | null
           contract_type?: string | null
           created_at?: string
           daily_hours?: number | null
@@ -272,6 +274,7 @@ export type Database = {
           assembly_point?: string | null
           badge_number?: string | null
           call_time?: string | null
+          company_id?: string | null
           contract_type?: string | null
           created_at?: string
           daily_hours?: number | null
@@ -319,6 +322,13 @@ export type Database = {
           worker_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "employment_links_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "employment_links_event_id_fkey"
             columns: ["event_id"]
