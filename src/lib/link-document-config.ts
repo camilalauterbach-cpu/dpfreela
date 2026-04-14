@@ -45,6 +45,7 @@ export function parseConfig(raw: any): LinkDocumentConfig {
   if (!raw || typeof raw !== "object") return { ...EMPTY_CONFIG };
   return {
     operational: Array.isArray(raw.operational) ? raw.operational : [],
+    operational_custom: raw.operational_custom || "",
     nrs: Array.isArray(raw.nrs) ? raw.nrs : [],
     nr_custom: raw.nr_custom || "",
     company: Array.isArray(raw.company) ? raw.company : [],
