@@ -2,6 +2,7 @@
 
 export interface LinkDocumentConfig {
   operational: string[];   // e.g. ["ficha_epi", "ordem_servico", "aso_vinculo"]
+  operational_custom?: string; // free text for "outros operacionais"
   nrs: string[];           // e.g. ["nr_6", "nr_10", "nr_35"]
   nr_custom?: string;      // free text for custom NR
   company: string[];       // e.g. ["apr", "ltcat", "pcmso", "pgr"]
@@ -9,6 +10,7 @@ export interface LinkDocumentConfig {
 
 export const EMPTY_CONFIG: LinkDocumentConfig = {
   operational: [],
+  operational_custom: "",
   nrs: [],
   nr_custom: "",
   company: [],
@@ -43,6 +45,7 @@ export function parseConfig(raw: any): LinkDocumentConfig {
   if (!raw || typeof raw !== "object") return { ...EMPTY_CONFIG };
   return {
     operational: Array.isArray(raw.operational) ? raw.operational : [],
+    operational_custom: raw.operational_custom || "",
     nrs: Array.isArray(raw.nrs) ? raw.nrs : [],
     nr_custom: raw.nr_custom || "",
     company: Array.isArray(raw.company) ? raw.company : [],
@@ -56,6 +59,10 @@ export function getConfiguredDocs(config: LinkDocumentConfig) {
   for (const cat of config.operational) {
     const opt = OPERATIONAL_OPTIONS.find((o) => o.value === cat);
     docs.push({ category: cat, label: opt?.label || cat, group: "operational" });
+  }
+
+  if (config.operational_custom) {
+    docs.push({ category: "operational_custom", label: config.operational_custom, group: "operational" });
   }
 
   for (const cat of config.nrs) {
@@ -81,5 +88,6 @@ export function getCategoryLabel(category: string, config?: LinkDocumentConfig):
   const found = allOptions.find((o) => o.value === category);
   if (found) return found.label;
   if (category === "nr_custom" && config?.nr_custom) return config.nr_custom;
+  if (category === "operational_custom" && config?.operational_custom) return config.operational_custom;
   return category;
 }

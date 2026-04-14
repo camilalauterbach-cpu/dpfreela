@@ -272,7 +272,7 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
               </SelectContent>
             </Select>
           )}
-          {canManage && (!doc || status === "pending" || status === "rejected" || status === "replace") && (
+          {canManage && (
             <Button
               size="sm"
               variant="outline"
@@ -281,6 +281,7 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
               disabled={uploadMutation.isPending}
             >
               {uploadMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+              <span className="ml-1">{doc ? "Substituir" : "Enviar"}</span>
             </Button>
           )}
         </div>
@@ -381,10 +382,17 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
                         <p className="text-xs text-muted-foreground">{new Date(doc.created_at).toLocaleDateString("pt-BR")}</p>
                       </div>
                     </div>
-                    <Badge variant="outline" className={`text-xs shrink-0 ${STATUS_VARIANT[status]}`}>
-                      {STATUS_ICON[status]}
-                      <span className="ml-1">{DOC_STATUS_LABELS[status] || status}</span>
-                    </Badge>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Badge variant="outline" className={`text-xs ${STATUS_VARIANT[status]}`}>
+                        {STATUS_ICON[status]}
+                        <span className="ml-1">{DOC_STATUS_LABELS[status] || status}</span>
+                      </Badge>
+                      {doc.file_path && (
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handlePreview(doc.file_path, doc.mime_type, "worker-documents")}>
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
