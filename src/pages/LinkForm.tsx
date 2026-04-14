@@ -75,6 +75,18 @@ const statusOptions = [
   { value: "cancelled", label: "Cancelado", description: "Cancelado antes de iniciar." },
 ];
 
+const getRelationRecord = (value: any) => Array.isArray(value) ? value[0] : value;
+
+const getWorkerLabel = (worker: any) => {
+  if (!worker) return "";
+  return `${worker.full_name}${worker.nickname ? ` (${worker.nickname})` : ""}`;
+};
+
+const getCompanyLabel = (company: any) => {
+  if (!company) return "";
+  return company.trade_name || company.legal_name || "";
+};
+
 export default function LinkForm() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -157,6 +169,7 @@ export default function LinkForm() {
   const [highlightDates, setHighlightDates] = useState(false);
   const hireDateRef = useRef<HTMLInputElement>(null);
   const contractSectionRef = useRef<HTMLDivElement>(null);
+  const existingLink = existing as any | undefined;
 
   // Load existing record into form
   useEffect(() => {
@@ -201,6 +214,37 @@ export default function LinkForm() {
       });
     }
   }, [isEdit, existing]);
+
+  useEffect(() => {
+    if (!isEdit || !existingLink) return;
+
+    setForm((prev) => {
+      const next = { ...prev };
+      let changed = false;
+
+      if (!prev.worker_id && existingLink.worker_id) {
+        next.worker_id = existingLink.worker_id;
+        changed = true;
+      }
+
+      if (!prev.event_id && existingLink.event_id) {
+        next.event_id = existingLink.event_id;
+        changed = true;
+      }
+
+      if (!prev.company_id && existingLink.company_id) {
+        next.company_id = existingLink.company_id;
+        changed = true;
+      }
+
+      if (!prev.status && existingLink.status) {
+        next.status = existingLink.status;
+        changed = true;
+      }
+
+      return changed ? next : prev;
+    });
+  }, [isEdit, existingLink]);
 
   const set = (key: string, value: any) => setForm((p) => ({ ...p, [key]: value }));
 
@@ -371,6 +415,26 @@ export default function LinkForm() {
   };
 
   const currentStatusInfo = statusOptions.find((s) => s.value === form.status);
+  const existingWorker = getRelationRecord(existingLink?.workers);
+  const existingEvent = getRelationRecord(existingLink?.events);
+  const existingCompany = getRelationRecord(existingLink?.companies);
+  const currentWorker = workers?.find((worker: any) => worker.id === form.worker_id) || existingWorker;
+  const currentEvent = events?.find((event: any) => event.id === form.event_id) || existingEvent;
+  const currentCompany = companies?.find((company: any) => company.id === form.company_id) || existingCompany;
+  const workerLabel = getWorkerLabel(currentWorker);
+  const eventLabel = currentEvent?.name || "";
+  const companyLabel = getCompanyLabel(currentCompany);
+  const workerLocked = isEdit && !!existingLink?.worker_id;
+  const eventLocked = isEdit && !!existingLink?.event_id;
+  const companyLocked = isEdit && !!existingLink?.company_id;
+
+  const renderReadOnlyField = (label: string, value: string, hint: string) => (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Input value={value || "—"} readOnly aria-readonly="true" />
+      <p className="text-xs text-muted-foreground">{hint}</p>
+    </div>
+  );
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-3xl">
@@ -391,50 +455,67 @@ export default function LinkForm() {
             <Label>Nome do vínculo *</Label>
             <Input value={form.link_name} onChange={(e) => set("link_name", e.target.value)} placeholder="Ex: Segurança — Festival Salvador 2026" required />
           </div>
-          <div>
-            <Label>Trabalhador *</Label>
-            <Select value={form.worker_id} onValueChange={(v) => set("worker_id", v)}>
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                {workers?.map((w: any) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    {w.full_name}{w.nickname ? ` (${w.nickname})` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Evento</Label>
-            <Select value={form.event_id} onValueChange={(v) => {
-              set("event_id", v);
-              // Auto-fill company from event
-              const ev = events?.find((e: any) => e.id === v);
-              if (ev && (ev as any).company_id) {
-                set("company_id", (ev as any).company_id);
-              }
-            }}>
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                {events?.map((ev: any) => (
-                  <SelectItem key={ev.id} value={ev.id}>{ev.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Empresa</Label>
-            <Select value={form.company_id} onValueChange={(v) => set("company_id", v)}>
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                {companies?.map((c: any) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.trade_name || c.legal_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {workerLocked ? (
+            renderReadOnlyField("Trabalhador *", workerLabel, "Trabalhador estrutural preservado nesta edição.")
+          ) : (
+            <div>
+              <Label>Trabalhador *</Label>
+              <Select value={form.worker_id} onValueChange={(v) => set("worker_id", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione">{form.worker_id ? workerLabel : undefined}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {workers?.map((w: any) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.full_name}{w.nickname ? ` (${w.nickname})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {eventLocked ? (
+            renderReadOnlyField("Evento", eventLabel, "Evento estrutural preservado nesta edição.")
+          ) : (
+            <div>
+              <Label>Evento</Label>
+              <Select value={form.event_id} onValueChange={(v) => {
+                set("event_id", v);
+                const ev = events?.find((e: any) => e.id === v);
+                if (ev && (ev as any).company_id) {
+                  set("company_id", (ev as any).company_id);
+                }
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione">{form.event_id ? eventLabel : undefined}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {events?.map((ev: any) => (
+                    <SelectItem key={ev.id} value={ev.id}>{ev.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {companyLocked ? (
+            renderReadOnlyField("Empresa", companyLabel, "Empresa estrutural preservada nesta edição.")
+          ) : (
+            <div>
+              <Label>Empresa</Label>
+              <Select value={form.company_id} onValueChange={(v) => set("company_id", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione">{form.company_id ? companyLabel : undefined}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {companies?.map((c: any) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.trade_name || c.legal_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div>
             <Label>Função/Cargo{reqMark("job_role")}</Label>
             <Input value={form.job_role} onChange={(e) => set("job_role", e.target.value)} />
@@ -470,7 +551,7 @@ export default function LinkForm() {
           <div>
             <Label>Status</Label>
             <Select value={form.status} onValueChange={(v) => set("status", v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger><SelectValue>{currentStatusInfo?.label}</SelectValue></SelectTrigger>
               <SelectContent>
                 {statusOptions.map((s) => (
                   <SelectItem key={s.value} value={s.value}>
