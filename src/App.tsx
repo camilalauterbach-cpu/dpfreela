@@ -24,6 +24,7 @@ import CompanyDetail from "./pages/CompanyDetail";
 import Links from "./pages/Links";
 import LinkDetail from "./pages/LinkDetail";
 import LinkForm from "./pages/LinkForm";
+import LinkWorkerDetail from "./pages/LinkWorkerDetail";
 import Payroll from "./pages/Payroll";
 import PayrollForm from "./pages/PayrollForm";
 import PayrollDetail from "./pages/PayrollDetail";

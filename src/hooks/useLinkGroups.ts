@@ -212,6 +212,24 @@ export function useUpdateGroupWorker() {
   });
 }
 
+export function useLinkGroupWorker(groupId: string | undefined, workerId: string | undefined) {
+  return useQuery({
+    queryKey: ["link-group-worker", groupId, workerId],
+    enabled: !!groupId && !!workerId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("link_group_workers")
+        .select("*, workers(full_name, nickname, cpf, phone_main)")
+        .eq("link_group_id", groupId!)
+        .eq("worker_id", workerId!)
+        .is("deleted_at", null)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useRemoveGroupWorker() {
   const queryClient = useQueryClient();
   return useMutation({
