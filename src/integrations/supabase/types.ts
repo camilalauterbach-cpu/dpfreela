@@ -105,7 +105,8 @@ export type Database = {
           deleted_at: string | null
           document_number: string | null
           document_type: string
-          employment_link_id: string
+          employment_link_id: string | null
+          event_id: string | null
           file_name: string | null
           file_path: string | null
           file_size: number | null
@@ -122,7 +123,8 @@ export type Database = {
           deleted_at?: string | null
           document_number?: string | null
           document_type: string
-          employment_link_id: string
+          employment_link_id?: string | null
+          event_id?: string | null
           file_name?: string | null
           file_path?: string | null
           file_size?: number | null
@@ -139,7 +141,8 @@ export type Database = {
           deleted_at?: string | null
           document_number?: string | null
           document_type?: string
-          employment_link_id?: string
+          employment_link_id?: string | null
+          event_id?: string | null
           file_name?: string | null
           file_path?: string | null
           file_size?: number | null
