@@ -95,11 +95,13 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
   const uploadMutation = useMutation({
     mutationFn: async ({ file, category }: { file: File; category: string }) => {
       const ext = file.name.split(".").pop();
-      const path = `${workerId}/${employmentLinkId}/${category}_${Date.now()}.${ext}`;
+      const storagePath = useNewModel
+        ? `${workerId}/${linkGroupWorkerId}/${category}_${Date.now()}.${ext}`
+        : `${workerId}/${employmentLinkId}/${category}_${Date.now()}.${ext}`;
 
       const { error: uploadErr } = await supabase.storage
         .from("link-documents")
-        .upload(path, file);
+        .upload(storagePath, file);
       if (uploadErr) throw uploadErr;
 
       const existing = linkDocs?.find((d: any) => d.category === category);
@@ -107,7 +109,7 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
         const { error } = await supabase
           .from("employment_link_documents")
           .update({
-            file_path: path,
+            file_path: storagePath,
             file_name: file.name,
             mime_type: file.type,
             file_size: file.size,
@@ -116,24 +118,29 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
           .eq("id", existing.id);
         if (error) throw error;
       } else {
+        const insertPayload: Record<string, any> = {
+          worker_id: workerId,
+          document_type: "operacional_vinculo",
+          category,
+          file_path: storagePath,
+          file_name: file.name,
+          mime_type: file.type,
+          file_size: file.size,
+          status: "uploaded",
+        };
+        if (useNewModel) {
+          insertPayload.link_group_worker_id = linkGroupWorkerId;
+        } else {
+          insertPayload.employment_link_id = employmentLinkId;
+        }
         const { error } = await supabase
           .from("employment_link_documents")
-          .insert({
-            employment_link_id: employmentLinkId,
-            worker_id: workerId,
-            document_type: "operacional_vinculo",
-            category,
-            file_path: path,
-            file_name: file.name,
-            mime_type: file.type,
-            file_size: file.size,
-            status: "uploaded",
-          } as any);
+          .insert(insertPayload as any);
         if (error) throw error;
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["link-docs", employmentLinkId] });
+      queryClient.invalidateQueries({ queryKey: ["link-docs", docOwnerId] });
       toast({ title: "Documento enviado" });
     },
     onError: (err: any) => {
