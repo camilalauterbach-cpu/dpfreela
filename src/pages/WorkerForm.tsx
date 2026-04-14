@@ -97,6 +97,16 @@ export default function WorkerForm() {
   const [form, setForm] = useState<WorkerFormData>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [operationalOpen, setOperationalOpen] = useState(false);
+  const [loadedId, setLoadedId] = useState<string | undefined>(undefined);
+
+  // Reset form when switching between workers or from edit to new
+  useEffect(() => {
+    if (!isEdit) {
+      setForm(emptyForm);
+      setErrors({});
+      setLoadedId(undefined);
+    }
+  }, [isEdit, id]);
 
   useEffect(() => {
     if (existing) {
