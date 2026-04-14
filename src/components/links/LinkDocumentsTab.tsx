@@ -76,14 +76,21 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
   });
 
   const { data: linkDocs, isLoading: loadingLinkDocs } = useQuery({
-    queryKey: ["link-docs", employmentLinkId],
-    enabled: !!employmentLinkId,
+    queryKey: ["link-docs", docOwnerId],
+    enabled: !!docOwnerId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("employment_link_documents")
         .select("*")
-        .eq("employment_link_id", employmentLinkId)
         .is("deleted_at", null);
+
+      if (useNewModel) {
+        query = query.eq("link_group_worker_id" as any, linkGroupWorkerId!);
+      } else {
+        query = query.eq("employment_link_id", employmentLinkId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
