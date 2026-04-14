@@ -235,9 +235,9 @@ export default function EventForm() {
           </CardContent>
         </Card>
 
-        {/* Requisitos documentais */}
+        {/* Exigências para trabalhadores alocados */}
         <Card>
-          <CardHeader><CardTitle className="text-base">Requisitos documentais</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Exigências para trabalhadores alocados</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
               <Switch
