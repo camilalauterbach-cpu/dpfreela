@@ -85,7 +85,14 @@ export function useLinkGroupWorkers(groupId: string | undefined) {
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data;
+
+      // Sort by worker name client-side
+      const sorted = (data ?? []).sort((a: any, b: any) => {
+        const nameA = a.workers?.full_name?.toLowerCase() || "";
+        const nameB = b.workers?.full_name?.toLowerCase() || "";
+        return nameA.localeCompare(nameB, "pt-BR");
+      });
+      return sorted;
     },
   });
 }
@@ -181,6 +188,7 @@ export function useAllocateWorker() {
     },
     onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: ["link-group-workers", vars.link_group_id] });
+      queryClient.invalidateQueries({ queryKey: ["link-group", vars.link_group_id] });
       INVALIDATE_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
     },
   });
@@ -198,6 +206,7 @@ export function useUpdateGroupWorker() {
     },
     onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: ["link-group-workers", vars.link_group_id] });
+      queryClient.invalidateQueries({ queryKey: ["link-group", vars.link_group_id] });
       INVALIDATE_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
     },
   });
@@ -215,6 +224,7 @@ export function useRemoveGroupWorker() {
     },
     onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: ["link-group-workers", vars.link_group_id] });
+      queryClient.invalidateQueries({ queryKey: ["link-group", vars.link_group_id] });
       INVALIDATE_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
     },
   });
