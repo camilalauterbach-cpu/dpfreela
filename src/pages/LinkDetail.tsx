@@ -234,6 +234,7 @@ export default function LinkDetail() {
             event={event}
             workerName={workerName}
             workerCpf={l.workers?.cpf}
+            requiredDocuments={l.required_documents}
           />
         </TabsContent>
       </Tabs>
