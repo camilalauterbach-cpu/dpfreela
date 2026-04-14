@@ -46,10 +46,10 @@ export function EventDocumentsTab({ eventId }: Props) {
   const { data: docs, isLoading } = useQuery({
     queryKey: ["event-documents", eventId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
         .from("employment_link_documents")
-        .select("*")
-        .eq("event_id" as any, eventId)
+        .select("*") as any)
+        .eq("event_id", eventId)
         .is("employment_link_id", null)
         .is("deleted_at", null);
       if (error) throw error;
