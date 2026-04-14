@@ -45,7 +45,9 @@ const STATUS_VARIANT: Record<string, string> = {
   replace: "bg-yellow-50 text-yellow-700 border-yellow-200",
 };
 
-export function LinkDocumentsTab({ workerId, employmentLinkId, event, workerName, workerCpf, requiredDocuments }: Props) {
+export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId, event, workerName, workerCpf, requiredDocuments }: Props) {
+  const useNewModel = !!linkGroupWorkerId;
+  const docOwnerId = useNewModel ? linkGroupWorkerId : employmentLinkId;
   const navigate = useNavigate();
   const { toast } = useToast();
   const { hasAnyRole } = useAuth();
