@@ -67,7 +67,7 @@ interface LinkDocZipParams {
   mode: "worker" | "event" | "all";
 }
 
-export async function exportLinkDocsZip({ workerId, employmentLinkId, workerName, cpf, mode }: LinkDocZipParams) {
+export async function exportLinkDocsZip({ workerId, employmentLinkId, linkGroupWorkerId, workerName, cpf, mode }: LinkDocZipParams) {
   const zip = new JSZip();
   let fileCount = 0;
 
