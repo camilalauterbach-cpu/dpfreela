@@ -404,16 +404,61 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, event, workerName
             </Card>
           )}
 
-          {companyDocs.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Documentos da empresa/operação</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {companyDocs.map((d) => renderLinkDocRow(d.category, d.label))}
-              </CardContent>
-            </Card>
-          )}
+          {/* Seção legado: documentos de empresa configurados antes da separação */}
+          {companyDocs.length > 0 && (() => {
+            const legacyDocs = companyDocs.filter((d) => linkDocMap.has(d.category));
+            if (legacyDocs.length === 0 && companyDocs.length > 0) {
+              // Config exists but no docs uploaded — show muted note
+              return (
+                <Card className="border-dashed opacity-60">
+                  <CardContent className="py-4">
+                    <p className="text-xs text-muted-foreground">
+                      ⚠️ Este vínculo possuía configurações de documentos da empresa (legado). Novos documentos da empresa devem ser enviados na aba Documentos do evento.
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            }
+            if (legacyDocs.length === 0) return null;
+            return (
+              <Card className="border-dashed opacity-70">
+                <CardHeader>
+                  <CardTitle className="text-sm text-muted-foreground">Documentos da empresa (legado)</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Estes documentos foram configurados antes da separação. Novos documentos da empresa devem ser enviados na aba Documentos do evento.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  {legacyDocs.map((d) => {
+                    const doc = linkDocMap.get(d.category);
+                    const status = doc?.status || "pending";
+                    return (
+                      <div key={d.category} className="flex items-center justify-between gap-2 py-2 border-b border-border last:border-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm truncate">{d.label}</p>
+                            {doc?.file_name && <p className="text-xs text-muted-foreground truncate">{doc.file_name}</p>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Badge variant="outline" className={`text-xs ${STATUS_VARIANT[status]}`}>
+                            {STATUS_ICON[status]}
+                            <span className="ml-1">{DOC_STATUS_LABELS[status] || status}</span>
+                          </Badge>
+                          {doc?.file_path && (
+                            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handlePreview(doc.file_path, doc.mime_type, "link-documents")}>
+                              <Eye className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            );
+          })()}
         </div>
       ) : (
         <Card>

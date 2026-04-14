@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Pencil, Loader2, Trash2 } from "lucide-react";
 import { EventLinksList } from "@/components/links/EventLinksList";
+import { EventDocumentsTab } from "@/components/events/EventDocumentsTab";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useDeleteRecord } from "@/hooks/useDeleteRecord";
 
@@ -93,6 +94,7 @@ export default function EventDetail() {
       <Tabs defaultValue="dados" className="w-full">
         <TabsList className="w-full justify-start">
           <TabsTrigger value="dados">Informações</TabsTrigger>
+          <TabsTrigger value="documentos">Documentos</TabsTrigger>
           <TabsTrigger value="vinculos">Vínculos</TabsTrigger>
         </TabsList>
 
@@ -117,14 +119,14 @@ export default function EventDetail() {
             </CardContent>
           </Card>
 
-          {/* Requisitos documentais */}
+          {/* Exigências para trabalhadores alocados */}
           {(() => {
             const ev = event as any;
             const hasRequirements = ev.requires_epi_form || ev.requires_service_order || (ev.required_nrs && ev.required_nrs.length > 0) || ev.required_nrs_other;
             if (!hasRequirements) return null;
             return (
               <Card>
-                <CardHeader><CardTitle className="text-base">Requisitos documentais</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-base">Exigências para trabalhadores alocados</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
                   {ev.requires_epi_form && <p className="text-sm">✅ Exige ficha de entrega de EPI</p>}
                   {ev.requires_service_order && <p className="text-sm">✅ Exige ordem de serviço</p>}
@@ -157,6 +159,10 @@ export default function EventDetail() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="documentos" className="mt-4">
+          <EventDocumentsTab eventId={event.id} />
         </TabsContent>
 
         <TabsContent value="vinculos" className="mt-4">

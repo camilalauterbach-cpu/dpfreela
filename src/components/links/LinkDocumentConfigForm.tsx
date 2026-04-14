@@ -87,14 +87,8 @@ export function LinkDocumentConfigForm({ config, onChange }: Props) {
           </div>
         </div>
 
-        <div className="border-t pt-4">
-          <CheckboxGroup
-            title="C) Documentos da empresa/operação exigidos no vínculo"
-            options={COMPANY_DOC_OPTIONS}
-            selected={config.company}
-            onToggle={(v) => toggle("company", v)}
-          />
-        </div>
+        {/* Seção C removida: documentos da empresa/operação agora ficam no nível do evento */}
+        {/* Dados legados em config.company são preservados no tipo para compatibilidade */}
       </CardContent>
     </Card>
   );
