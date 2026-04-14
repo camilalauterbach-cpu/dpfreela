@@ -1,29 +1,61 @@
 
 
-## Etapa 1 — Migração SQL do schema
+## Etapa 2 — Migração dos 27 trabalhadores do evento da Shakira
 
-Primeira etapa isolada. Criar as duas tabelas novas com RLS e triggers, sem tocar em nenhuma tabela existente.
+### Passo 1: Criar 1 link_group
 
-### SQL a executar
+```sql
+INSERT INTO link_groups (group_name, event_id, company_id, hire_date, end_date, status)
+VALUES (
+  'Equipe - Show da Shakira no RJ',
+  'b1b2c3d4-0002-4000-8000-000000000002',
+  'a1b2c3d4-0001-4000-8000-000000000001',
+  '2026-04-26',
+  '2026-05-04',
+  'draft'
+);
+```
 
-**Tabela `link_groups`** (agrupador):
-- Todos os campos do plano v3: `group_name`, `event_id`, `company_id`, `status`, `hire_date`, `end_date`, jornada, operacional, `required_documents`, `notes`, `deleted_at`, timestamps
-- RLS habilitado com 4 policies (select/insert/update/delete) usando `has_any_role`, idênticas às de `employment_links`
-- Trigger `update_updated_at_column` em UPDATE
+- `company_id` extraído do evento (confirmado: `a1b2c3d4-0001-4000-8000-000000000001`)
 
-**Tabela `link_group_workers`** (alocação individual):
-- Campos individuais: `link_group_id`, `worker_id`, `job_role`, `job_function`, `department`, `contract_type`, `hire_date`, `end_date`, `remuneration_type`, `daily_rate`, `hourly_rate`, `fixed_salary`, `payment_frequency`, `has_transport_allowance`, `transport_allowance`, `has_meal_allowance`, `meal_allowance`, `status`, `notes`, `deleted_at`, timestamps
-- Constraint `UNIQUE(link_group_id, worker_id)`
-- RLS habilitado com 4 policies idênticas
-- Trigger `update_updated_at_column` em UPDATE
+### Passo 2: Buscar o ID do grupo recém-criado
 
-### O que NÃO será feito nesta etapa
+```sql
+SELECT id FROM link_groups
+WHERE event_id = 'b1b2c3d4-0002-4000-8000-000000000002'
+LIMIT 1;
+```
 
-- Nenhuma alteração em tabelas existentes
-- Nenhuma migração de dados
+### Passo 3: Inserir os 27 trabalhadores no link_group_workers
+
+```sql
+INSERT INTO link_group_workers (link_group_id, worker_id, job_role, job_function, contract_type, status)
+SELECT
+  '<id_do_grupo_criado_no_passo_2>',
+  worker_id,
+  job_role,
+  job_function,
+  contract_type,
+  'active'
+FROM employment_links
+WHERE deleted_at IS NULL
+  AND event_id = 'b1b2c3d4-0002-4000-8000-000000000002';
+```
+
+- Filtro explícito por `event_id` — migra apenas os 27 do Shakira
+- `hire_date`/`end_date` individuais não preenchidos (iguais ao grupo)
+- Campos financeiros todos nulos nos registros atuais — ficam nulos
+
+### Validação após execução
+
+Confirmar:
+- 1 registro em `link_groups`
+- 27 registros em `link_group_workers` com o `link_group_id` correto
+- Dados de `job_role`, `job_function`, `contract_type` preservados
+
+### O que NÃO será feito
+
+- Nenhuma alteração nos 27 registros de `employment_links`
 - Nenhuma alteração de frontend
-
-### Validação esperada após esta etapa
-
-Confirmar via query que as duas tabelas existem, RLS está habilitado, e as policies estão aplicadas.
+- Nenhum soft-delete
 
