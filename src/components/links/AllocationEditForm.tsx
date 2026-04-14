@@ -79,7 +79,7 @@ export function AllocationEditForm({ allocation, groupId, onSaved }: Props) {
       notes: form.notes || null,
     };
 
-    updateMutation.mutate(payload, {
+    updateMutation.mutate(payload as { id: string; link_group_id: string } & Record<string, any>, {
       onSuccess: () => {
         toast({ title: "Alocação atualizada" });
         onSaved?.();
