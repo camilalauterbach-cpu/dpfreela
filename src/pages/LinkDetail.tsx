@@ -374,7 +374,7 @@ export default function LinkDetail() {
                         {canEdit && (
                           <TableCell>
                             <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => setRemoveTarget({ id: w.id, name: wName })}
+                              onClick={(e) => { e.stopPropagation(); setRemoveTarget({ id: w.id, name: wName }); }}
                               disabled={removeMutation.isPending}
                             >
                               <UserMinus className="h-3 w-3" />
