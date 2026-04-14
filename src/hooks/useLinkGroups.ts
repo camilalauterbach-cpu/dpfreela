@@ -188,6 +188,7 @@ export function useAllocateWorker() {
     },
     onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: ["link-group-workers", vars.link_group_id] });
+      queryClient.invalidateQueries({ queryKey: ["link-group", vars.link_group_id] });
       INVALIDATE_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
     },
   });
@@ -205,6 +206,7 @@ export function useUpdateGroupWorker() {
     },
     onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: ["link-group-workers", vars.link_group_id] });
+      queryClient.invalidateQueries({ queryKey: ["link-group", vars.link_group_id] });
       INVALIDATE_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
     },
   });
@@ -222,6 +224,7 @@ export function useRemoveGroupWorker() {
     },
     onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: ["link-group-workers", vars.link_group_id] });
+      queryClient.invalidateQueries({ queryKey: ["link-group", vars.link_group_id] });
       INVALIDATE_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
     },
   });
