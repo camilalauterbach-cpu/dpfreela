@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo, useRef } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useEmploymentLink } from "@/hooks/useEmploymentLinks";
-import { getSystemSetting } from "@/lib/system-settings";
+import { useLinkGroup, useCreateLinkGroup, useUpdateLinkGroup } from "@/hooks/useLinkGroups";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,24 +14,6 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2, Save, X, Info } from "lucide-react";
 import { LinkDocumentConfigForm } from "@/components/links/LinkDocumentConfigForm";
 import { LinkDocumentConfig, EMPTY_CONFIG, parseConfig } from "@/lib/link-document-config";
-
-/* ── All workers/events/companies for selects (no pagination) ── */
-function useAllWorkers() {
-  return useQuery({
-    queryKey: ["workers-all-select"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("workers")
-        .select("id, full_name, nickname, cpf")
-        .is("deleted_at", null)
-        .order("full_name")
-        .limit(1000);
-      if (error) throw error;
-      return data ?? [];
-    },
-    staleTime: 60_000,
-  });
-}
 
 function useAllEvents() {
   return useQuery({
@@ -69,48 +50,30 @@ function useAllCompanies() {
 }
 
 const statusOptions = [
-  { value: "draft", label: "Rascunho", description: "Vínculo em preparação, ainda não confirmado." },
-  { value: "active", label: "Ativo", description: "Vínculo confirmado e em vigor." },
+  { value: "draft", label: "Rascunho", description: "Grupo em preparação, ainda não confirmado." },
+  { value: "active", label: "Ativo", description: "Grupo confirmado e em vigor." },
   { value: "suspended", label: "Suspenso", description: "Temporariamente pausado." },
   { value: "completed", label: "Concluído", description: "Período encerrado normalmente." },
   { value: "terminated", label: "Encerrado", description: "Encerrado antes do previsto." },
   { value: "cancelled", label: "Cancelado", description: "Cancelado antes de iniciar." },
 ];
 
-const getRelationRecord = (value: any) => Array.isArray(value) ? value[0] : value;
-
-const getWorkerLabel = (worker: any) => {
-  if (!worker) return "";
-  return `${worker.full_name}${worker.nickname ? ` (${worker.nickname})` : ""}`;
-};
-
-const getCompanyLabel = (company: any) => {
-  if (!company) return "";
-  return company.trade_name || company.legal_name || "";
-};
-
 export default function LinkForm() {
   const { id } = useParams();
-  const [searchParams] = useSearchParams();
   const isEdit = !!id;
   const navigate = useNavigate();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const { data: existing, isLoading: loadingExisting } = useEmploymentLink(id);
-  const { data: workers } = useAllWorkers();
+  const { data: existing, isLoading: loadingExisting } = useLinkGroup(id);
   const { data: events } = useAllEvents();
   const { data: companies } = useAllCompanies();
+  const createMutation = useCreateLinkGroup();
+  const updateMutation = useUpdateLinkGroup();
 
   const [form, setForm] = useState<Record<string, any>>({
-    link_name: "",
-    worker_id: searchParams.get("worker") || "",
-    event_id: searchParams.get("event") || "",
+    group_name: "",
+    event_id: "",
     company_id: "",
-    job_role: "",
-    job_function: "",
-    department: "",
-    contract_type: "",
     status: "draft",
     hire_date: "",
     end_date: "",
@@ -128,66 +91,22 @@ export default function LinkForm() {
     uniform_notes: "",
     transport_notes: "",
     meal_entitlement: "",
-    daily_rate: "",
-    hourly_rate: "",
-    fixed_salary: "",
-    payment_frequency: "",
-    remuneration_type: "",
-    has_transport_allowance: false,
-    transport_allowance: "",
-    has_meal_allowance: false,
-    meal_allowance: "",
     notes: "",
   });
 
   const [docConfig, setDocConfig] = useState<LinkDocumentConfig>({ ...EMPTY_CONFIG });
-
-  const [globalConfig, setGlobalConfig] = useState<any>(null);
-  const [configLoaded, setConfigLoaded] = useState(false);
-
-  // Load global config
-  useEffect(() => {
-    getSystemSetting("links_admission_config").then((val) => {
-      setGlobalConfig(val);
-      setConfigLoaded(true);
-    });
-  }, []);
-
-  // Apply global defaults for NEW links only
-  useEffect(() => {
-    if (isEdit || !configLoaded || !globalConfig) return;
-    setForm((prev) => ({
-      ...prev,
-      has_transport_allowance: prev.has_transport_allowance || globalConfig.default_vt || false,
-      transport_allowance: prev.transport_allowance || globalConfig.default_vt_value || "",
-      has_meal_allowance: prev.has_meal_allowance || globalConfig.default_vr_va || false,
-      meal_allowance: prev.meal_allowance || globalConfig.default_vr_va_value || "",
-      uniform_notes: prev.uniform_notes || globalConfig.default_uniform_notes || "",
-      transport_notes: prev.transport_notes || globalConfig.default_transport_notes || "",
-      meal_entitlement: prev.meal_entitlement || globalConfig.default_meal_entitlement || "",
-      notes: prev.notes || globalConfig.default_notes || "",
-    }));
-  }, [isEdit, configLoaded, globalConfig]);
-
   const [newDate, setNewDate] = useState("");
   const [highlightDates, setHighlightDates] = useState(false);
   const hireDateRef = useRef<HTMLInputElement>(null);
   const contractSectionRef = useRef<HTMLDivElement>(null);
-  const existingLink = existing as any | undefined;
 
-  // Load existing record into form
   useEffect(() => {
     if (isEdit && existing) {
       const e = existing as any;
       setForm({
-        link_name: e.link_name || "",
-        worker_id: e.worker_id || "",
+        group_name: e.group_name || "",
         event_id: e.event_id || "",
         company_id: e.company_id || "",
-        job_role: e.job_role || "",
-        job_function: e.job_function || "",
-        department: e.department || "",
-        contract_type: e.contract_type || "",
         status: e.status || "draft",
         hire_date: e.hire_date || "",
         end_date: e.end_date || "",
@@ -205,55 +124,14 @@ export default function LinkForm() {
         uniform_notes: e.uniform_notes || "",
         transport_notes: e.transport_notes || "",
         meal_entitlement: e.meal_entitlement || "",
-        daily_rate: e.daily_rate != null ? String(e.daily_rate) : "",
-        hourly_rate: e.hourly_rate != null ? String(e.hourly_rate) : "",
-        fixed_salary: e.fixed_salary != null ? String(e.fixed_salary) : "",
-        payment_frequency: e.payment_frequency || "",
-        remuneration_type: e.remuneration_type || "",
-        has_transport_allowance: e.has_transport_allowance || false,
-        transport_allowance: e.transport_allowance != null ? String(e.transport_allowance) : "",
-        has_meal_allowance: e.has_meal_allowance || false,
-        meal_allowance: e.meal_allowance != null ? String(e.meal_allowance) : "",
         notes: e.notes || "",
       });
       setDocConfig(parseConfig(e.required_documents));
     }
   }, [isEdit, existing]);
 
-  useEffect(() => {
-    if (!isEdit || !existingLink) return;
-
-    setForm((prev) => {
-      const next = { ...prev };
-      let changed = false;
-
-      if (!prev.worker_id && existingLink.worker_id) {
-        next.worker_id = existingLink.worker_id;
-        changed = true;
-      }
-
-      if (!prev.event_id && existingLink.event_id) {
-        next.event_id = existingLink.event_id;
-        changed = true;
-      }
-
-      if (!prev.company_id && existingLink.company_id) {
-        next.company_id = existingLink.company_id;
-        changed = true;
-      }
-
-      if (!prev.status && existingLink.status) {
-        next.status = existingLink.status;
-        changed = true;
-      }
-
-      return changed ? next : prev;
-    });
-  }, [isEdit, existingLink]);
-
   const set = (key: string, value: any) => setForm((p) => ({ ...p, [key]: value }));
 
-  // Auto-fill company when event is selected
   useEffect(() => {
     if (form.event_id && events) {
       const ev = events.find((e: any) => e.id === form.event_id);
@@ -277,8 +155,7 @@ export default function LinkForm() {
       toast({ title: "Data duplicada", variant: "destructive" });
       return;
     }
-    const updated = [...form.specific_work_dates, newDate].sort();
-    set("specific_work_dates", updated);
+    set("specific_work_dates", [...form.specific_work_dates, newDate].sort());
     setNewDate("");
   };
 
@@ -286,134 +163,68 @@ export default function LinkForm() {
     set("specific_work_dates", form.specific_work_dates.filter((x: string) => x !== d));
   };
 
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const payload: Record<string, any> = {
-        link_name: form.link_name || null,
-        worker_id: form.worker_id,
-        event_id: form.event_id || null,
-        company_id: form.company_id || null,
-        job_role: form.job_role || null,
-        job_function: form.job_function || null,
-        department: form.department || null,
-        contract_type: form.contract_type || null,
-        status: form.status,
-        hire_date: form.hire_date || null,
-        end_date: form.end_date || null,
-        shift_type: form.shift_type || null,
-        work_shift: form.work_shift || null,
-        work_schedule: form.work_schedule || null,
-        call_time: form.call_time || null,
-        daily_hours: form.daily_hours ? Number(form.daily_hours) : null,
-        weekly_hours: form.weekly_hours ? Number(form.weekly_hours) : null,
-        work_days_mode: form.work_days_mode,
-        specific_work_dates: form.work_days_mode === "specific_dates" ? form.specific_work_dates : [],
-        work_days_notes: form.work_days_notes || null,
-        supervisor_name: form.supervisor_name || null,
-        assembly_point: form.assembly_point || null,
-        uniform_notes: form.uniform_notes || null,
-        transport_notes: form.transport_notes || null,
-        meal_entitlement: form.meal_entitlement || null,
-        daily_rate: form.daily_rate ? Number(form.daily_rate) : null,
-        hourly_rate: form.hourly_rate ? Number(form.hourly_rate) : null,
-        fixed_salary: form.fixed_salary ? Number(form.fixed_salary) : null,
-        payment_frequency: form.payment_frequency || null,
-        remuneration_type: form.remuneration_type || null,
-        has_transport_allowance: form.has_transport_allowance,
-        transport_allowance: form.transport_allowance ? Number(form.transport_allowance) : null,
-        has_meal_allowance: form.has_meal_allowance,
-        meal_allowance: form.meal_allowance ? Number(form.meal_allowance) : null,
-        notes: form.notes || null,
-        required_documents: docConfig,
-      };
-
-      if (isEdit) {
-        const { error } = await supabase.from("employment_links").update(payload as any).eq("id", id!);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("employment_links").insert(payload as any);
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["employment-links"] });
-      queryClient.invalidateQueries({ queryKey: ["employment-link"] });
-      toast({ title: isEdit ? "Vínculo atualizado" : "Vínculo criado" });
-      navigate("/links");
-    },
-    onError: (err: any) => {
-      toast({ title: "Erro ao salvar", description: err?.message, variant: "destructive" });
-    },
-  });
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.link_name.trim()) {
-      toast({ title: "Nome do vínculo é obrigatório", variant: "destructive" });
+    if (!form.group_name.trim()) {
+      toast({ title: "Nome do grupo é obrigatório", variant: "destructive" });
       return;
     }
-    if (!form.worker_id) {
-      toast({ title: "Selecione um trabalhador", variant: "destructive" });
+    if (!form.event_id) {
+      toast({ title: "Selecione um evento", variant: "destructive" });
       return;
     }
-    if (!form.hire_date) {
-      toast({ title: "Data de início é obrigatória", variant: "destructive" });
-      return;
-    }
-    if (!form.end_date) {
-      toast({ title: "Data de fim é obrigatória", variant: "destructive" });
-      return;
-    }
-    if (form.end_date < form.hire_date) {
-      toast({ title: "Data de fim deve ser posterior à data de início", variant: "destructive" });
-      return;
-    }
-    const rf = globalConfig?.required_fields;
-    if (rf) {
-      if (rf.job_role && !form.job_role.trim()) {
-        toast({ title: "Função/Cargo é obrigatório", variant: "destructive" }); return;
-      }
-      if (rf.department && !form.department.trim()) {
-        toast({ title: "Departamento é obrigatório", variant: "destructive" }); return;
-      }
-      if (rf.contract_type && !form.contract_type) {
-        toast({ title: "Tipo de contrato é obrigatório", variant: "destructive" }); return;
-      }
-      if (rf.daily_hours && !form.daily_hours) {
-        toast({ title: "Horas diárias é obrigatório", variant: "destructive" }); return;
-      }
-      if (rf.weekly_hours && !form.weekly_hours) {
-        toast({ title: "Horas semanais é obrigatório", variant: "destructive" }); return;
-      }
-    }
-    mutation.mutate();
-  };
 
-  const enabledRemTypes = useMemo(() => {
-    const allTypes = [
-      { value: "daily", label: "Diarista" },
-      { value: "monthly", label: "Mensalista" },
-      { value: "hourly", label: "Horista" },
-      { value: "per_event", label: "Por evento" },
-    ];
-    if (!globalConfig?.remuneration_types) return allTypes;
-    const filtered = allTypes.filter((t) => globalConfig.remuneration_types[t.value] !== false);
-    if (isEdit && form.remuneration_type) {
-      const currentExists = filtered.some((t) => t.value === form.remuneration_type);
-      if (!currentExists) {
-        const current = allTypes.find((t) => t.value === form.remuneration_type);
-        if (current) filtered.push({ ...current, label: `${current.label} (desabilitado)` });
-      }
+    const payload: Record<string, any> = {
+      group_name: form.group_name,
+      event_id: form.event_id,
+      company_id: form.company_id || null,
+      status: form.status,
+      hire_date: form.hire_date || null,
+      end_date: form.end_date || null,
+      shift_type: form.shift_type || null,
+      work_shift: form.work_shift || null,
+      work_schedule: form.work_schedule || null,
+      call_time: form.call_time || null,
+      daily_hours: form.daily_hours ? Number(form.daily_hours) : null,
+      weekly_hours: form.weekly_hours ? Number(form.weekly_hours) : null,
+      work_days_mode: form.work_days_mode,
+      specific_work_dates: form.work_days_mode === "specific_dates" ? form.specific_work_dates : [],
+      work_days_notes: form.work_days_notes || null,
+      supervisor_name: form.supervisor_name || null,
+      assembly_point: form.assembly_point || null,
+      uniform_notes: form.uniform_notes || null,
+      transport_notes: form.transport_notes || null,
+      meal_entitlement: form.meal_entitlement || null,
+      notes: form.notes || null,
+      required_documents: docConfig,
+    };
+
+    if (isEdit) {
+      updateMutation.mutate({ id: id!, ...payload }, {
+        onSuccess: () => {
+          toast({ title: "Grupo atualizado" });
+          navigate(`/links/${id}`);
+        },
+        onError: (err: any) => {
+          toast({ title: "Erro ao salvar", description: err?.message, variant: "destructive" });
+        },
+      });
+    } else {
+      createMutation.mutate(payload, {
+        onSuccess: (data) => {
+          toast({ title: "Grupo criado" });
+          navigate(`/links/${data.id}`);
+        },
+        onError: (err: any) => {
+          toast({ title: "Erro ao salvar", description: err?.message, variant: "destructive" });
+        },
+      });
     }
-    return filtered;
-  }, [globalConfig, isEdit, form.remuneration_type]);
+  };
 
   if (isEdit && loadingExisting) {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
-
-  const isRequired = (field: string) => globalConfig?.required_fields?.[field] === true;
-  const reqMark = (field: string) => isRequired(field) ? " *" : "";
 
   const formatDateBR = (d: string) => {
     const [y, m, day] = d.split("-");
@@ -421,26 +232,9 @@ export default function LinkForm() {
   };
 
   const currentStatusInfo = statusOptions.find((s) => s.value === form.status);
-  const existingWorker = getRelationRecord(existingLink?.workers);
-  const existingEvent = getRelationRecord(existingLink?.events);
-  const existingCompany = getRelationRecord(existingLink?.companies);
-  const currentWorker = workers?.find((worker: any) => worker.id === form.worker_id) || existingWorker;
-  const currentEvent = events?.find((event: any) => event.id === form.event_id) || existingEvent;
-  const currentCompany = companies?.find((company: any) => company.id === form.company_id) || existingCompany;
-  const workerLabel = getWorkerLabel(currentWorker);
-  const eventLabel = currentEvent?.name || "";
-  const companyLabel = getCompanyLabel(currentCompany);
-  const workerLocked = isEdit && !!existingLink?.worker_id;
-  const eventLocked = isEdit && !!existingLink?.event_id;
-  const companyLocked = isEdit && !!existingLink?.company_id;
-
-  const renderReadOnlyField = (label: string, value: string, hint: string) => (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <Input value={value || "—"} readOnly aria-readonly="true" />
-      <p className="text-xs text-muted-foreground">{hint}</p>
-    </div>
-  );
+  const currentEvent = events?.find((e: any) => e.id === form.event_id);
+  const currentCompany = companies?.find((c: any) => c.id === form.company_id);
+  const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-3xl">
@@ -449,7 +243,7 @@ export default function LinkForm() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h1 className="text-xl font-semibold text-foreground">
-          {isEdit ? "Editar vínculo" : "Novo vínculo"}
+          {isEdit ? "Editar grupo" : "Novo grupo"}
         </h1>
       </div>
 
@@ -458,81 +252,40 @@ export default function LinkForm() {
         <CardHeader><CardTitle className="text-base">Identificação</CardTitle></CardHeader>
         <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <Label>Nome do vínculo *</Label>
-            <Input value={form.link_name} onChange={(e) => set("link_name", e.target.value)} placeholder="Ex: Segurança — Festival Salvador 2026" required />
-          </div>
-          {workerLocked ? (
-            renderReadOnlyField("Trabalhador *", workerLabel, "Trabalhador estrutural preservado nesta edição.")
-          ) : (
-            <div>
-              <Label>Trabalhador *</Label>
-              <Select value={form.worker_id} onValueChange={(v) => set("worker_id", v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione">{form.worker_id ? workerLabel : undefined}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {workers?.map((w: any) => (
-                    <SelectItem key={w.id} value={w.id}>
-                      {w.full_name}{w.nickname ? ` (${w.nickname})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          {eventLocked ? (
-            renderReadOnlyField("Evento", eventLabel, "Evento estrutural preservado nesta edição.")
-          ) : (
-            <div>
-              <Label>Evento</Label>
-              <Select value={form.event_id} onValueChange={(v) => {
-                set("event_id", v);
-                const ev = events?.find((e: any) => e.id === v);
-                if (ev && (ev as any).company_id) {
-                  set("company_id", (ev as any).company_id);
-                }
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione">{form.event_id ? eventLabel : undefined}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {events?.map((ev: any) => (
-                    <SelectItem key={ev.id} value={ev.id}>{ev.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          {companyLocked ? (
-            renderReadOnlyField("Empresa", companyLabel, "Empresa estrutural preservada nesta edição.")
-          ) : (
-            <div>
-              <Label>Empresa</Label>
-              <Select value={form.company_id} onValueChange={(v) => set("company_id", v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione">{form.company_id ? companyLabel : undefined}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {companies?.map((c: any) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.trade_name || c.legal_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          <div>
-            <Label>Função/Cargo{reqMark("job_role")}</Label>
-            <Input value={form.job_role} onChange={(e) => set("job_role", e.target.value)} />
+            <Label>Nome do grupo *</Label>
+            <Input value={form.group_name} onChange={(e) => set("group_name", e.target.value)} placeholder="Ex: Equipe Segurança — Festival 2026" required />
           </div>
           <div>
-            <Label>Atividade</Label>
-            <Input value={form.job_function} onChange={(e) => set("job_function", e.target.value)} />
+            <Label>Evento *</Label>
+            <Select value={form.event_id} onValueChange={(v) => {
+              set("event_id", v);
+              const ev = events?.find((e: any) => e.id === v);
+              if (ev && (ev as any).company_id) {
+                set("company_id", (ev as any).company_id);
+              }
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione">{form.event_id ? currentEvent?.name : undefined}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {events?.map((ev: any) => (
+                  <SelectItem key={ev.id} value={ev.id}>{ev.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
-            <Label>Departamento{reqMark("department")}</Label>
-            <Input value={form.department} onChange={(e) => set("department", e.target.value)} />
+            <Label>Empresa</Label>
+            <Select value={form.company_id} onValueChange={(v) => set("company_id", v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione">{form.company_id ? (currentCompany?.trade_name || currentCompany?.legal_name) : undefined}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {companies?.map((c: any) => (
+                  <SelectItem key={c.id} value={c.id}>{c.trade_name || c.legal_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -542,27 +295,12 @@ export default function LinkForm() {
         <CardHeader><CardTitle className="text-base">Contrato</CardTitle></CardHeader>
         <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2">
           <div>
-            <Label>Tipo de contrato{reqMark("contract_type")}</Label>
-            <Select value={form.contract_type} onValueChange={(v) => set("contract_type", v)}>
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="clt">CLT</SelectItem>
-                <SelectItem value="pj">PJ</SelectItem>
-                <SelectItem value="freelancer">Freelancer</SelectItem>
-                <SelectItem value="temporary">Temporário</SelectItem>
-                <SelectItem value="intern">Estagiário</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
             <Label>Status</Label>
             <Select value={form.status} onValueChange={(v) => set("status", v)}>
               <SelectTrigger><SelectValue>{currentStatusInfo?.label}</SelectValue></SelectTrigger>
               <SelectContent>
                 {statusOptions.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>
-                    {s.label}
-                  </SelectItem>
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -573,30 +311,22 @@ export default function LinkForm() {
               </p>
             )}
           </div>
+          <div />
           <div>
             <Label className={highlightDates && !form.hire_date ? "text-destructive font-semibold" : ""}>
-              Data início *
-              {highlightDates && !form.hire_date && <span className="ml-1 text-xs font-normal">← preencha aqui</span>}
+              Data início
             </Label>
-            <Input
-              ref={hireDateRef}
-              type="date"
-              value={form.hire_date}
+            <Input ref={hireDateRef} type="date" value={form.hire_date}
               onChange={(e) => { set("hire_date", e.target.value); if (e.target.value && form.end_date) setHighlightDates(false); }}
-              required
               className={highlightDates && !form.hire_date ? "border-destructive ring-2 ring-destructive/30" : ""}
             />
           </div>
           <div>
             <Label className={highlightDates && !form.end_date ? "text-destructive font-semibold" : ""}>
-              Data fim *
-              {highlightDates && !form.end_date && <span className="ml-1 text-xs font-normal">← preencha aqui</span>}
+              Data fim
             </Label>
-            <Input
-              type="date"
-              value={form.end_date}
+            <Input type="date" value={form.end_date}
               onChange={(e) => { set("end_date", e.target.value); if (form.hire_date && e.target.value) setHighlightDates(false); }}
-              required
               className={highlightDates && !form.end_date ? "border-destructive ring-2 ring-destructive/30" : ""}
             />
           </div>
@@ -624,17 +354,17 @@ export default function LinkForm() {
             <Input type="time" value={form.call_time} onChange={(e) => set("call_time", e.target.value)} />
           </div>
           <div>
-            <Label>Horas diárias{reqMark("daily_hours")}</Label>
+            <Label>Horas diárias</Label>
             <Input type="number" step="0.5" value={form.daily_hours} onChange={(e) => set("daily_hours", e.target.value)} />
           </div>
           <div>
-            <Label>Horas semanais{reqMark("weekly_hours")}</Label>
+            <Label>Horas semanais</Label>
             <Input type="number" step="0.5" value={form.weekly_hours} onChange={(e) => set("weekly_hours", e.target.value)} />
           </div>
         </CardContent>
       </Card>
 
-      {/* Modo de dias */}
+      {/* Dias de atuação */}
       <Card>
         <CardHeader><CardTitle className="text-base">Dias de atuação</CardTitle></CardHeader>
         <CardContent className="space-y-4">
@@ -662,32 +392,19 @@ export default function LinkForm() {
             <div className="space-y-2">
               <Label>Datas de atuação</Label>
               {!form.hire_date || !form.end_date ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setHighlightDates(true);
-                    contractSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-                    setTimeout(() => hireDateRef.current?.focus(), 400);
-                  }}
-                  className="flex items-center gap-2 rounded-md border border-dashed border-destructive/50 bg-destructive/5 px-3 py-2 text-xs text-destructive hover:bg-destructive/10 transition-colors w-full text-left"
-                >
+                <button type="button" onClick={() => {
+                  setHighlightDates(true);
+                  contractSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  setTimeout(() => hireDateRef.current?.focus(), 400);
+                }} className="flex items-center gap-2 rounded-md border border-dashed border-destructive/50 bg-destructive/5 px-3 py-2 text-xs text-destructive hover:bg-destructive/10 transition-colors w-full text-left">
                   <span>⚠️ Preencha as datas de início e fim na seção Contrato.</span>
                   <span className="underline whitespace-nowrap">Ir para lá →</span>
                 </button>
               ) : (
                 <>
                   <div className="flex gap-2">
-                    <Input
-                      type="date"
-                      value={newDate}
-                      onChange={(e) => setNewDate(e.target.value)}
-                      min={form.hire_date}
-                      max={form.end_date}
-                      className="flex-1"
-                    />
-                    <Button type="button" size="sm" variant="outline" onClick={addSpecificDate}>
-                      Adicionar
-                    </Button>
+                    <Input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} min={form.hire_date} max={form.end_date} className="flex-1" />
+                    <Button type="button" size="sm" variant="outline" onClick={addSpecificDate}>Adicionar</Button>
                   </div>
                   {form.specific_work_dates.length > 0 && (
                     <div className="flex flex-wrap gap-1">
@@ -708,7 +425,7 @@ export default function LinkForm() {
 
           <div>
             <Label>Observações da escala</Label>
-            <Textarea value={form.work_days_notes} onChange={(e) => set("work_days_notes", e.target.value)} rows={2} placeholder="Ex: Folga nos dias de montagem" />
+            <Textarea value={form.work_days_notes} onChange={(e) => set("work_days_notes", e.target.value)} rows={2} />
           </div>
         </CardContent>
       </Card>
@@ -740,99 +457,6 @@ export default function LinkForm() {
         </CardContent>
       </Card>
 
-      {/* Remuneração e benefícios */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">Remuneração e benefícios</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-            <div>
-              <Label>Tipo de remuneração principal</Label>
-              <Select value={form.remuneration_type} onValueChange={(v) => set("remuneration_type", v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  {enabledRemTypes.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Frequência de pagamento</Label>
-              <Select value={form.payment_frequency} onValueChange={(v) => set("payment_frequency", v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">Diária</SelectItem>
-                  <SelectItem value="weekly">Semanal</SelectItem>
-                  <SelectItem value="biweekly">Quinzenal</SelectItem>
-                  <SelectItem value="monthly">Mensal</SelectItem>
-                  <SelectItem value="per_event">Por evento</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-            <div className={form.remuneration_type === "daily" ? "ring-2 ring-primary/30 rounded-md p-2 -m-2" : ""}>
-              <Label className={form.remuneration_type === "daily" ? "font-semibold text-primary" : ""}>
-                Diária (R$) {form.remuneration_type === "daily" && <span className="text-xs">← principal</span>}
-              </Label>
-              <Input type="number" step="0.01" value={form.daily_rate} onChange={(e) => set("daily_rate", e.target.value)} />
-            </div>
-            <div className={form.remuneration_type === "monthly" ? "ring-2 ring-primary/30 rounded-md p-2 -m-2" : ""}>
-              <Label className={form.remuneration_type === "monthly" ? "font-semibold text-primary" : ""}>
-                Salário fixo (R$) {form.remuneration_type === "monthly" && <span className="text-xs">← principal</span>}
-              </Label>
-              <Input type="number" step="0.01" value={form.fixed_salary} onChange={(e) => set("fixed_salary", e.target.value)} />
-            </div>
-            <div className={form.remuneration_type === "hourly" ? "ring-2 ring-primary/30 rounded-md p-2 -m-2" : ""}>
-              <Label className={form.remuneration_type === "hourly" ? "font-semibold text-primary" : ""}>
-                Hora (R$) {form.remuneration_type === "hourly" && <span className="text-xs">← principal</span>}
-              </Label>
-              <Input type="number" step="0.01" value={form.hourly_rate} onChange={(e) => set("hourly_rate", e.target.value)} />
-            </div>
-          </div>
-
-          <div className="border-t pt-4 grid gap-4 grid-cols-1 sm:grid-cols-2">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="has_vt"
-                  checked={form.has_transport_allowance}
-                  onChange={(e) => set("has_transport_allowance", e.target.checked)}
-                  className="h-4 w-4 rounded border-input"
-                />
-                <Label htmlFor="has_vt" className="mb-0">Recebe vale-transporte (VT)</Label>
-              </div>
-              {form.has_transport_allowance && (
-                <div>
-                  <Label>Valor VT (R$)</Label>
-                  <Input type="number" step="0.01" value={form.transport_allowance} onChange={(e) => set("transport_allowance", e.target.value)} />
-                </div>
-              )}
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="has_vr"
-                  checked={form.has_meal_allowance}
-                  onChange={(e) => set("has_meal_allowance", e.target.checked)}
-                  className="h-4 w-4 rounded border-input"
-                />
-                <Label htmlFor="has_vr" className="mb-0">Recebe vale-refeição/alimentação (VR/VA)</Label>
-              </div>
-              {form.has_meal_allowance && (
-                <div>
-                  <Label>Valor VR/VA (R$)</Label>
-                  <Input type="number" step="0.01" value={form.meal_allowance} onChange={(e) => set("meal_allowance", e.target.value)} />
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Configuração documental */}
       <LinkDocumentConfigForm config={docConfig} onChange={setDocConfig} />
 
@@ -846,8 +470,8 @@ export default function LinkForm() {
 
       <div className="flex justify-end gap-2 pb-4">
         <Button type="button" variant="outline" onClick={() => navigate("/links")}>Cancelar</Button>
-        <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
+        <Button type="submit" disabled={isPending}>
+          {isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
           Salvar
         </Button>
       </div>
