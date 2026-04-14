@@ -1,71 +1,58 @@
 
 
-## Etapa 4 — Reescrita das telas principais para link_groups
+## Implementação: 3 correções funcionais + modelagem contratação/remuneração
 
-### Ajustes pendentes no hook (pré-requisito)
+### 1. Migração SQL
 
-Dois ajustes no `useLinkGroups.ts` antes das telas:
+**`link_groups`**: adicionar `allowed_contract_types text not null default 'both'`
 
-1. **`useLinkGroupWorkers`**: trocar `.order("created_at", { ascending: false })` por ordenação pelo nome do trabalhador (via join, client-side sort por `workers.full_name`)
-2. **Mutations de worker** (`useAllocateWorker`, `useUpdateGroupWorker`, `useRemoveGroupWorker`): adicionar invalidação de `["link-group", vars.link_group_id]` no `onSuccess`
+**`link_group_workers`**: adicionar 7 colunas:
+- `shift_type text`, `work_shift text`, `work_schedule text`, `call_time time`, `daily_hours numeric`, `weekly_hours numeric`
+- `category_reference_rate numeric`
 
-### Tela 1: Links.tsx (listagem)
+Nenhuma coluna existente removida. Dados dos 27 trabalhadores intactos.
 
-Substituir o uso de `useEmploymentLinks` por `useLinkGroups`. A tabela passa a listar **grupos**, não vínculos individuais.
+### 2. `src/pages/LinkForm.tsx`
 
-Colunas: Nome do grupo, Evento, Empresa, Trabalhadores (count), Período, Status.
+- **Adicionar** select `allowed_contract_types` na seção Contrato (CLT / Prestação de serviço / Ambos)
+- **Remover** seção Jornada inteira (linhas 336-365) — turno, escala, horário passam para o trabalhador
+- Remover campos de jornada do state/payload, adicionar `allowed_contract_types`
 
-Filtros mantidos: busca, status, empresa, evento, período.
-Exportações (CSV, PDF, Admissão, ZIP): mantidas mas adaptadas para ler de `link_groups` + `link_group_workers`.
-Click na row navega para `/links/:groupId` (detalhe do grupo).
-Botao "Novo" navega para `/links/new` (criar grupo).
+### 3. `src/pages/LinkDetail.tsx`
 
-### Tela 2: LinkForm.tsx (criar/editar grupo)
+**Tab Dados**:
+- Remover card Jornada (linhas 191-201)
+- Adicionar "Tipo de contratação permitido" no card Contrato
 
-Formulario de **grupo**, nao de vinculo individual. Campos do grupo:
+**Dialog de alocação** — expandir com seções completas:
+- **Identificação**: trabalhador, função/cargo, atividade, departamento, tipo de contrato (filtrado por `allowed_contract_types` do grupo: `clt` → só CLT, `service` → só prestação, `both` → ambas)
+- **Jornada**: turno, escala, horário, horário de chamada, horas diárias, horas semanais
+- **Remuneração**: tipo de remuneração (cachê/diária/hora/fixo) + valor efetivo do evento (campos separados e claros)
+- **Referência**: valor de referência da categoria/cargo (campo `category_reference_rate`, separado do efetivo)
+- **Benefícios**: VT (toggle + valor), VR/VA (toggle + valor)
+- **Observações**
 
-- `group_name` (obrigatório)
-- `event_id` (select, auto-preenche `company_id`)
-- `company_id` (select)
-- `status`, `hire_date`, `end_date`
-- Jornada: `shift_type`, `work_shift`, `work_schedule`, `call_time`, `daily_hours`, `weekly_hours`
-- Dias de atuacao: `work_days_mode`, `specific_work_dates`, `work_days_notes`
-- Operacional: `supervisor_name`, `assembly_point`, `uniform_notes`, `transport_notes`, `meal_entitlement`
-- `required_documents` (config de documentos)
-- `notes`
+**Remoção de trabalhador**: substituir `confirm()` nativo por `DeleteConfirmDialog`
 
-Sem campos de remuneração no grupo (fica no worker individual).
-Sem seleção de trabalhador (alocação é feita no detalhe do grupo).
-Usa `useCreateLinkGroup` / `useUpdateLinkGroup`.
+### 4. `src/components/links/EventLinksList.tsx`
 
-### Tela 3: LinkDetail.tsx (detalhe do grupo)
+Reescrever para usar `useLinkGroupsByEvent(eventId)`:
+- Cards listam **grupos** (nome, worker_count, status)
+- Click navega para `/links/{group.id}`
+- Botão "Novo grupo" navega para `/links/new?event={eventId}`
+- Remover imports/queries de `employment_links`
 
-Header com nome do grupo, badge de status, evento, empresa.
+### 5. `src/hooks/useLinkGroups.ts`
 
-Tabs:
-- **Dados**: cards com informações do grupo (mesma estrutura atual, sem remuneração)
-- **Trabalhadores**: lista de `link_group_workers` com nome, função, status. Botão "Alocar trabalhador" abre dialog/inline para adicionar worker ao grupo. Cada worker com ações de editar/remover.
-- **Documentos**: mantido, adaptado para usar `link_group_workers` em vez de `employment_links`
-
-Usa `useLinkGroup(id)`, `useLinkGroupWorkers(id)`, `useAllocateWorker`, `useRemoveGroupWorker`.
-
-### Rotas (App.tsx)
-
-Sem alteração de rotas. As rotas `/links`, `/links/new`, `/links/:id`, `/links/:id/edit` continuam existindo, apontando para os mesmos componentes reescritos.
-
-### O que NAO sera feito nesta etapa
-
-- Nenhuma alteração em `EventLinksList`, `WorkerLinksList`, `ImportLinksDialog`, `Dashboard` (etapa 5)
-- Nenhuma migração SQL
-- Nenhum soft-delete do legado
-- `useEmploymentLinks.ts` permanece intacto
+Expandir `useLinkGroupWorkers` select para incluir os 7 novos campos.
 
 ### Arquivos alterados
 
-| Arquivo | Acao |
+| Arquivo | Ação |
 |---|---|
-| `src/hooks/useLinkGroups.ts` | Ajustar ordenacao e invalidacao |
-| `src/pages/Links.tsx` | Reescrever para listar `link_groups` |
-| `src/pages/LinkForm.tsx` | Reescrever para criar/editar grupo |
-| `src/pages/LinkDetail.tsx` | Reescrever para detalhe de grupo + tab trabalhadores |
+| Migração SQL | 1 coluna em `link_groups`, 7 em `link_group_workers` |
+| `src/hooks/useLinkGroups.ts` | Expandir select |
+| `src/pages/LinkForm.tsx` | Tipo contratação, remover Jornada |
+| `src/pages/LinkDetail.tsx` | Dialog expandido, modal remoção, remover Jornada |
+| `src/components/links/EventLinksList.tsx` | Reescrever para link_groups |
 
