@@ -85,6 +85,15 @@ export function useLinkGroupWorkers(groupId: string | undefined) {
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
       if (error) throw error;
+
+      // Sort by worker name client-side
+      const sorted = (data ?? []).sort((a: any, b: any) => {
+        const nameA = a.workers?.full_name?.toLowerCase() || "";
+        const nameB = b.workers?.full_name?.toLowerCase() || "";
+        return nameA.localeCompare(nameB, "pt-BR");
+      });
+      return sorted;
+      if (error) throw error;
       return data;
     },
   });
