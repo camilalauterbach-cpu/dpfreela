@@ -1,61 +1,72 @@
 
 
-## Plano de implementação: Reorganização documental no vínculo + categoria "Outros"
+## Plano de implementação: Dados bancários estruturados + comprovante automático
 
-### Resumo das mudanças
+### Resumo
 
-Cinco arquivos serão modificados/criados. Nenhuma migração de banco. Totalmente não destrutivo.
+5 alterações: 1 migração SQL, 2 arquivos novos, 2 arquivos modificados. Totalmente não destrutivo.
 
-### 1. `src/lib/worker-completeness.ts`
-- Adicionar `"outros"` ao `CONDITIONAL_DOC_CATEGORIES`
-- Adicionar label: `outros: "Outros (complementares)"`
+### 1. Migração SQL
 
-### 2. `src/components/workers/DocumentChecklist.tsx`
-- Na categoria `"outros"`: cada upload cria um **novo registro** (insert sempre, nunca update)
-- Exibir todos os docs "outros" como lista com nome do arquivo + data
-- Cada item com botão Ver e seletor de status
-- Botão "Adicionar documento" sempre visível na seção "outros"
-- Texto orientativo: *"Documentos de filhos, declaração racial, comprovantes complementares, etc."*
+```sql
+ALTER TABLE worker_payment_methods
+  ADD COLUMN IF NOT EXISTS holder_name text,
+  ADD COLUMN IF NOT EXISTS holder_cpf text;
+```
 
-### 3. `src/components/links/LinkDocumentsTab.tsx` (novo)
-Recebe `workerId`, `employmentLinkId`, `event`, `workerName`.
+### 2. Novo: `src/lib/generate-bank-receipt.ts`
 
-**Seção A — Documentos do Trabalhador (somente leitura)**
-- Busca `worker_documents` do worker
-- Exibe todas as categorias obrigatórias + condicionais com status (aprovado, pendente, enviado, etc.)
-- Categorias sem arquivo aparecem como "Pendente"
-- Sem botões de upload/edição
-- Aviso com link: *"Para incluir ou alterar documentos, acesse o cadastro do trabalhador."* → navega para `/workers/{workerId}?tab=documentos`
+Função usando `jspdf` (já instalado) que recebe os dados bancários e retorna um `Blob` PDF contendo:
 
-**Seção B — Documentos do Evento/Vínculo**
-- Mantém `OperationalDocsChecklist` existente (editável)
+- Título: "Comprovante de Dados Bancários"
+- Subtítulo: "Gerado automaticamente pelo sistema"
+- Data/hora de geração (pt-BR)
+- Nome + CPF do trabalhador
+- Banco (nome/código)
+- Agência e Conta (quando preenchidos)
+- Tipo de conta (Corrente/Poupança)
+- Tipo de chave Pix (CPF/Telefone/E-mail/Aleatória) + Chave Pix
+- Titular: nome + CPF + indicação "Próprio trabalhador" ou "Terceiro"
+- Nome do usuário logado que gerou
+- Rodapé de validade documental
 
-**Seção C — Pendências (dois blocos separados)**
-- **Pendências do trabalhador**: docs obrigatórios faltantes OU com status != approved (uploaded, pending, rejected, replace). Ignora condicionais/opcionais não enviados.
-- **Pendências do evento**: docs operacionais faltantes OU com status != approved. Só mostra docs exigidos pelo evento.
+### 3. Novo: `src/components/workers/BankDataForm.tsx`
 
-**Botões de download no topo:**
-- "Baixar docs do trabalhador" — ZIP do bucket `worker-documents`
-- "Baixar docs do evento" — ZIP do bucket `link-documents`
-- "Baixar todos" — ZIP com subpastas `/documentos_trabalhador/` e `/documentos_evento/`
+Props: `workerId`, `workerName`, `workerCpf`, `onSuccess`.
 
-### 4. `src/pages/LinkDetail.tsx`
-- Substituir conteúdo da aba "Documentos" pelo novo `LinkDocumentsTab`
+Formulário Pix-first:
+- Bloco principal: Tipo de chave Pix + Chave Pix + Banco (obrigatório)
+- Seção expansível (Collapsible): Agência, Conta, Tipo de conta — opcional
+- Checkbox "Titular é o próprio trabalhador" (pré-marcado) + campos Titular/CPF
 
-### 5. `src/lib/export-docs-zip.ts`
-- Adicionar função `exportLinkDocsZip(params)` com `mode: 'worker' | 'event' | 'all'`
-- Modo `all` organiza em subpastas `/documentos_trabalhador/` e `/documentos_evento/`
+Ao salvar:
+1. Insere em `worker_payment_methods` com `holder_name`, `holder_cpf`
+2. Gera PDF via `generate-bank-receipt`
+3. Upload para `worker-documents/{workerId}/bank_document/{timestamp}.pdf`
+4. Insere novo registro em `worker_documents` com `category = "bank_document"`, `status = "uploaded"`, `notes = "auto_generated"`
 
-### 6. `src/pages/WorkerDetail.tsx`
-- Ler query param `?tab=documentos` para abrir na aba correta via `useSearchParams`
+### 4. Modificar: `src/components/workers/DocumentChecklist.tsx`
 
-### Regra de pendências (conforme solicitado)
-- **Pendente** = documento faltante (sem registro) OU documento existente com status diferente de "approved"
-- **Não poluir** = documentos condicionais/opcionais que não foram enviados NÃO aparecem no resumo de pendências (exceto se exigidos pelo evento)
+Props: adicionar `workerName?: string`, `workerCpf?: string`.
+
+Mudanças no card `bank_document`:
+- Remover `bank_document` do loop `renderDocCard` de obrigatórios
+- Criar seção dedicada `renderBankDocumentSection()` (similar a `renderOutrosSection`)
+- Buscar todos os docs com `category = "bank_document"` (múltiplos registros)
+- Cada doc exibe badge de origem: "Upload manual" ou "Gerado pelo sistema" (baseado em `notes === "auto_generated"`)
+- Dois botões de ação: "Enviar comprovante" (upload com `alwaysInsert = true`) e "Preencher dados bancários" (abre Dialog com `BankDataForm`)
+- Quando já existe doc ativo, AlertDialog de confirmação: "Adicionar" (coexistência) ou "Substituir" (soft-delete do anterior via `UPDATE ... SET deleted_at = now()`, arquivo no storage preservado)
+- Ação padrão: preservar o existente
+
+### 5. Modificar: `src/pages/WorkerDetail.tsx`
+
+Passar `workerName={worker.full_name}` e `workerCpf={worker.cpf}` para `<DocumentChecklist>`.
 
 ### Integridade
-- Zero migrações de banco
-- Documentos globais: somente leitura no vínculo
-- Nenhum dado existente movido, alterado ou deletado
-- Categoria "outros" apenas adiciona novos registros
+
+- Nenhum dado existente alterado ou removido
+- "Substituir" usa soft-delete (`deleted_at = now()`) — registro antigo permanece no banco, arquivo permanece no storage
+- Uploads manuais e comprovantes gerados coexistem com identificação visual clara
+- `jspdf` já instalado — zero dependências novas
+- `bank_document` continua contando como doc obrigatório para DP readiness (lógica em `computeDocCompleteness` já funciona)
 
