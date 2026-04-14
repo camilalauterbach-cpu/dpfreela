@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2, Save, X, Info } from "lucide-react";
+import { LinkDocumentConfigForm } from "@/components/links/LinkDocumentConfigForm";
+import { LinkDocumentConfig, EMPTY_CONFIG, parseConfig } from "@/lib/link-document-config";
 
 /* ── All workers/events/companies for selects (no pagination) ── */
 function useAllWorkers() {
@@ -138,6 +140,8 @@ export default function LinkForm() {
     notes: "",
   });
 
+  const [docConfig, setDocConfig] = useState<LinkDocumentConfig>({ ...EMPTY_CONFIG });
+
   const [globalConfig, setGlobalConfig] = useState<any>(null);
   const [configLoaded, setConfigLoaded] = useState(false);
 
@@ -212,6 +216,7 @@ export default function LinkForm() {
         meal_allowance: e.meal_allowance != null ? String(e.meal_allowance) : "",
         notes: e.notes || "",
       });
+      setDocConfig(parseConfig(e.required_documents));
     }
   }, [isEdit, existing]);
 
@@ -319,6 +324,7 @@ export default function LinkForm() {
         has_meal_allowance: form.has_meal_allowance,
         meal_allowance: form.meal_allowance ? Number(form.meal_allowance) : null,
         notes: form.notes || null,
+        required_documents: docConfig,
       };
 
       if (isEdit) {
@@ -826,6 +832,9 @@ export default function LinkForm() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Configuração documental */}
+      <LinkDocumentConfigForm config={docConfig} onChange={setDocConfig} />
 
       {/* Observações */}
       <Card>
