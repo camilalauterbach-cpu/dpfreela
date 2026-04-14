@@ -201,6 +201,7 @@ export type Database = {
           parking_spot: string | null
           payment_frequency: string | null
           remuneration_type: string | null
+          required_documents: Json
           rest_days_pattern: string | null
           shift_type: string | null
           specific_work_dates: string[]
@@ -252,6 +253,7 @@ export type Database = {
           parking_spot?: string | null
           payment_frequency?: string | null
           remuneration_type?: string | null
+          required_documents?: Json
           rest_days_pattern?: string | null
           shift_type?: string | null
           specific_work_dates?: string[]
@@ -303,6 +305,7 @@ export type Database = {
           parking_spot?: string | null
           payment_frequency?: string | null
           remuneration_type?: string | null
+          required_documents?: Json
           rest_days_pattern?: string | null
           shift_type?: string | null
           specific_work_dates?: string[]
