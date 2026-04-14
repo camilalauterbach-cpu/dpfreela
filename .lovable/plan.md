@@ -1,61 +1,61 @@
 
 
-# Fase 1 — Ajustes Finais + Execução
+## Plano de implementação: Reorganização documental no vínculo + categoria "Outros"
 
-## Ajuste 1: CPF do Cadu
+### Resumo das mudanças
 
-CPF inválido `79154sjd...` será substituído por **`30517397109`** (válido mod-11, fictício).
+Cinco arquivos serão modificados/criados. Nenhuma migração de banco. Totalmente não destrutivo.
 
-Tabela corrigida:
+### 1. `src/lib/worker-completeness.ts`
+- Adicionar `"outros"` ao `CONDITIONAL_DOC_CATEGORIES`
+- Adicionar label: `outros: "Outros (complementares)"`
 
-| Nome | Apelido | CPF |
-|------|---------|-----|
-| Maria Silva dos Santos | Má | 52998224725 |
-| João Pedro de Oliveira | JP | 83749512030 |
-| Ana Carolina Ferreira | Carol | 15647318700 |
-| Carlos Eduardo Lima | Cadu | 30517397109 |
-| Beatriz Souza Mendes | Bia | 64725913080 |
+### 2. `src/components/workers/DocumentChecklist.tsx`
+- Na categoria `"outros"`: cada upload cria um **novo registro** (insert sempre, nunca update)
+- Exibir todos os docs "outros" como lista com nome do arquivo + data
+- Cada item com botão Ver e seletor de status
+- Botão "Adicionar documento" sempre visível na seção "outros"
+- Texto orientativo: *"Documentos de filhos, declaração racial, comprovantes complementares, etc."*
 
-## Ajuste 2: Storage — Viewer mais restrito
+### 3. `src/components/links/LinkDocumentsTab.tsx` (novo)
+Recebe `workerId`, `employmentLinkId`, `event`, `workerName`.
 
-Policies revisadas:
+**Seção A — Documentos do Trabalhador (somente leitura)**
+- Busca `worker_documents` do worker
+- Exibe todas as categorias obrigatórias + condicionais com status (aprovado, pendente, enviado, etc.)
+- Categorias sem arquivo aparecem como "Pendente"
+- Sem botões de upload/edição
+- Aviso com link: *"Para incluir ou alterar documentos, acesse o cadastro do trabalhador."* → navega para `/workers/{workerId}?tab=documentos`
 
-### `worker-documents`
-| Operação | Admin | Manager | Operator | Viewer |
-|----------|-------|---------|----------|--------|
-| SELECT (download) | ✅ | ✅ | ✅ | ❌ |
-| INSERT (upload) | ✅ | ✅ | ✅ | ❌ |
-| UPDATE | ✅ | ✅ | ❌ | ❌ |
-| DELETE | ✅ | ✅ | ❌ | ❌ |
+**Seção B — Documentos do Evento/Vínculo**
+- Mantém `OperationalDocsChecklist` existente (editável)
 
-### `link-documents`
-| Operação | Admin | Manager | Operator | Viewer |
-|----------|-------|---------|----------|--------|
-| SELECT | ✅ | ✅ | ✅ | ✅ |
-| INSERT | ✅ | ✅ | ✅ | ❌ |
-| UPDATE | ✅ | ✅ | ❌ | ❌ |
-| DELETE | ✅ | ✅ | ❌ | ❌ |
+**Seção C — Pendências (dois blocos separados)**
+- **Pendências do trabalhador**: docs obrigatórios faltantes OU com status != approved (uploaded, pending, rejected, replace). Ignora condicionais/opcionais não enviados.
+- **Pendências do evento**: docs operacionais faltantes OU com status != approved. Só mostra docs exigidos pelo evento.
 
-### `payment-receipts`
-| Operação | Admin | Manager | Operator | Viewer |
-|----------|-------|---------|----------|--------|
-| SELECT | ✅ | ✅ | ✅ | ❌ |
-| INSERT | ✅ | ✅ | ✅ | ❌ |
-| UPDATE | ✅ | ✅ | ❌ | ❌ |
-| DELETE | ✅ | ❌ | ❌ | ❌ |
+**Botões de download no topo:**
+- "Baixar docs do trabalhador" — ZIP do bucket `worker-documents`
+- "Baixar docs do evento" — ZIP do bucket `link-documents`
+- "Baixar todos" — ZIP com subpastas `/documentos_trabalhador/` e `/documentos_evento/`
 
-**Resumo**: Viewer perde acesso a `worker-documents` (dados pessoais) e `payment-receipts` (comprovantes financeiros). Mantém acesso de leitura apenas a `link-documents` (documentos operacionais do vínculo).
+### 4. `src/pages/LinkDetail.tsx`
+- Substituir conteúdo da aba "Documentos" pelo novo `LinkDocumentsTab`
 
----
+### 5. `src/lib/export-docs-zip.ts`
+- Adicionar função `exportLinkDocsZip(params)` com `mode: 'worker' | 'event' | 'all'`
+- Modo `all` organiza em subpastas `/documentos_trabalhador/` e `/documentos_evento/`
 
-## Execução — 8 etapas sequenciais
+### 6. `src/pages/WorkerDetail.tsx`
+- Ler query param `?tab=documentos` para abrir na aba correta via `useSearchParams`
 
-1. Habilitar Lovable Cloud (Supabase integrado)
-2. Migration 1: enum `app_role`, função `has_role()`, `profiles` com trigger, `user_roles`
-3. Migration 2: `companies`, `events`, `workers` (com CHECK CPF)
-4. Migration 3: `worker_dependents`, `worker_payment_methods` (partial unique index), `worker_documents`
-5. Migration 4: `employment_links` (40+ campos), `employment_link_documents`
-6. Migration 5: `payroll_batches`, `payroll_batch_items`, `payment_receipts` (CHECK constraint), `change_logs`, `saved_filters`
-7. Migration 6: RLS completo (admin/manager full, operator restrito, viewer read-only, change_logs imutável) + Storage buckets com policies granulares
-8. Seed data com CPFs corrigidos + instalar dependências + criar client Supabase
+### Regra de pendências (conforme solicitado)
+- **Pendente** = documento faltante (sem registro) OU documento existente com status diferente de "approved"
+- **Não poluir** = documentos condicionais/opcionais que não foram enviados NÃO aparecem no resumo de pendências (exceto se exigidos pelo evento)
+
+### Integridade
+- Zero migrações de banco
+- Documentos globais: somente leitura no vínculo
+- Nenhum dado existente movido, alterado ou deletado
+- Categoria "outros" apenas adiciona novos registros
 
