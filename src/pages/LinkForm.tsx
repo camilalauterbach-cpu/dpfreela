@@ -1,11 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEmploymentLink } from "@/hooks/useEmploymentLinks";
 import { getSystemSetting } from "@/lib/system-settings";
-import { useWorkers } from "@/hooks/useWorkers";
-import { useEvents } from "@/hooks/useEvents";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +12,68 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Save, X } from "lucide-react";
+import { ArrowLeft, Loader2, Save, X, Info } from "lucide-react";
+
+/* ── All workers/events/companies for selects (no pagination) ── */
+function useAllWorkers() {
+  return useQuery({
+    queryKey: ["workers-all-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("workers")
+        .select("id, full_name, nickname, cpf")
+        .is("deleted_at", null)
+        .order("full_name")
+        .limit(1000);
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 60_000,
+  });
+}
+
+function useAllEvents() {
+  return useQuery({
+    queryKey: ["events-all-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("events")
+        .select("id, name, company_id, companies(legal_name)")
+        .is("deleted_at", null)
+        .order("name")
+        .limit(1000);
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 60_000,
+  });
+}
+
+function useAllCompanies() {
+  return useQuery({
+    queryKey: ["companies-all-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("id, legal_name, trade_name")
+        .is("deleted_at", null)
+        .order("legal_name")
+        .limit(1000);
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 60_000,
+  });
+}
+
+const statusOptions = [
+  { value: "draft", label: "Rascunho", description: "Vínculo em preparação, ainda não confirmado." },
+  { value: "active", label: "Ativo", description: "Vínculo confirmado e em vigor." },
+  { value: "suspended", label: "Suspenso", description: "Temporariamente pausado." },
+  { value: "completed", label: "Concluído", description: "Período encerrado normalmente." },
+  { value: "terminated", label: "Encerrado", description: "Encerrado antes do previsto." },
+  { value: "cancelled", label: "Cancelado", description: "Cancelado antes de iniciar." },
+];
 
 export default function LinkForm() {
   const { id } = useParams();
@@ -25,13 +84,15 @@ export default function LinkForm() {
   const queryClient = useQueryClient();
 
   const { data: existing, isLoading: loadingExisting } = useEmploymentLink(id);
-  const { data: workers } = useWorkers("");
-  const { data: events } = useEvents("", "all");
+  const { data: workers } = useAllWorkers();
+  const { data: events } = useAllEvents();
+  const { data: companies } = useAllCompanies();
 
   const [form, setForm] = useState<Record<string, any>>({
     link_name: "",
     worker_id: searchParams.get("worker") || "",
     event_id: searchParams.get("event") || "",
+    company_id: "",
     job_role: "",
     job_function: "",
     department: "",
@@ -76,10 +137,9 @@ export default function LinkForm() {
     });
   }, []);
 
-  // Apply global defaults for NEW links only, after config is loaded
+  // Apply global defaults for NEW links only
   useEffect(() => {
     if (isEdit || !configLoaded || !globalConfig) return;
-    // Only apply if form hasn't been touched (still default empty values)
     setForm((prev) => ({
       ...prev,
       has_transport_allowance: prev.has_transport_allowance || globalConfig.default_vt || false,
@@ -97,6 +157,8 @@ export default function LinkForm() {
   const [highlightDates, setHighlightDates] = useState(false);
   const hireDateRef = useRef<HTMLInputElement>(null);
   const contractSectionRef = useRef<HTMLDivElement>(null);
+
+  // Load existing record into form
   useEffect(() => {
     if (isEdit && existing) {
       const e = existing as any;
@@ -104,6 +166,7 @@ export default function LinkForm() {
         link_name: e.link_name || "",
         worker_id: e.worker_id || "",
         event_id: e.event_id || "",
+        company_id: e.company_id || "",
         job_role: e.job_role || "",
         job_function: e.job_function || "",
         department: e.department || "",
@@ -141,6 +204,16 @@ export default function LinkForm() {
 
   const set = (key: string, value: any) => setForm((p) => ({ ...p, [key]: value }));
 
+  // Auto-fill company when event is selected
+  useEffect(() => {
+    if (form.event_id && events) {
+      const ev = events.find((e: any) => e.id === form.event_id);
+      if (ev && (ev as any).company_id && !form.company_id) {
+        set("company_id", (ev as any).company_id);
+      }
+    }
+  }, [form.event_id, events]);
+
   const addSpecificDate = () => {
     if (!newDate) return;
     if (form.hire_date && newDate < form.hire_date) {
@@ -170,6 +243,7 @@ export default function LinkForm() {
         link_name: form.link_name || null,
         worker_id: form.worker_id,
         event_id: form.event_id || null,
+        company_id: form.company_id || null,
         job_role: form.job_role || null,
         job_function: form.job_function || null,
         department: form.department || null,
@@ -244,7 +318,6 @@ export default function LinkForm() {
       toast({ title: "Data de fim deve ser posterior à data de início", variant: "destructive" });
       return;
     }
-    // Global required fields validation
     const rf = globalConfig?.required_fields;
     if (rf) {
       if (rf.job_role && !form.job_role.trim()) {
@@ -266,7 +339,6 @@ export default function LinkForm() {
     mutation.mutate();
   };
 
-  // Enabled remuneration types from global config
   const enabledRemTypes = useMemo(() => {
     const allTypes = [
       { value: "daily", label: "Diarista" },
@@ -276,7 +348,6 @@ export default function LinkForm() {
     ];
     if (!globalConfig?.remuneration_types) return allTypes;
     const filtered = allTypes.filter((t) => globalConfig.remuneration_types[t.value] !== false);
-    // In edit mode, always include the current value even if disabled globally
     if (isEdit && form.remuneration_type) {
       const currentExists = filtered.some((t) => t.value === form.remuneration_type);
       if (!currentExists) {
@@ -298,6 +369,8 @@ export default function LinkForm() {
     const [y, m, day] = d.split("-");
     return `${day}/${m}/${y}`;
   };
+
+  const currentStatusInfo = statusOptions.find((s) => s.value === form.status);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-3xl">
@@ -323,7 +396,7 @@ export default function LinkForm() {
             <Select value={form.worker_id} onValueChange={(v) => set("worker_id", v)}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
-                {(workers as any)?.data?.map((w: any) => (
+                {workers?.map((w: any) => (
                   <SelectItem key={w.id} value={w.id}>
                     {w.full_name}{w.nickname ? ` (${w.nickname})` : ""}
                   </SelectItem>
@@ -333,11 +406,31 @@ export default function LinkForm() {
           </div>
           <div>
             <Label>Evento</Label>
-            <Select value={form.event_id} onValueChange={(v) => set("event_id", v)}>
+            <Select value={form.event_id} onValueChange={(v) => {
+              set("event_id", v);
+              // Auto-fill company from event
+              const ev = events?.find((e: any) => e.id === v);
+              if (ev && (ev as any).company_id) {
+                set("company_id", (ev as any).company_id);
+              }
+            }}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
-                {(events as any)?.data?.map((ev: any) => (
+                {events?.map((ev: any) => (
                   <SelectItem key={ev.id} value={ev.id}>{ev.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Empresa</Label>
+            <Select value={form.company_id} onValueChange={(v) => set("company_id", v)}>
+              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent>
+                {companies?.map((c: any) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.trade_name || c.legal_name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -379,14 +472,19 @@ export default function LinkForm() {
             <Select value={form.status} onValueChange={(v) => set("status", v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="draft">Rascunho</SelectItem>
-                <SelectItem value="active">Ativo</SelectItem>
-                <SelectItem value="suspended">Suspenso</SelectItem>
-                <SelectItem value="completed">Concluído</SelectItem>
-                <SelectItem value="terminated">Encerrado</SelectItem>
-                <SelectItem value="cancelled">Cancelado</SelectItem>
+                {statusOptions.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            {currentStatusInfo && (
+              <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
+                <Info className="h-3 w-3 mt-0.5 shrink-0" />
+                {currentStatusInfo.description}
+              </p>
+            )}
           </div>
           <div>
             <Label className={highlightDates && !form.hire_date ? "text-destructive font-semibold" : ""}>

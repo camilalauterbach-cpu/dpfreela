@@ -67,6 +67,7 @@ export default function LinkDetail() {
   const workerName = l.workers?.full_name || "—";
   const workerNick = l.workers?.nickname;
   const eventName = l.events?.name || "—";
+  const companyName = l.companies?.trade_name || l.companies?.legal_name || null;
   const displayName = l.link_name || `${workerName} — ${eventName}`;
 
   const info = (label: string, value: string | number | null | undefined) => (
@@ -145,6 +146,7 @@ export default function LinkDetail() {
               {info("Trabalhador", `${workerName}${workerNick ? ` (${workerNick})` : ""}`)}
               {info("Evento", eventName)}
               {info("Função/Cargo", l.job_role)}
+              {info("Empresa", companyName)}
               {info("Atividade", l.job_function)}
               {info("Departamento", l.department)}
             </CardContent>
