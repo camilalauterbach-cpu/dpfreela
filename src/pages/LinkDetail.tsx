@@ -336,49 +336,52 @@ export default function LinkDetail() {
         </TabsContent>
 
         <TabsContent value="trabalhadores" className="mt-4 space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-1">
-              <Button size="sm" variant="outline" disabled={!workers?.length || exportingXlsx}
-                onClick={async () => {
-                  setExportingXlsx(true);
-                  try {
-                    const period = g.hire_date || g.end_date ? `${formatDateBR(g.hire_date)} – ${formatDateBR(g.end_date)}` : "";
-                    await exportGroupXlsx({ groupId: id!, groupName: g.group_name, eventName, companyName, period });
-                    toast.success("Excel exportado com sucesso");
-                  } catch (err: any) { toast.error(err.message || "Erro ao exportar Excel"); }
-                  finally { setExportingXlsx(false); }
-                }}>
-                {exportingXlsx ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Download className="mr-1 h-3 w-3" />} Excel
-              </Button>
-              <Button size="sm" variant="outline" disabled={!workers?.length || exportingPdf}
-                onClick={async () => {
-                  setExportingPdf(true);
-                  try {
-                    const period = g.hire_date || g.end_date ? `${formatDateBR(g.hire_date)} – ${formatDateBR(g.end_date)}` : "";
-                    await exportGroupPdf({ groupId: id!, groupName: g.group_name, eventName, companyName, period });
-                    toast.success("PDF exportado com sucesso");
-                  } catch (err: any) { toast.error(err.message || "Erro ao exportar PDF"); }
-                  finally { setExportingPdf(false); }
-                }}>
-                {exportingPdf ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FileText className="mr-1 h-3 w-3" />} PDF
-              </Button>
-              <Button size="sm" variant="outline" disabled={!workers?.length || exportingZip}
-                onClick={async () => {
-                  setExportingZip(true);
-                  try {
-                    const workerList = (workers || []).map((w: any) => ({
-                      workerId: w.worker_id,
-                      linkGroupWorkerId: w.id,
-                      fullName: w.workers?.full_name || "",
-                      cpf: w.workers?.cpf || "",
-                    }));
-                    const count = await exportGroupDocsZip({ groupName: g.group_name, workers: workerList });
-                    toast.success(`ZIP gerado com ${count} arquivo(s)`);
-                  } catch (err: any) { toast.error(err.message || "Erro ao gerar ZIP"); }
-                  finally { setExportingZip(false); }
-                }}>
-                {exportingZip ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FolderArchive className="mr-1 h-3 w-3" />} ZIP
-              </Button>
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Relatórios e exportações</p>
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant="outline" disabled={!workers?.length || exportingXlsx}
+                  onClick={async () => {
+                    setExportingXlsx(true);
+                    try {
+                      const period = g.hire_date || g.end_date ? `${formatDateBR(g.hire_date)} – ${formatDateBR(g.end_date)}` : "";
+                      await exportGroupXlsx({ groupId: id!, groupName: g.group_name, eventName, companyName, period });
+                      toast.success("Excel exportado com sucesso");
+                    } catch (err: any) { toast.error(err.message || "Erro ao exportar Excel"); }
+                    finally { setExportingXlsx(false); }
+                  }}>
+                  {exportingXlsx ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Download className="mr-1 h-3 w-3" />} Excel
+                </Button>
+                <Button size="sm" variant="outline" disabled={!workers?.length || exportingPdf}
+                  onClick={async () => {
+                    setExportingPdf(true);
+                    try {
+                      const period = g.hire_date || g.end_date ? `${formatDateBR(g.hire_date)} – ${formatDateBR(g.end_date)}` : "";
+                      await exportGroupPdf({ groupId: id!, groupName: g.group_name, eventName, companyName, period });
+                      toast.success("PDF exportado com sucesso");
+                    } catch (err: any) { toast.error(err.message || "Erro ao exportar PDF"); }
+                    finally { setExportingPdf(false); }
+                  }}>
+                  {exportingPdf ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FileText className="mr-1 h-3 w-3" />} PDF
+                </Button>
+                <Button size="sm" variant="outline" disabled={!workers?.length || exportingZip}
+                  onClick={async () => {
+                    setExportingZip(true);
+                    try {
+                      const workerList = (workers || []).map((w: any) => ({
+                        workerId: w.worker_id,
+                        linkGroupWorkerId: w.id,
+                        fullName: w.workers?.full_name || "",
+                        cpf: w.workers?.cpf || "",
+                      }));
+                      const count = await exportGroupDocsZip({ groupName: g.group_name, workers: workerList });
+                      toast.success(`ZIP gerado com ${count} arquivo(s)`);
+                    } catch (err: any) { toast.error(err.message || "Erro ao gerar ZIP"); }
+                    finally { setExportingZip(false); }
+                  }}>
+                  {exportingZip ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FolderArchive className="mr-1 h-3 w-3" />} Docs
+                </Button>
+              </div>
             </div>
             {canEdit && (
               <Button size="sm" onClick={() => setShowAllocate(true)}>
