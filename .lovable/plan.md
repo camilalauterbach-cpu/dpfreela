@@ -1,108 +1,54 @@
 
 
-## Correções documentais: Preview, "Outros" e consistência
+## Exportações operacionais do grupo para contabilidade
 
-### 1. Preview com tratamento de erro e fallback (+ nome do arquivo)
+### Resumo
+Criar novo arquivo `src/lib/export-group.ts` com duas funções (Excel e PDF) e adicionar botões na aba Trabalhadores do `LinkDetail.tsx`.
 
-**Arquivos**: `src/components/links/LinkDocumentsTab.tsx`, `src/components/workers/DocumentChecklist.tsx`
+### Arquivos
 
-Ambos os componentes têm a mesma fragilidade: `handlePreview` não trata erro. Se o signed URL falhar, nada acontece.
-
-**Alterações**:
-- Envolver `handlePreview` em try/catch
-- Adicionar estados `previewError` (boolean) e `previewFileName` (string)
-- No Dialog de preview, quando `previewError = true`: exibir card com:
-  - Nome do arquivo (para conferência operacional)
-  - Mensagem "Não foi possível carregar o preview deste documento"
-  - Botão "Baixar arquivo" (window.open para o signed URL com download)
-  - Botão "Abrir em nova aba" (window.open)
-- Quando o preview carrega normalmente, exibir o nome do arquivo acima da imagem/iframe
-- Quando MIME não é imagem nem PDF: exibir o mesmo fallback com download direto
-
-**LinkDocumentsTab** — `handlePreview` atual (linha 177-185):
-```typescript
-// De:
-const handlePreview = async (filePath, mimeType, bucket) => {
-  const { data } = await supabase.storage.from(bucket).createSignedUrl(filePath, 300);
-  if (data?.signedUrl) { setPreviewUrl(...); setPreviewMime(...); }
-};
-
-// Para:
-const handlePreview = async (filePath, mimeType, bucket, fileName?: string) => {
-  try {
-    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(filePath, 300);
-    if (error || !data?.signedUrl) throw new Error("Falha ao gerar URL");
-    setPreviewUrl(data.signedUrl);
-    setPreviewMime(mimeType);
-    setPreviewFileName(fileName || filePath.split("/").pop() || "documento");
-    setPreviewError(false);
-  } catch {
-    setPreviewError(true);
-    setPreviewFileName(fileName || filePath.split("/").pop() || "documento");
-    setPreviewUrl("error");
-  }
-};
-```
-
-**DocumentChecklist** — mesma refatoração no `handlePreview` (linha 189-198).
-
-**Dialog de preview** — nos dois componentes, substituir o conteúdo condicional por:
-- Se `previewError` ou MIME não suportado: card informativo com nome do arquivo + botões de fallback
-- Se imagem: `<img>` com nome do arquivo acima
-- Se PDF: `<iframe>` com nome do arquivo acima
-
----
-
-### 2. "Outros" customizado com texto específico
-
-**Arquivo**: `src/lib/link-document-config.ts`
-
-Na função `getConfiguredDocs` (linha 56-83), quando `operational` contém `"outros_operacionais"` e `operational_custom` tem texto, o item `outros_operacionais` já aparece com label genérico "Outros operacionais" (vindo de OPERATIONAL_OPTIONS). Mas o texto customizado é adicionado separadamente como `operational_custom`.
-
-**Correção**: quando `operational_custom` tem texto E `operational` contém `"outros_operacionais"`, substituir o label do item `outros_operacionais` pelo texto customizado, e não duplicar com `operational_custom` separado. Mesma lógica para NRs com `nr_custom`.
-
-```typescript
-// Lógica corrigida em getConfiguredDocs:
-for (const cat of config.operational) {
-  if (cat === "outros_operacionais" && config.operational_custom) {
-    // Usa o texto customizado como label em vez do genérico
-    docs.push({ category: cat, label: config.operational_custom, group: "operational" });
-  } else {
-    const opt = OPERATIONAL_OPTIONS.find((o) => o.value === cat);
-    docs.push({ category: cat, label: opt?.label || cat, group: "operational" });
-  }
-}
-// Só adiciona operational_custom como item separado se NÃO há "outros_operacionais" selecionado
-if (config.operational_custom && !config.operational.includes("outros_operacionais")) {
-  docs.push({ category: "operational_custom", label: config.operational_custom, group: "operational" });
-}
-
-// Mesma lógica para NRs:
-// Se nr_custom tem texto, usa como label em vez de "NR custom"
-// Não duplica como item separado
-```
-
----
-
-### 3. Nenhuma alteração adicional necessária
-
-- Categoria "Outros" do trabalhador: já funciona em `DocumentChecklist` (linhas 430-516) com multi-upload
-- A seção "Outros (complementares)" no `LinkDocumentsTab` (linhas 371-399) já exibe os docs globais do trabalhador
-- O preview dessas seções será corrigido automaticamente pelo item 1
-
----
-
-### Arquivos alterados
-
-| Arquivo | Alteração |
+| Arquivo | Ação |
 |---|---|
-| `src/components/links/LinkDocumentsTab.tsx` | Preview try/catch, estados de erro/fileName, Dialog com fallback e nome do arquivo |
-| `src/components/workers/DocumentChecklist.tsx` | Mesma correção de preview |
-| `src/lib/link-document-config.ts` | Label customizado para "outros_operacionais" e NR custom sem duplicação |
+| `src/lib/export-group.ts` | **Novo** — `exportGroupXlsx` e `exportGroupPdf` |
+| `src/pages/LinkDetail.tsx` | Botões "Excel" e "PDF" na aba Trabalhadores |
+
+### 1. `src/lib/export-group.ts`
+
+**`exportGroupXlsx(groupId, groupName, eventName, companyName, period)`**
+- Fetch on-demand: `link_group_workers` do grupo (com `workers(*)` completo via select join)
+- Para cada worker_id, buscar `worker_payment_methods` ordenado por `is_preferred DESC, created_at DESC`, pegar o primeiro ativo (deleted_at IS NULL)
+- Montar planilha ExcelJS com ~75 colunas, mesma estrutura do `export-admission.ts` adaptada ao modelo de grupos:
+  - Dados cadastrais do trabalhador (todos os campos da tabela `workers`, mesmo vazios)
+  - Dados da alocação (job_role, job_function, department, contract_type, status, hire_date, end_date, remuneration_type, daily_rate, hourly_rate, fixed_salary, category_reference_rate, payment_frequency, VT, VR/VA, horas, turno, escala, horário, call_time, notes)
+  - Dados bancários (method_type, pix_key, pix_key_type, bank_name, bank_code, agency, account_number, account_type, holder_name, holder_cpf)
+  - Grupo, Evento, Empresa como colunas contextuais
+- Campos vazios saem em branco (string vazia), nunca omitidos
+- Nome do arquivo: `grupo_<nome>_contabilidade_YYYY-MM-DD.xlsx`
+
+**`exportGroupPdf(groupId, groupName, eventName, companyName, period, workerCount)`**
+- Fetch on-demand: mesmos dados mas renderiza resumido
+- jsPDF + autoTable
+- Header: nome do grupo, evento, empresa, período (hire_date – end_date), quantidade de trabalhadores, data de geração
+- Tabela resumida: Nome, CPF, Função, Contrato, Tipo Remuneração, Valor efetivo, VT, VR/VA, Status
+- Nome do arquivo: `grupo_<nome>_resumo_YYYY-MM-DD.pdf`
+
+### 2. `src/pages/LinkDetail.tsx`
+
+Na aba "Trabalhadores" (linha 334-340), ao lado do botão "Alocar trabalhador":
+- Botão "Excel" (ícone Download) e botão "PDF" (ícone FileText)
+- Desabilitados quando `!workers?.length`
+- Loading state individual por botão
+- Chamam as funções passando `id`, `g.group_name`, `eventName`, `companyName`, período (`g.hire_date` – `g.end_date`)
+- Toast de sucesso/erro
+
+### Dados bancários — regra de seleção
+1. Método com `is_preferred = true` e `deleted_at IS NULL`
+2. Se não existir preferido, o mais recente ativo (`ORDER BY created_at DESC LIMIT 1`)
+3. Se nenhum, colunas bancárias em branco
 
 ### Garantias
-- Sem apagar documentos existentes
-- Sem sobrescrever configuração manual do grupo
-- Sem alterar legado
-- Sem mexer nos 27 trabalhadores cadastrados
+- Sem alterar dados existentes
+- Sem mexer no legado de `employment_links`
+- Sem remover `export-admission.ts` ou `export-payroll.ts`
+- Fetch pesado apenas no momento do clique de exportação
 
