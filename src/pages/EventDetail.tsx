@@ -57,23 +57,23 @@ export default function EventDetail() {
 
   return (
     <div className="space-y-4 max-w-3xl">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/events")}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2 min-w-0">
+          <Button variant="ghost" size="icon" className="shrink-0 mt-0.5" onClick={() => navigate("/events")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-semibold text-foreground">{event.name}</h1>
+              <h1 className="text-lg sm:text-xl font-semibold text-foreground break-words">{event.name}</h1>
               <Badge variant={statusVariant(event.status)}>{statusLabels[event.status] || event.status}</Badge>
             </div>
-            {companyName && <p className="text-sm text-muted-foreground">{companyName}</p>}
+            {companyName && <p className="text-xs sm:text-sm text-muted-foreground truncate">{companyName}</p>}
           </div>
         </div>
         {canEdit && (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <Button size="sm" variant="outline" onClick={() => navigate(`/events/${id}/edit`)}>
-              <Pencil className="mr-1 h-3 w-3" /> Editar
+              <Pencil className="mr-1 h-3 w-3" /> <span className="hidden sm:inline">Editar</span>
             </Button>
             <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setShowDeleteDialog(true)}>
               <Trash2 className="h-3 w-3" />
@@ -92,16 +92,16 @@ export default function EventDetail() {
       />
 
       <Tabs defaultValue="dados" className="w-full">
-        <TabsList className="w-full justify-start">
-          <TabsTrigger value="dados">Informações</TabsTrigger>
-          <TabsTrigger value="documentos">Documentos</TabsTrigger>
-          <TabsTrigger value="vinculos">Vínculos</TabsTrigger>
+        <TabsList className="w-full justify-start overflow-x-auto">
+          <TabsTrigger value="dados" className="text-xs sm:text-sm">Informações</TabsTrigger>
+          <TabsTrigger value="documentos" className="text-xs sm:text-sm">Documentos</TabsTrigger>
+          <TabsTrigger value="vinculos" className="text-xs sm:text-sm">Vínculos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dados" className="space-y-4 mt-4">
           <Card>
             <CardHeader><CardTitle className="text-base">Dados do evento</CardTitle></CardHeader>
-            <CardContent className="grid gap-4 grid-cols-2">
+            <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2">
               {info("Nome", event.name)}
               {info("Empresa", companyName ? `${companyName}${companyTrade ? ` (${companyTrade})` : ""}` : null)}
               {info("Descrição", event.description)}
@@ -111,7 +111,7 @@ export default function EventDetail() {
 
           <Card>
             <CardHeader><CardTitle className="text-base">Período e local</CardTitle></CardHeader>
-            <CardContent className="grid gap-4 grid-cols-2">
+            <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2">
               {info("Data início", event.start_date ? new Date(event.start_date + "T12:00:00").toLocaleDateString("pt-BR") : null)}
               {info("Data fim", event.end_date ? new Date(event.end_date + "T12:00:00").toLocaleDateString("pt-BR") : null)}
               {info("Local", event.location)}

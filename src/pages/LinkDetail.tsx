@@ -59,9 +59,10 @@ const formatCurrency = (v: number | null | undefined) => {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
 };
 
-function useAllWorkers() {
+function useAllWorkers(enabled: boolean) {
   return useQuery({
     queryKey: ["workers-all-select"],
+    enabled,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("workers")
@@ -137,7 +138,8 @@ export default function LinkDetail() {
   const [alloc, setAlloc] = useState({ ...INITIAL_ALLOC });
   const allocateMutation = useAllocateWorker();
   const removeMutation = useRemoveGroupWorker();
-  const { data: allWorkers } = useAllWorkers();
+  // Only fetch workers list when the allocate dialog is open
+  const { data: allWorkers } = useAllWorkers(showAllocate);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingZip, setExportingZip] = useState(false);
@@ -234,23 +236,24 @@ export default function LinkDetail() {
 
   return (
     <div className="space-y-4 max-w-3xl">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/links")}>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2 min-w-0">
+          <Button variant="ghost" size="icon" className="shrink-0 mt-0.5" onClick={() => navigate("/links")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-semibold text-foreground">{g.group_name}</h1>
+              <h1 className="text-lg sm:text-xl font-semibold text-foreground break-words">{g.group_name}</h1>
               <Badge variant={statusVariant(g.status)}>{statusLabels[g.status] || g.status}</Badge>
             </div>
-            <p className="text-sm text-muted-foreground">{eventName} · {companyName}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground truncate">{eventName} · {companyName}</p>
           </div>
         </div>
         {canEdit && (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <Button size="sm" variant="outline" onClick={() => navigate(`/links/${id}/edit`)}>
-              <Pencil className="mr-1 h-3 w-3" /> Editar
+              <Pencil className="mr-1 h-3 w-3" /> <span className="hidden sm:inline">Editar</span>
             </Button>
             {canDelete && (
               <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setShowDeleteDialog(true)}>
@@ -271,9 +274,9 @@ export default function LinkDetail() {
       />
 
       <Tabs defaultValue="dados" className="w-full">
-        <TabsList className="w-full justify-start">
-          <TabsTrigger value="dados">Dados</TabsTrigger>
-          <TabsTrigger value="trabalhadores">
+        <TabsList className="w-full justify-start overflow-x-auto">
+          <TabsTrigger value="dados" className="text-xs sm:text-sm">Dados</TabsTrigger>
+          <TabsTrigger value="trabalhadores" className="text-xs sm:text-sm">
             Trabalhadores {workers && <Badge variant="secondary" className="ml-1 text-xs">{workers.length}</Badge>}
           </TabsTrigger>
         </TabsList>
@@ -281,7 +284,7 @@ export default function LinkDetail() {
         <TabsContent value="dados" className="space-y-4 mt-4">
           <Card>
             <CardHeader><CardTitle className="text-base">Identificação</CardTitle></CardHeader>
-            <CardContent className="grid gap-4 grid-cols-2">
+            <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2">
               {info("Nome do grupo", g.group_name)}
               {info("Evento", eventName)}
               {info("Empresa", companyName)}
@@ -290,7 +293,7 @@ export default function LinkDetail() {
 
           <Card>
             <CardHeader><CardTitle className="text-base">Contrato</CardTitle></CardHeader>
-            <CardContent className="grid gap-4 grid-cols-2">
+            <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2">
               {info("Status", statusLabels[g.status] || g.status)}
               {info("Tipo de contratação", contractTypeLabels[allowedContracts] || allowedContracts)}
               {info("Data início", formatDateBR(g.hire_date))}
@@ -318,7 +321,7 @@ export default function LinkDetail() {
 
           <Card>
             <CardHeader><CardTitle className="text-base">Operacional</CardTitle></CardHeader>
-            <CardContent className="grid gap-4 grid-cols-2">
+            <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2">
               {info("Supervisor", g.supervisor_name)}
               {info("Ponto de encontro", g.assembly_point)}
               {info("Uniforme", g.uniform_notes)}
@@ -336,10 +339,10 @@ export default function LinkDetail() {
         </TabsContent>
 
         <TabsContent value="trabalhadores" className="mt-4 space-y-4">
-          <div className="flex items-start justify-between flex-wrap gap-4">
-            <div className="space-y-2">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div className="space-y-1.5">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Relatórios e exportações</p>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 flex-wrap">
                 <Button size="sm" variant="outline" disabled={!workers?.length || exportingXlsx}
                   onClick={async () => {
                     setExportingXlsx(true);
@@ -384,7 +387,7 @@ export default function LinkDetail() {
               </div>
             </div>
             {canEdit && (
-              <Button size="sm" onClick={() => setShowAllocate(true)}>
+              <Button size="sm" className="self-start" onClick={() => setShowAllocate(true)}>
                 <Plus className="mr-1 h-3 w-3" /> Alocar trabalhador
               </Button>
             )}
@@ -395,7 +398,7 @@ export default function LinkDetail() {
           ) : !workers?.length ? (
             <p className="py-6 text-center text-muted-foreground">Nenhum trabalhador alocado neste grupo.</p>
           ) : (
-            <div className="border rounded-lg overflow-x-auto">
+            <div className="border rounded-lg overflow-x-auto -mx-3 sm:mx-0">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -454,7 +457,7 @@ export default function LinkDetail() {
 
       {/* Allocate Worker Dialog */}
       <Dialog open={showAllocate} onOpenChange={setShowAllocate}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Alocar trabalhador</DialogTitle>
             <DialogDescription>Preencha os dados individuais do trabalhador neste grupo.</DialogDescription>
@@ -476,7 +479,7 @@ export default function LinkDetail() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Função/Cargo</Label>
                   <Input value={alloc.job_role} onChange={(e) => setA("job_role", e.target.value)} />
@@ -486,7 +489,7 @@ export default function LinkDetail() {
                   <Input value={alloc.job_function} onChange={(e) => setA("job_function", e.target.value)} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Departamento</Label>
                   <Input value={alloc.department} onChange={(e) => setA("department", e.target.value)} />
@@ -510,7 +513,7 @@ export default function LinkDetail() {
             {/* Jornada */}
             <div className="space-y-3">
               <h4 className="text-sm font-semibold text-foreground">Jornada</h4>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Turno</Label>
                   <Input value={alloc.shift_type} onChange={(e) => setA("shift_type", e.target.value)} placeholder="Ex: Diurno" />
@@ -520,7 +523,7 @@ export default function LinkDetail() {
                   <Input value={alloc.work_shift} onChange={(e) => setA("work_shift", e.target.value)} placeholder="Ex: 6x1" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Horário</Label>
                   <Input value={alloc.work_schedule} onChange={(e) => setA("work_schedule", e.target.value)} placeholder="Ex: 08:00-17:00" />
@@ -530,7 +533,7 @@ export default function LinkDetail() {
                   <Input type="time" value={alloc.call_time} onChange={(e) => setA("call_time", e.target.value)} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Horas diárias</Label>
                   <Input type="number" step="0.5" value={alloc.daily_hours} onChange={(e) => setA("daily_hours", e.target.value)} />
@@ -610,9 +613,9 @@ export default function LinkDetail() {
               <Textarea value={alloc.notes} onChange={(e) => setA("notes", e.target.value)} rows={2} />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAllocate(false)}>Cancelar</Button>
-            <Button onClick={handleAllocate} disabled={allocateMutation.isPending}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setShowAllocate(false)} className="w-full sm:w-auto">Cancelar</Button>
+            <Button onClick={handleAllocate} disabled={allocateMutation.isPending} className="w-full sm:w-auto">
               {allocateMutation.isPending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
               Alocar
             </Button>

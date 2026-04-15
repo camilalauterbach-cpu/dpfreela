@@ -1,15 +1,13 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLinkGroups } from "@/hooks/useLinkGroups";
-import { useCompanies } from "@/hooks/useCompanies";
-import { useEvents } from "@/hooks/useEvents";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Plus, Search, Download, FileText } from "lucide-react";
+import { Loader2, Plus, Search, Download, FileText, Filter, X } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -38,40 +36,19 @@ const formatDateBR = (d: string | null) => {
 export default function Links() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [companyFilter, setCompanyFilter] = useState("all");
-  const [eventFilter, setEventFilter] = useState("all");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
 
   const { data: groups, isLoading } = useLinkGroups(search, statusFilter);
-  const { data: companies } = useCompanies("");
-  const { data: events } = useEvents("", "all");
   const { hasAnyRole } = useAuth();
   const canCreate = hasAnyRole(["admin", "manager", "operator"]);
   const navigate = useNavigate();
-
-  const companyNameMap = useMemo(() => {
-    const m = new Map<string, string>();
-    ((companies as any)?.data ?? []).forEach((c: any) => m.set(c.id, c.trade_name || c.legal_name));
-    return m;
-  }, [companies]);
-
-  const eventNameMap = useMemo(() => {
-    const m = new Map<string, string>();
-    ((events as any)?.data ?? []).forEach((ev: any) => m.set(ev.id, ev.name));
-    return m;
-  }, [events]);
 
   const filteredGroups = useMemo(() => {
     if (!groups) return [];
     let result = groups as any[];
 
-    if (companyFilter !== "all") {
-      result = result.filter((g) => g.company_id === companyFilter);
-    }
-    if (eventFilter !== "all") {
-      result = result.filter((g) => g.event_id === eventFilter);
-    }
     if (periodStart) {
       result = result.filter((g) => !g.end_date || g.end_date >= periodStart);
     }
@@ -80,7 +57,14 @@ export default function Links() {
     }
 
     return result;
-  }, [groups, companyFilter, eventFilter, periodStart, periodEnd]);
+  }, [groups, periodStart, periodEnd]);
+
+  const hasAdvancedFilters = !!periodStart || !!periodEnd;
+
+  const clearAdvanced = () => {
+    setPeriodStart("");
+    setPeriodEnd("");
+  };
 
   const getExportRows = () =>
     filteredGroups.map((g: any) => ({
@@ -115,8 +99,6 @@ export default function Links() {
     doc.text("Relatório de Grupos de Vínculos", 14, 15);
 
     const filters: string[] = [];
-    if (companyFilter !== "all") filters.push(`Empresa: ${companyNameMap.get(companyFilter) || companyFilter}`);
-    if (eventFilter !== "all") filters.push(`Evento: ${eventNameMap.get(eventFilter) || eventFilter}`);
     if (statusFilter !== "all") filters.push(`Status: ${statusLabels[statusFilter] || statusFilter}`);
     if (periodStart || periodEnd) filters.push(`Período: ${periodStart ? formatDateBR(periodStart) : "…"} – ${periodEnd ? formatDateBR(periodEnd) : "…"}`);
     if (filters.length) {
@@ -140,23 +122,23 @@ export default function Links() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold text-foreground">Grupos de Vínculos</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold text-foreground">Grupos de Vínculos</h1>
         <div className="flex gap-1">
           {canCreate && (
             <Button size="sm" onClick={() => navigate("/links/new")}>
-              <Plus className="mr-1 h-4 w-4" /> Novo Grupo
+              <Plus className="mr-1 h-4 w-4" /> <span className="hidden sm:inline">Novo Grupo</span><span className="sm:hidden">Novo</span>
             </Button>
           )}
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar por grupo ou evento" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-          </div>
+      {/* Search + Status */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar por grupo ou evento" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        </div>
+        <div className="flex gap-2">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-[140px]"><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
@@ -169,38 +151,42 @@ export default function Links() {
               <SelectItem value="cancelled">Cancelado</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Select value={companyFilter} onValueChange={setCompanyFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Empresa" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas empresas</SelectItem>
-              {((companies as any)?.data ?? []).map((c: any) => (
-                <SelectItem key={c.id} value={c.id}>{c.trade_name || c.legal_name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={eventFilter} onValueChange={setEventFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Evento" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos eventos</SelectItem>
-              {((events as any)?.data ?? []).forEach ? ((events as any)?.data ?? []).map((ev: any) => (
-                <SelectItem key={ev.id} value={ev.id}>{ev.name}</SelectItem>
-              )) : null}
-            </SelectContent>
-          </Select>
-          <Input type="date" placeholder="Início" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="w-full sm:w-[140px]" />
-          <Input type="date" placeholder="Fim" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="w-full sm:w-[140px]" />
-        </div>
-        <div className="flex flex-wrap gap-1 justify-end">
-          <Button size="sm" variant="outline" onClick={exportCSV} disabled={!filteredGroups.length}>
-            <Download className="mr-1 h-3 w-3" /> CSV
-          </Button>
-          <Button size="sm" variant="outline" onClick={exportPDF} disabled={!filteredGroups.length}>
-            <FileText className="mr-1 h-3 w-3" /> PDF
+          <Button
+            variant={showAdvanced ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="relative shrink-0"
+          >
+            <Filter className="mr-1 h-4 w-4" /> <span className="hidden sm:inline">Filtros</span>
+            {hasAdvancedFilters && (
+              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center">
+                {[periodStart, periodEnd].filter(Boolean).length}
+              </span>
+            )}
           </Button>
         </div>
       </div>
+
+      {/* Advanced filters */}
+      {showAdvanced && (
+        <div className="flex flex-col sm:flex-row gap-2 p-3 rounded-lg border bg-muted/30">
+          <Input type="date" placeholder="Início" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="w-full sm:w-[150px]" />
+          <Input type="date" placeholder="Fim" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="w-full sm:w-[150px]" />
+          {hasAdvancedFilters && (
+            <Button variant="ghost" size="sm" onClick={clearAdvanced}>
+              <X className="mr-1 h-3 w-3" /> Limpar
+            </Button>
+          )}
+          <div className="flex gap-1 sm:ml-auto">
+            <Button size="sm" variant="outline" onClick={exportCSV} disabled={!filteredGroups.length}>
+              <Download className="mr-1 h-3 w-3" /> CSV
+            </Button>
+            <Button size="sm" variant="outline" onClick={exportPDF} disabled={!filteredGroups.length}>
+              <FileText className="mr-1 h-3 w-3" /> PDF
+            </Button>
+          </div>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex justify-center py-12">
@@ -209,14 +195,14 @@ export default function Links() {
       ) : !filteredGroups.length ? (
         <p className="py-8 text-center text-muted-foreground">Nenhum grupo encontrado.</p>
       ) : (
-        <div className="border rounded-lg overflow-x-auto">
+        <div className="border rounded-lg overflow-x-auto -mx-3 sm:mx-0">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Grupo</TableHead>
                 <TableHead className="hidden sm:table-cell">Evento</TableHead>
                 <TableHead className="hidden md:table-cell">Empresa</TableHead>
-                <TableHead className="text-center">Trabalhadores</TableHead>
+                <TableHead className="text-center">Trab.</TableHead>
                 <TableHead className="hidden lg:table-cell">Período</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>

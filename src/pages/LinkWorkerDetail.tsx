@@ -96,30 +96,30 @@ export default function LinkWorkerDetail() {
   return (
     <div className="space-y-4 max-w-3xl">
       {/* Header */}
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={() => navigate(`/links/${groupId}`)}>
+      <div className="flex items-start gap-2">
+        <Button variant="ghost" size="icon" className="shrink-0 mt-0.5" onClick={() => navigate(`/links/${groupId}`)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-xl font-semibold text-foreground">{worker?.full_name || "Trabalhador"}</h1>
+            <h1 className="text-lg sm:text-xl font-semibold text-foreground break-words">{worker?.full_name || "Trabalhador"}</h1>
             <Badge variant={statusVariant(a.status)}>{statusLabels[a.status] || a.status}</Badge>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground truncate">
             {g.group_name} · {eventName}
           </p>
         </div>
         {canEdit && !editing && (
-          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-            <Pencil className="mr-1 h-3 w-3" /> Editar alocação
+          <Button variant="outline" size="sm" className="shrink-0" onClick={() => setEditing(true)}>
+            <Pencil className="mr-1 h-3 w-3" /> <span className="hidden sm:inline">Editar alocação</span><span className="sm:hidden">Editar</span>
           </Button>
         )}
       </div>
 
       <Tabs defaultValue="dados" className="w-full">
-        <TabsList className="w-full justify-start">
-          <TabsTrigger value="dados">Dados da alocação</TabsTrigger>
-          <TabsTrigger value="documentos">Documentos</TabsTrigger>
+        <TabsList className="w-full justify-start overflow-x-auto">
+          <TabsTrigger value="dados" className="text-xs sm:text-sm">Dados da alocação</TabsTrigger>
+          <TabsTrigger value="documentos" className="text-xs sm:text-sm">Documentos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dados" className="space-y-4 mt-4">
@@ -140,7 +140,7 @@ export default function LinkWorkerDetail() {
               {/* Identificação */}
               <Card>
                 <CardHeader><CardTitle className="text-base">Identificação</CardTitle></CardHeader>
-                <CardContent className="grid gap-4 grid-cols-2">
+                <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                   {info("Nome completo", worker?.full_name)}
                   {info("Apelido", worker?.nickname)}
                   {info("CPF", worker?.cpf)}
@@ -151,7 +151,7 @@ export default function LinkWorkerDetail() {
               {/* Contrato */}
               <Card>
                 <CardHeader><CardTitle className="text-base">Contrato</CardTitle></CardHeader>
-                <CardContent className="grid gap-4 grid-cols-2">
+                <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                   {info("Tipo de contrato", contractTypeLabels[a.contract_type] || a.contract_type)}
                   {info("Função/Cargo", a.job_role)}
                   {info("Atividade", a.job_function)}
@@ -164,7 +164,7 @@ export default function LinkWorkerDetail() {
               {/* Jornada */}
               <Card>
                 <CardHeader><CardTitle className="text-base">Jornada</CardTitle></CardHeader>
-                <CardContent className="grid gap-4 grid-cols-2">
+                <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                   {info("Turno", a.shift_type)}
                   {info("Escala", a.work_shift)}
                   {info("Horário", a.work_schedule)}
@@ -181,7 +181,7 @@ export default function LinkWorkerDetail() {
                   <div className="grid gap-4 grid-cols-1">
                     {info("Tipo de remuneração", remunerationTypeLabels[a.remuneration_type] || a.remuneration_type)}
                   </div>
-                  <div className="grid gap-4 grid-cols-2">
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                     <div className="p-3 rounded-md bg-primary/5 border border-primary/20">
                       <p className="text-xs text-muted-foreground">{a.remuneration_type ? getEffectiveLabel(a.remuneration_type) : "Valor efetivo do evento"}</p>
                       <p className="text-lg font-semibold text-foreground">{formatCurrency(getEffectiveValue(a))}</p>
@@ -200,7 +200,7 @@ export default function LinkWorkerDetail() {
               {/* Benefícios */}
               <Card>
                 <CardHeader><CardTitle className="text-base">Benefícios</CardTitle></CardHeader>
-                <CardContent className="grid gap-4 grid-cols-2">
+                <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                   {info("Vale-transporte (VT)", a.has_transport_allowance ? formatCurrency(a.transport_allowance) : "Não")}
                   {info("Vale-refeição/alimentação (VR/VA)", a.has_meal_allowance ? formatCurrency(a.meal_allowance) : "Não")}
                 </CardContent>
