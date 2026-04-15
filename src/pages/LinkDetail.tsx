@@ -16,8 +16,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Pencil, Loader2, Trash2, Plus, UserMinus, Download, FileText } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, Trash2, Plus, UserMinus, Download, FileText, FolderArchive } from "lucide-react";
 import { exportGroupXlsx, exportGroupPdf } from "@/lib/export-group";
+import { exportGroupDocsZip } from "@/lib/export-docs-zip";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useDeleteRecord } from "@/hooks/useDeleteRecord";
 import { toast } from "sonner";
@@ -139,6 +140,7 @@ export default function LinkDetail() {
   const { data: allWorkers } = useAllWorkers();
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingZip, setExportingZip] = useState(false);
 
   // Remove worker modal
   const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
@@ -359,6 +361,23 @@ export default function LinkDetail() {
                   finally { setExportingPdf(false); }
                 }}>
                 {exportingPdf ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FileText className="mr-1 h-3 w-3" />} PDF
+              </Button>
+              <Button size="sm" variant="outline" disabled={!workers?.length || exportingZip}
+                onClick={async () => {
+                  setExportingZip(true);
+                  try {
+                    const workerList = (workers || []).map((w: any) => ({
+                      workerId: w.worker_id,
+                      linkGroupWorkerId: w.id,
+                      fullName: w.workers?.full_name || "",
+                      cpf: w.workers?.cpf || "",
+                    }));
+                    const count = await exportGroupDocsZip({ groupName: g.group_name, workers: workerList });
+                    toast.success(`ZIP gerado com ${count} arquivo(s)`);
+                  } catch (err: any) { toast.error(err.message || "Erro ao gerar ZIP"); }
+                  finally { setExportingZip(false); }
+                }}>
+                {exportingZip ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FolderArchive className="mr-1 h-3 w-3" />} ZIP
               </Button>
             </div>
             {canEdit && (
