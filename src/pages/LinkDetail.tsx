@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useLinkGroup, useLinkGroupWorkers, useAllocateWorker, useRemoveGroupWorker } from "@/hooks/useLinkGroups";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,7 +16,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Pencil, Loader2, Trash2, Plus, UserMinus } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, Trash2, Plus, UserMinus, Download, FileText } from "lucide-react";
+import { exportGroupXlsx, exportGroupPdf } from "@/lib/export-group";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useDeleteRecord } from "@/hooks/useDeleteRecord";
 import { toast } from "sonner";
@@ -136,6 +137,8 @@ export default function LinkDetail() {
   const allocateMutation = useAllocateWorker();
   const removeMutation = useRemoveGroupWorker();
   const { data: allWorkers } = useAllWorkers();
+  const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   // Remove worker modal
   const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
@@ -331,13 +334,39 @@ export default function LinkDetail() {
         </TabsContent>
 
         <TabsContent value="trabalhadores" className="mt-4 space-y-4">
-          {canEdit && (
-            <div className="flex justify-end">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-1">
+              <Button size="sm" variant="outline" disabled={!workers?.length || exportingXlsx}
+                onClick={async () => {
+                  setExportingXlsx(true);
+                  try {
+                    const period = g.hire_date || g.end_date ? `${formatDateBR(g.hire_date)} – ${formatDateBR(g.end_date)}` : "";
+                    await exportGroupXlsx({ groupId: id!, groupName: g.group_name, eventName, companyName, period });
+                    toast.success("Excel exportado com sucesso");
+                  } catch (err: any) { toast.error(err.message || "Erro ao exportar Excel"); }
+                  finally { setExportingXlsx(false); }
+                }}>
+                {exportingXlsx ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Download className="mr-1 h-3 w-3" />} Excel
+              </Button>
+              <Button size="sm" variant="outline" disabled={!workers?.length || exportingPdf}
+                onClick={async () => {
+                  setExportingPdf(true);
+                  try {
+                    const period = g.hire_date || g.end_date ? `${formatDateBR(g.hire_date)} – ${formatDateBR(g.end_date)}` : "";
+                    await exportGroupPdf({ groupId: id!, groupName: g.group_name, eventName, companyName, period });
+                    toast.success("PDF exportado com sucesso");
+                  } catch (err: any) { toast.error(err.message || "Erro ao exportar PDF"); }
+                  finally { setExportingPdf(false); }
+                }}>
+                {exportingPdf ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FileText className="mr-1 h-3 w-3" />} PDF
+              </Button>
+            </div>
+            {canEdit && (
               <Button size="sm" onClick={() => setShowAllocate(true)}>
                 <Plus className="mr-1 h-3 w-3" /> Alocar trabalhador
               </Button>
-            </div>
-          )}
+            )}
+          </div>
 
           {loadingWorkers ? (
             <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
