@@ -71,6 +71,9 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPassword />} />
 
               {/* Protected routes with layout */}
+              <Route path="/dashboard" element={<Navigate to="/" replace />} />
+
+              {/* Protected routes with layout */}
               <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/workers" element={<Workers />} />
