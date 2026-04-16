@@ -78,7 +78,7 @@ interface WorkerFormData {
 const emptyForm: WorkerFormData = {
   full_name: "", nickname: "", social_name: "", cpf: "", birth_date: "", gender: "",
   race_color: "", education_level: "", nationality: "Brasileira", birth_country: "Brasil", birth_city: "", birth_state: "",
-  mother_name: "", father_name: "", nis_pis: "", rg: "", rg_issuer: "", rg_state: "",
+  mother_name: "", father_name: "", nis_pis: "", rg: "", rg_issuer: "", rg_state: "", rg_issue_date: "",
   ctps_number: "", ctps_series: "", ctps_state: "", phone_main: "", email: "",
   address: "", neighborhood: "", city: "", state: "", zip_code: "",
   is_pcd: false, is_rehabilitated: false, pcd_type: "", pcd_notes: "",
