@@ -587,7 +587,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
                 }}
               />
             ) : previewMime?.startsWith("image/") ? (
-              <img src={previewUrl} alt="Documento" className="w-full rounded" />
+              <img src={previewUrl} alt="Documento" loading="lazy" className="w-full rounded" />
             ) : previewMime?.includes("pdf") ? (
               <iframe src={previewUrl} className="w-full h-[70vh] rounded" />
             ) : (
