@@ -1155,6 +1155,7 @@ export type Database = {
           phone_secondary: string | null
           race_color: string | null
           rg: string | null
+          rg_issue_date: string | null
           rg_issuer: string | null
           rg_state: string | null
           shirt_size: string | null
@@ -1203,6 +1204,7 @@ export type Database = {
           phone_secondary?: string | null
           race_color?: string | null
           rg?: string | null
+          rg_issue_date?: string | null
           rg_issuer?: string | null
           rg_state?: string | null
           shirt_size?: string | null
@@ -1251,6 +1253,7 @@ export type Database = {
           phone_secondary?: string | null
           race_color?: string | null
           rg?: string | null
+          rg_issue_date?: string | null
           rg_issuer?: string | null
           rg_state?: string | null
           shirt_size?: string | null
