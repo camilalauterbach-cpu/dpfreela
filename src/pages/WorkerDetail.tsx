@@ -150,6 +150,7 @@ export default function WorkerDetail() {
               {info("RG", worker.rg)}
               {info("Órgão emissor", w.rg_issuer)}
               {info("UF do RG", w.rg_state)}
+              {info("Data de emissão do RG", w.rg_issue_date ? new Date(w.rg_issue_date + "T12:00:00").toLocaleDateString("pt-BR") : null)}
               {info("NIS/PIS/PASEP", w.nis_pis)}
               {info("CTPS número", w.ctps_number)}
               {info("CTPS série", w.ctps_series)}

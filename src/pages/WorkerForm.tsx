@@ -50,6 +50,7 @@ interface WorkerFormData {
   rg: string;
   rg_issuer: string;
   rg_state: string;
+  rg_issue_date: string;
   ctps_number: string;
   ctps_series: string;
   ctps_state: string;
@@ -78,7 +79,7 @@ interface WorkerFormData {
 const emptyForm: WorkerFormData = {
   full_name: "", nickname: "", social_name: "", cpf: "", birth_date: "", gender: "",
   race_color: "", education_level: "", nationality: "Brasileira", birth_country: "Brasil", birth_city: "", birth_state: "",
-  mother_name: "", father_name: "", nis_pis: "", rg: "", rg_issuer: "", rg_state: "",
+  mother_name: "", father_name: "", nis_pis: "", rg: "", rg_issuer: "", rg_state: "", rg_issue_date: "",
   ctps_number: "", ctps_series: "", ctps_state: "", phone_main: "", email: "",
   address: "", neighborhood: "", city: "", state: "", zip_code: "",
   is_pcd: false, is_rehabilitated: false, pcd_type: "", pcd_notes: "",
@@ -129,6 +130,7 @@ export default function WorkerForm() {
         rg: existing.rg || "",
         rg_issuer: (existing as any).rg_issuer || "",
         rg_state: (existing as any).rg_state || "",
+        rg_issue_date: (existing as any).rg_issue_date || "",
         ctps_number: (existing as any).ctps_number || "",
         ctps_series: (existing as any).ctps_series || "",
         ctps_state: (existing as any).ctps_state || "",
@@ -209,6 +211,7 @@ export default function WorkerForm() {
         rg: form.rg.trim() || null,
         rg_issuer: form.rg_issuer.trim() || null,
         rg_state: form.rg_state || null,
+        rg_issue_date: form.rg_issue_date || null,
         ctps_number: form.ctps_number.trim() || null,
         ctps_series: form.ctps_series.trim() || null,
         ctps_state: form.ctps_state || null,
@@ -403,6 +406,10 @@ export default function WorkerForm() {
                   {STATES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="rg_issue_date">Data de emissão do RG</Label>
+              <Input id="rg_issue_date" type="date" value={form.rg_issue_date} onChange={set("rg_issue_date")} />
             </div>
             <div className="space-y-1">
               <Label htmlFor="nis_pis">NIS/PIS/PASEP</Label>
