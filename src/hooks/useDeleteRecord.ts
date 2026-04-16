@@ -7,13 +7,13 @@ type TableName = "workers" | "companies" | "events" | "employment_links" | "link
 
 const dependencyChecks: Record<TableName, { table: string; column: string; label: string }[]> = {
   workers: [
-    { table: "employment_links", column: "worker_id", label: "vínculos" },
+    { table: "link_group_workers", column: "worker_id", label: "alocações em grupos" },
   ],
   companies: [
     { table: "events", column: "company_id", label: "eventos" },
   ],
   events: [
-    { table: "employment_links", column: "event_id", label: "vínculos" },
+    { table: "link_groups", column: "event_id", label: "grupos/vínculos" },
   ],
   employment_links: [
     { table: "employment_link_documents", column: "employment_link_id", label: "documentos" },
