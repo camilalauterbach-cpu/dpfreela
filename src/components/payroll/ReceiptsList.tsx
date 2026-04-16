@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Upload, Download, Trash2, Loader2, FileText } from "lucide-react";
+import { validateUpload, ALLOWED_FILE_EXTENSIONS } from "@/lib/upload-validation";
 
 interface Props {
   batchId: string;
@@ -23,6 +24,8 @@ export function ReceiptsList({ batchId, canUpload }: Props) {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
+      const validationError = validateUpload(file);
+      if (validationError) throw new Error(validationError);
       const path = `${batchId}/${Date.now()}_${file.name}`;
       const { error: storageError } = await supabase.storage
         .from("payment-receipts")
@@ -57,14 +60,19 @@ export function ReceiptsList({ batchId, canUpload }: Props) {
   });
 
   const handleDownload = async (filePath: string, fileName: string) => {
-    const { data, error } = await supabase.storage.from("payment-receipts").download(filePath);
-    if (error) { toast({ title: "Erro no download", variant: "destructive" }); return; }
-    const url = URL.createObjectURL(data);
+    const { data, error } = await supabase.storage
+      .from("payment-receipts")
+      .createSignedUrl(filePath, 60, { download: fileName });
+    if (error || !data?.signedUrl) {
+      toast({ title: "Erro no download", variant: "destructive" });
+      return;
+    }
     const a = document.createElement("a");
-    a.href = url;
+    a.href = data.signedUrl;
     a.download = fileName;
+    a.target = "_blank";
+    a.rel = "noopener";
     a.click();
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -77,7 +85,7 @@ export function ReceiptsList({ batchId, canUpload }: Props) {
               {uploadMutation.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Upload className="mr-1 h-3 w-3" />}
               Anexar
             </Button>
-            <input ref={fileRef} type="file" className="hidden" onChange={(e) => { if (e.target.files?.[0]) uploadMutation.mutate(e.target.files[0]); e.target.value = ""; }} />
+            <input ref={fileRef} type="file" accept={ALLOWED_FILE_EXTENSIONS} className="hidden" onChange={(e) => { if (e.target.files?.[0]) uploadMutation.mutate(e.target.files[0]); e.target.value = ""; }} />
           </>
         )}
       </CardHeader>

@@ -8,6 +8,7 @@ import { Loader2, Upload, CheckCircle2, Clock, XCircle, RefreshCw } from "lucide
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRef } from "react";
+import { validateUpload, ALLOWED_FILE_EXTENSIONS } from "@/lib/upload-validation";
 
 interface RequiredDoc {
   category: string;
@@ -78,7 +79,9 @@ export function OperationalDocsChecklist({ employmentLinkId, workerId, event }: 
   });
 
   const uploadMutation = useMutation({
-    mutationFn: async ({ file, category }: { file: File; category: string }) => {
+   mutationFn: async ({ file, category }: { file: File; category: string }) => {
+      const validationError = validateUpload(file);
+      if (validationError) throw new Error(validationError);
       const ext = file.name.split(".").pop();
       const path = `${workerId}/${employmentLinkId}/${category}_${Date.now()}.${ext}`;
 
@@ -190,11 +193,11 @@ export function OperationalDocsChecklist({ employmentLinkId, workerId, event }: 
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
-        <input
+       <input
           ref={fileInputRef}
           type="file"
           className="hidden"
-          accept=".pdf,.jpg,.jpeg,.png,.webp"
+          accept={ALLOWED_FILE_EXTENSIONS}
           onChange={handleFileChange}
         />
 

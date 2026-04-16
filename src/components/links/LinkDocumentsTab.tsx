@@ -18,6 +18,7 @@ import { LinkDocumentConfig, parseConfig, getConfiguredDocs, getCategoryLabel } 
 import { exportLinkDocsZip } from "@/lib/export-docs-zip";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { validateUpload, ALLOWED_FILE_EXTENSIONS } from "@/lib/upload-validation";
 
 interface Props {
   workerId: string;
@@ -95,7 +96,9 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
   });
 
   const uploadMutation = useMutation({
-    mutationFn: async ({ file, category }: { file: File; category: string }) => {
+   mutationFn: async ({ file, category }: { file: File; category: string }) => {
+      const validationError = validateUpload(file);
+      if (validationError) throw new Error(validationError);
       const ext = file.name.split(".").pop();
       const storagePath = useNewModel
         ? `${workerId}/${linkGroupWorkerId}/${category}_${Date.now()}.${ext}`
@@ -304,11 +307,11 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
   return (
     <div className="space-y-6">
       {/* Hidden file input */}
-      <input
+     <input
         ref={fileInputRef}
         type="file"
         className="hidden"
-        accept=".pdf,.jpg,.jpeg,.png,.webp"
+        accept={ALLOWED_FILE_EXTENSIONS}
         onChange={handleFileChange}
       />
 

@@ -24,6 +24,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { BankDataForm } from "./BankDataForm";
+import { validateUpload, ALLOWED_FILE_EXTENSIONS } from "@/lib/upload-validation";
 
 interface Props {
   workerId: string;
@@ -75,7 +76,9 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
   const [bankReplaceAction, setBankReplaceAction] = useState<"upload" | "form" | null>(null);
 
   const uploadMutation = useMutation({
-    mutationFn: async ({ category, file, alwaysInsert }: { category: string; file: File; alwaysInsert?: boolean }) => {
+   mutationFn: async ({ category, file, alwaysInsert }: { category: string; file: File; alwaysInsert?: boolean }) => {
+      const validationError = validateUpload(file);
+      if (validationError) throw new Error(validationError);
       const ext = file.name.split(".").pop();
       const path = `${workerId}/${category}/${Date.now()}.${ext}`;
 
@@ -584,7 +587,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
                 }}
               />
             ) : previewMime?.startsWith("image/") ? (
-              <img src={previewUrl} alt="Documento" className="w-full rounded" />
+              <img src={previewUrl} alt="Documento" loading="lazy" className="w-full rounded" />
             ) : previewMime?.includes("pdf") ? (
               <iframe src={previewUrl} className="w-full h-[70vh] rounded" />
             ) : (
