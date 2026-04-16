@@ -14,6 +14,7 @@ import { Loader2, Upload, FileText, Eye, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
+import { validateUpload, ALLOWED_FILE_EXTENSIONS } from "@/lib/upload-validation";
 
 interface Props {
   eventId: string;
@@ -58,7 +59,9 @@ export function EventDocumentsTab({ eventId }: Props) {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: async ({ file, category }: { file: File; category: string }) => {
+   mutationFn: async ({ file, category }: { file: File; category: string }) => {
+      const validationError = validateUpload(file);
+      if (validationError) throw new Error(validationError);
       const ext = file.name.split(".").pop();
       const path = `events/${eventId}/${category}_${Date.now()}.${ext}`;
 
@@ -150,11 +153,11 @@ export function EventDocumentsTab({ eventId }: Props) {
 
   return (
     <div className="space-y-4">
-      <input
+       <input
         ref={fileInputRef}
         type="file"
         className="hidden"
-        accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
+        accept={ALLOWED_FILE_EXTENSIONS}
         onChange={handleFileChange}
       />
 
@@ -224,14 +227,14 @@ export function EventDocumentsTab({ eventId }: Props) {
       </Card>
 
       {/* Preview dialog */}
-      <Dialog open={!!previewUrl} onOpenChange={() => setPreviewUrl(null)}>
+       <Dialog open={!!previewUrl} onOpenChange={() => setPreviewUrl(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Preview do documento</DialogTitle>
           </DialogHeader>
           {previewUrl && (
             previewMime?.startsWith("image/") ? (
-              <img src={previewUrl} alt="Documento" className="w-full rounded" />
+              <img src={previewUrl} alt="Documento" loading="lazy" className="w-full rounded" />
             ) : (
               <iframe src={previewUrl} className="w-full h-[70vh] rounded" />
             )
