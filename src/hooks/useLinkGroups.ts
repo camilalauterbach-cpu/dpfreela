@@ -97,6 +97,23 @@ export function useLinkGroupWorkers(groupId: string | undefined) {
   });
 }
 
+export function useWorkerGroupAllocations(workerId: string | undefined) {
+  return useQuery({
+    queryKey: ["worker-group-allocations", workerId],
+    enabled: !!workerId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("link_group_workers")
+        .select("id, worker_id, link_group_id, job_role, status, hire_date, link_groups(group_name, events(name))")
+        .eq("worker_id", workerId!)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useLinkGroupsByEvent(eventId: string | undefined) {
   return useQuery({
     queryKey: ["link-groups-event", eventId],
@@ -189,6 +206,7 @@ export function useAllocateWorker() {
     onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: ["link-group-workers", vars.link_group_id] });
       queryClient.invalidateQueries({ queryKey: ["link-group", vars.link_group_id] });
+      queryClient.invalidateQueries({ queryKey: ["worker-group-allocations", vars.worker_id] });
       INVALIDATE_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
     },
   });
@@ -207,6 +225,7 @@ export function useUpdateGroupWorker() {
     onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: ["link-group-workers", vars.link_group_id] });
       queryClient.invalidateQueries({ queryKey: ["link-group", vars.link_group_id] });
+      queryClient.invalidateQueries({ queryKey: ["worker-group-allocations"] });
       INVALIDATE_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
     },
   });
@@ -243,6 +262,7 @@ export function useRemoveGroupWorker() {
     onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: ["link-group-workers", vars.link_group_id] });
       queryClient.invalidateQueries({ queryKey: ["link-group", vars.link_group_id] });
+      queryClient.invalidateQueries({ queryKey: ["worker-group-allocations"] });
       INVALIDATE_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
     },
   });
