@@ -52,9 +52,15 @@ const TABLE_OPTIONS = [
 ];
 
 const ACTION_COLORS: Record<string, string> = {
-  INSERT: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-  UPDATE: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
-  DELETE: "bg-red-500/15 text-red-700 dark:text-red-400",
+  insert: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  update: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  delete: "bg-red-500/15 text-red-700 dark:text-red-400",
+};
+
+const ACTION_LABELS: Record<string, string> = {
+  insert: "INSERT",
+  update: "UPDATE",
+  delete: "DELETE",
 };
 
 export function SettingsAudit() {
@@ -221,7 +227,7 @@ export function SettingsAudit() {
                         variant="outline"
                         className={ACTION_COLORS[log.action] || ""}
                       >
-                        {log.action}
+                        {ACTION_LABELS[log.action] || log.action}
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-xs font-mono">
@@ -280,7 +286,7 @@ export function SettingsAudit() {
                     variant="outline"
                     className={ACTION_COLORS[selectedLog.action] || ""}
                   >
-                    {selectedLog.action}
+                    {ACTION_LABELS[selectedLog.action] || selectedLog.action}
                   </Badge>
                 </div>
                 <div>
