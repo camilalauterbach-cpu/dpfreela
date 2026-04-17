@@ -98,6 +98,7 @@ const App = () => (
                 <Route path="/payroll/:id" element={<PayrollDetail />} />
                 <Route path="/payroll/:id/edit" element={<PayrollForm />} />
                 <Route path="/settings" element={<ProtectedRoute requiredRoles={["admin", "manager"]}><SettingsPage /></ProtectedRoute>} />
+                <Route path="/settings/:tab" element={<ProtectedRoute requiredRoles={["admin", "manager"]}><SettingsPage /></ProtectedRoute>} />
               </Route>
 
               <Route path="*" element={<NotFound />} />
