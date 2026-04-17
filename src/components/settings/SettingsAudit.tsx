@@ -227,7 +227,7 @@ export function SettingsAudit() {
                         variant="outline"
                         className={ACTION_COLORS[log.action] || ""}
                       >
-                        {log.action}
+                        {ACTION_LABELS[log.action] || log.action}
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-xs font-mono">
@@ -286,7 +286,7 @@ export function SettingsAudit() {
                     variant="outline"
                     className={ACTION_COLORS[selectedLog.action] || ""}
                   >
-                    {selectedLog.action}
+                    {ACTION_LABELS[selectedLog.action] || selectedLog.action}
                   </Badge>
                 </div>
                 <div>
