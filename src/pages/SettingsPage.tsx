@@ -1,22 +1,31 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, UserCircle, Building2, Palette, FileText } from "lucide-react";
+import { Users, UserCircle, Building2, Palette, FileText, ShieldCheck } from "lucide-react";
+import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { SettingsUsers } from "@/components/settings/SettingsUsers";
 import { SettingsProfile } from "@/components/settings/SettingsProfile";
 import { SettingsCompany } from "@/components/settings/SettingsCompany";
 import { SettingsPreferences } from "@/components/settings/SettingsPreferences";
 import { SettingsLinksAdmission } from "@/components/settings/SettingsLinksAdmission";
+import { SettingsAudit } from "@/components/settings/SettingsAudit";
 
 export default function SettingsPage() {
   const { hasAnyRole, hasRole } = useAuth();
+  const { tab } = useParams();
+  const navigate = useNavigate();
   const isAdmin = hasRole("admin");
   const canEditGlobal = hasAnyRole(["admin", "manager"]);
+  const defaultTab = tab && (isAdmin || !["users", "audit"].includes(tab)) ? tab : "profile";
 
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold text-foreground">Configurações</h1>
 
-      <Tabs defaultValue="profile" className="w-full">
+      <Tabs
+        value={defaultTab}
+        onValueChange={(v) => navigate(v === "profile" ? "/settings" : `/settings/${v}`)}
+        className="w-full"
+      >
         <TabsList className="flex flex-wrap h-auto gap-1">
           <TabsTrigger value="profile" className="gap-1.5 text-xs sm:text-sm">
             <UserCircle className="h-4 w-4" />
@@ -40,6 +49,12 @@ export default function SettingsPage() {
             <Palette className="h-4 w-4" />
             <span className="hidden sm:inline">Preferências</span>
           </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="audit" className="gap-1.5 text-xs sm:text-sm">
+              <ShieldCheck className="h-4 w-4" />
+              <span className="hidden sm:inline">Auditoria</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="profile">
@@ -63,6 +78,12 @@ export default function SettingsPage() {
         <TabsContent value="preferences">
           <SettingsPreferences />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="audit">
+            <SettingsAudit />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
