@@ -18,7 +18,7 @@ import { LinkDocumentConfig, parseConfig, getConfiguredDocs, getCategoryLabel } 
 import { exportLinkDocsZip } from "@/lib/export-docs-zip";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { validateUpload, ALLOWED_FILE_EXTENSIONS } from "@/lib/upload-validation";
+import { validateUpload, ALLOWED_FILE_EXTENSIONS, getSafeContentType } from "@/lib/upload-validation";
 
 interface Props {
   workerId: string;
@@ -106,7 +106,7 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
 
       const { error: uploadErr } = await supabase.storage
         .from("link-documents")
-        .upload(storagePath, file);
+        .upload(storagePath, file, { contentType: getSafeContentType(file) });
       if (uploadErr) throw uploadErr;
 
       const existing = linkDocs?.find((d: any) => d.category === category);

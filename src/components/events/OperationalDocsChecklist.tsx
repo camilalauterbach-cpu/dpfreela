@@ -8,7 +8,7 @@ import { Loader2, Upload, CheckCircle2, Clock, XCircle, RefreshCw } from "lucide
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRef } from "react";
-import { validateUpload, ALLOWED_FILE_EXTENSIONS } from "@/lib/upload-validation";
+import { validateUpload, ALLOWED_FILE_EXTENSIONS, getSafeContentType } from "@/lib/upload-validation";
 
 interface RequiredDoc {
   category: string;
@@ -87,7 +87,7 @@ export function OperationalDocsChecklist({ employmentLinkId, workerId, event }: 
 
       const { error: uploadErr } = await supabase.storage
         .from("link-documents")
-        .upload(path, file);
+        .upload(path, file, { contentType: getSafeContentType(file) });
       if (uploadErr) throw uploadErr;
 
       // Check if doc already exists for this category

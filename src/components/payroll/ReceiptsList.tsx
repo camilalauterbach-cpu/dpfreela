@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Upload, Download, Trash2, Loader2, FileText } from "lucide-react";
-import { validateUpload, ALLOWED_FILE_EXTENSIONS } from "@/lib/upload-validation";
+import { validateUpload, ALLOWED_FILE_EXTENSIONS, getSafeContentType } from "@/lib/upload-validation";
 
 interface Props {
   batchId: string;
@@ -29,7 +29,7 @@ export function ReceiptsList({ batchId, canUpload }: Props) {
       const path = `${batchId}/${Date.now()}_${file.name}`;
       const { error: storageError } = await supabase.storage
         .from("payment-receipts")
-        .upload(path, file);
+        .upload(path, file, { contentType: getSafeContentType(file) });
       if (storageError) throw storageError;
 
       const { error } = await supabase.from("payment_receipts").insert({

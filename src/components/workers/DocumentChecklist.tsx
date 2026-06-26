@@ -24,7 +24,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { BankDataForm } from "./BankDataForm";
-import { validateUpload, ALLOWED_FILE_EXTENSIONS } from "@/lib/upload-validation";
+import { validateUpload, ALLOWED_FILE_EXTENSIONS, getSafeContentType } from "@/lib/upload-validation";
 
 interface Props {
   workerId: string;
@@ -84,7 +84,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
 
       const { error: uploadErr } = await supabase.storage
         .from("worker-documents")
-        .upload(path, file, { upsert: true });
+        .upload(path, file, { upsert: true, contentType: getSafeContentType(file) });
       if (uploadErr) throw uploadErr;
 
       if (alwaysInsert) {
