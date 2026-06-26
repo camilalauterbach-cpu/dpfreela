@@ -226,7 +226,7 @@ export function SettingsUsers() {
               : ""
           }
           onConfirm={handleDelete}
-          loading={deleting}
+          isDeleting={deleting}
         />
       </CardContent>
     </Card>
