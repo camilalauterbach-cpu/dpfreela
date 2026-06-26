@@ -4,6 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Trash2, UserX } from "lucide-react";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -26,6 +29,8 @@ export function SettingsUsers() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmDelete, setConfirmDelete] = useState<UserRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -92,11 +97,46 @@ export function SettingsUsers() {
     }
   };
 
+  const handleDeactivate = async (user: UserRow) => {
+    if (!user.role_id) return;
+    const { error } = await supabase.from("user_roles").delete().eq("id", user.role_id);
+    if (error) {
+      toast({ title: "Erro ao inativar", description: error.message, variant: "destructive" });
+    } else {
+      toast({
+        title: "Usuário inativado",
+        description: `${user.full_name || "Usuário"} perdeu o acesso ao sistema.`,
+      });
+      fetchUsers();
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    const { error } = await supabase.functions.invoke("admin-delete-user", {
+      body: { user_id: confirmDelete.user_id },
+    });
+    setDeleting(false);
+    if (error) {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    } else {
+      toast({
+        title: "Usuário excluído",
+        description: `${confirmDelete.full_name || "Usuário"} foi removido. O e-mail está liberado para novo cadastro.`,
+      });
+      setConfirmDelete(null);
+      fetchUsers();
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Usuários e Permissões</CardTitle>
-        <CardDescription>Gerencie os papéis dos usuários do sistema.</CardDescription>
+        <CardDescription>
+          Gerencie papéis, inative ou exclua usuários. Excluir libera o e-mail para novo cadastro.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -109,6 +149,7 @@ export function SettingsUsers() {
               <TableRow>
                 <TableHead>Usuário</TableHead>
                 <TableHead>Permissão</TableHead>
+                <TableHead className="w-[140px] text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -145,11 +186,48 @@ export function SettingsUsers() {
                       </div>
                     )}
                   </TableCell>
+                  <TableCell className="text-right">
+                    {u.user_id !== currentUser?.id && (
+                      <div className="flex items-center justify-end gap-1">
+                        {u.role_id && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Inativar (remove permissão)"
+                            onClick={() => handleDeactivate(u)}
+                          >
+                            <UserX className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="Excluir usuário (libera o e-mail)"
+                          onClick={() => setConfirmDelete(u)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         )}
+
+        <DeleteConfirmDialog
+          open={!!confirmDelete}
+          onOpenChange={(o) => !o && setConfirmDelete(null)}
+          title="Excluir usuário"
+          description={
+            confirmDelete
+              ? `Esta ação remove ${confirmDelete.full_name || "este usuário"} do sistema (perfil, permissões e autenticação). O e-mail ficará liberado para novo cadastro. Esta ação não pode ser desfeita.`
+              : ""
+          }
+          onConfirm={handleDelete}
+          loading={deleting}
+        />
       </CardContent>
     </Card>
   );
