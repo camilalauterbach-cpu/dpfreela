@@ -99,7 +99,9 @@ export function SettingsUsers() {
 
   const handleDeactivate = async (user: UserRow) => {
     if (!user.role_id) return;
-    const { error } = await supabase.from("user_roles").delete().eq("id", user.role_id);
+    const { error } = await supabase.functions.invoke("admin-deactivate-user", {
+      body: { user_id: user.user_id },
+    });
     if (error) {
       toast({ title: "Erro ao inativar", description: error.message, variant: "destructive" });
     } else {
