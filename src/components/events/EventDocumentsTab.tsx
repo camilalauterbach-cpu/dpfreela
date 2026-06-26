@@ -14,7 +14,7 @@ import { Loader2, Upload, FileText, Eye, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
-import { validateUpload, ALLOWED_FILE_EXTENSIONS } from "@/lib/upload-validation";
+import { validateUpload, ALLOWED_FILE_EXTENSIONS, getSafeContentType } from "@/lib/upload-validation";
 
 interface Props {
   eventId: string;

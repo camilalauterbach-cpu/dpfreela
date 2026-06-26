@@ -18,7 +18,7 @@ import { LinkDocumentConfig, parseConfig, getConfiguredDocs, getCategoryLabel } 
 import { exportLinkDocsZip } from "@/lib/export-docs-zip";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { validateUpload, ALLOWED_FILE_EXTENSIONS } from "@/lib/upload-validation";
+import { validateUpload, ALLOWED_FILE_EXTENSIONS, getSafeContentType } from "@/lib/upload-validation";
 
 interface Props {
   workerId: string;
