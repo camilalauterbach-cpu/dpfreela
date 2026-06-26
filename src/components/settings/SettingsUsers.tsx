@@ -16,10 +16,9 @@ const roleLabels: Record<string, string> = {
 
 type UserRow = {
   user_id: string;
-  email: string;
   full_name: string | null;
-  role: string;
-  role_id: string;
+  role: string | null;
+  role_id: string | null;
 };
 
 export function SettingsUsers() {
@@ -30,23 +29,38 @@ export function SettingsUsers() {
 
   const fetchUsers = async () => {
     setLoading(true);
-    // Get all roles
-    const { data: roles } = await supabase.from("user_roles").select("id, user_id, role");
-    if (!roles) { setLoading(false); return; }
+    // List ALL profiles (admins/managers can view all via RLS) so that
+    // newly-signed-up collaborators without a role are visible and can
+    // receive permissions.
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("user_id, full_name")
+      .order("full_name", { ascending: true, nullsFirst: false });
 
-    // Get profiles for those users
-    const userIds = [...new Set(roles.map((r) => r.user_id))];
-    const { data: profiles } = await supabase.from("profiles").select("user_id, full_name").in("user_id", userIds);
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("id, user_id, role");
 
-    const profileMap = new Map((profiles || []).map((p) => [p.user_id, p.full_name]));
+    const roleMap = new Map(
+      (roles || []).map((r) => [r.user_id, { role: r.role as string, role_id: r.id as string }])
+    );
 
-    const merged: UserRow[] = roles.map((r) => ({
-      user_id: r.user_id,
-      email: "", // we don't have access to auth.users emails from client
-      full_name: profileMap.get(r.user_id) || null,
-      role: r.role,
-      role_id: r.id,
-    }));
+    const merged: UserRow[] = (profiles || []).map((p) => {
+      const r = roleMap.get(p.user_id);
+      return {
+        user_id: p.user_id,
+        full_name: p.full_name,
+        role: r?.role ?? null,
+        role_id: r?.role_id ?? null,
+      };
+    });
+
+    // Users without a role come first so admins notice them immediately.
+    merged.sort((a, b) => {
+      if (!a.role && b.role) return -1;
+      if (a.role && !b.role) return 1;
+      return (a.full_name || "").localeCompare(b.full_name || "");
+    });
 
     setUsers(merged);
     setLoading(false);
@@ -54,15 +68,26 @@ export function SettingsUsers() {
 
   useEffect(() => { fetchUsers(); }, []);
 
-  const handleRoleChange = async (roleId: string, newRole: string) => {
-    const { error } = await supabase
-      .from("user_roles")
-      .update({ role: newRole as any })
-      .eq("id", roleId);
+  const handleRoleChange = async (
+    user: UserRow,
+    newRole: "admin" | "manager" | "operator" | "viewer"
+  ) => {
+    const { error } = user.role_id
+      ? await supabase
+          .from("user_roles")
+          .update({ role: newRole as any })
+          .eq("id", user.role_id)
+      : await supabase
+          .from("user_roles")
+          .insert({ user_id: user.user_id, role: newRole as any });
+
     if (error) {
-      toast({ title: "Erro ao alterar role", description: error.message, variant: "destructive" });
+      toast({ title: "Erro ao alterar permissão", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Permissão atualizada" });
+      toast({
+        title: user.role_id ? "Permissão atualizada" : "Permissão concedida",
+        description: `${user.full_name || "Usuário"} agora é ${roleLabels[newRole]}.`,
+      });
       fetchUsers();
     }
   };
@@ -88,7 +113,7 @@ export function SettingsUsers() {
             </TableHeader>
             <TableBody>
               {users.map((u) => (
-                <TableRow key={u.role_id}>
+                <TableRow key={u.user_id}>
                   <TableCell>
                     <div>
                       <p className="font-medium text-foreground">{u.full_name || "Sem nome"}</p>
@@ -97,11 +122,18 @@ export function SettingsUsers() {
                   </TableCell>
                   <TableCell>
                     {u.user_id === currentUser?.id ? (
-                      <Badge variant="secondary">{roleLabels[u.role] || u.role}</Badge>
+                      <Badge variant="secondary">{u.role ? roleLabels[u.role] : "Sem permissão"}</Badge>
                     ) : (
-                      <Select defaultValue={u.role} onValueChange={(v) => handleRoleChange(u.role_id, v)}>
-                        <SelectTrigger className="w-[140px]">
-                          <SelectValue />
+                      <div className="flex items-center gap-2">
+                        {!u.role && (
+                          <Badge variant="destructive" className="text-xs">Sem permissão</Badge>
+                        )}
+                        <Select
+                          value={u.role ?? undefined}
+                          onValueChange={(v) => handleRoleChange(u, v as any)}
+                        >
+                        <SelectTrigger className="w-[160px]">
+                          <SelectValue placeholder="Atribuir…" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="admin">Administrador</SelectItem>
@@ -109,7 +141,8 @@ export function SettingsUsers() {
                           <SelectItem value="operator">Operador</SelectItem>
                           <SelectItem value="viewer">Visualizador</SelectItem>
                         </SelectContent>
-                      </Select>
+                        </Select>
+                      </div>
                     )}
                   </TableCell>
                 </TableRow>
