@@ -58,6 +58,14 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Look up affected user details for the audit log
+    const { data: targetUser } = await admin.auth.admin.getUserById(targetUserId);
+    const targetEmail = targetUser?.user?.email ?? null;
+    const { data: targetProfile } = await admin
+      .from("profiles").select("full_name").eq("user_id", targetUserId).maybeSingle();
+    const { data: targetRoles } = await admin
+      .from("user_roles").select("role").eq("user_id", targetUserId);
+
     // Clean up app data first (FKs are ON DELETE CASCADE in most cases, but be explicit)
     await admin.from("user_roles").delete().eq("user_id", targetUserId);
     await admin.from("profiles").delete().eq("user_id", targetUserId);
@@ -68,6 +76,22 @@ Deno.serve(async (req) => {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Audit log
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+    await admin.from("change_logs").insert({
+      table_name: "auth.users",
+      record_id: targetUserId,
+      action: "delete",
+      old_data: {
+        email: targetEmail,
+        full_name: targetProfile?.full_name ?? null,
+        roles: (targetRoles ?? []).map((r: any) => r.role),
+      },
+      new_data: null,
+      changed_by: callerId,
+      ip_address: ip,
+    });
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
