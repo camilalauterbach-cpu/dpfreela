@@ -24,15 +24,22 @@ export function validateUpload(file: File): string | null {
     const mb = (file.size / 1024 / 1024).toFixed(1);
     return `Arquivo muito grande (${mb} MB). Limite: 10 MB.`;
   }
-  // Alguns navegadores enviam type vazio — aí confiamos na extensão
-  if (file.type && !(ALLOWED_MIME_TYPES as readonly string[]).includes(file.type)) {
+  // Exigir MIME válido enviado pelo navegador. Sem fallback por extensão
+  // (evita upload de HTML/JS renomeado como .pdf).
+  if (!file.type || !(ALLOWED_MIME_TYPES as readonly string[]).includes(file.type)) {
     return "Tipo de arquivo não permitido. Aceitos: PDF, JPG, PNG, WebP.";
   }
-  if (!file.type) {
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    if (!ext || !["pdf", "jpg", "jpeg", "png", "webp"].includes(ext)) {
-      return "Tipo de arquivo não permitido. Aceitos: PDF, JPG, PNG, WebP.";
-    }
-  }
   return null;
+}
+
+/**
+ * Retorna um Content-Type seguro (sempre da allow-list) a ser passado no
+ * `storage.upload({ contentType })`. Nunca confia em valores arbitrários do
+ * navegador — apenas em tipos previamente validados.
+ */
+export function getSafeContentType(file: File): string {
+  if ((ALLOWED_MIME_TYPES as readonly string[]).includes(file.type)) {
+    return file.type;
+  }
+  return "application/octet-stream";
 }

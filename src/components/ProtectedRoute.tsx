@@ -22,7 +22,7 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRoles && requiredRoles.length > 0 && roles.length > 0 && !hasAnyRole(requiredRoles)) {
+  if (requiredRoles && requiredRoles.length > 0 && !hasAnyRole(requiredRoles)) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-2">
         <h1 className="text-2xl font-semibold text-foreground">Acesso negado</h1>
