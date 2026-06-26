@@ -106,7 +106,7 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
 
       const { error: uploadErr } = await supabase.storage
         .from("link-documents")
-        .upload(storagePath, file);
+        .upload(storagePath, file, { contentType: getSafeContentType(file) });
       if (uploadErr) throw uploadErr;
 
       const existing = linkDocs?.find((d: any) => d.category === category);

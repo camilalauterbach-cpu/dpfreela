@@ -67,7 +67,7 @@ export function EventDocumentsTab({ eventId }: Props) {
 
       const { error: uploadErr } = await supabase.storage
         .from("link-documents")
-        .upload(path, file);
+        .upload(path, file, { contentType: getSafeContentType(file) });
       if (uploadErr) throw uploadErr;
 
       // Validação na aplicação: event_id sempre preenchido

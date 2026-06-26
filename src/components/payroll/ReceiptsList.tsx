@@ -29,7 +29,7 @@ export function ReceiptsList({ batchId, canUpload }: Props) {
       const path = `${batchId}/${Date.now()}_${file.name}`;
       const { error: storageError } = await supabase.storage
         .from("payment-receipts")
-        .upload(path, file);
+        .upload(path, file, { contentType: getSafeContentType(file) });
       if (storageError) throw storageError;
 
       const { error } = await supabase.from("payment_receipts").insert({
