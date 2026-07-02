@@ -1270,6 +1270,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      ensure_current_user_access: {
+        Args: never
+        Returns: {
+          roles: Database["public"]["Enums"]["app_role"][]
+        }[]
+      }
       get_audit_user_emails: {
         Args: { _user_ids: string[] }
         Returns: {
