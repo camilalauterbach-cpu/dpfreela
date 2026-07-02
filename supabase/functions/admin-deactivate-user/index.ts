@@ -72,6 +72,16 @@ Deno.serve(async (req) => {
       });
     }
 
+    const { error: disableErr } = await admin
+      .from("profiles")
+      .update({ access_disabled_at: new Date().toISOString() })
+      .eq("user_id", targetUserId);
+    if (disableErr) {
+      return new Response(JSON.stringify({ error: disableErr.message }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
     await admin.from("change_logs").insert({
       table_name: "user_roles",
@@ -82,7 +92,7 @@ Deno.serve(async (req) => {
         full_name: targetProfile?.full_name ?? null,
         roles: (previousRoles ?? []).map((r: any) => r.role),
       },
-      new_data: { roles: [] },
+      new_data: { roles: [], access_disabled_at: true },
       changed_by: callerId,
       ip_address: ip,
     });
