@@ -14,39 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      access_repair_logs: {
-        Row: {
-          created_at: string
-          email: string | null
-          id: string
-          profile_created: boolean
-          reason: string
-          role_assigned: boolean
-          roles_after: Database["public"]["Enums"]["app_role"][]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          email?: string | null
-          id?: string
-          profile_created?: boolean
-          reason: string
-          role_assigned?: boolean
-          roles_after?: Database["public"]["Enums"]["app_role"][]
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          email?: string | null
-          id?: string
-          profile_created?: boolean
-          reason?: string
-          role_assigned?: boolean
-          roles_after?: Database["public"]["Enums"]["app_role"][]
-          user_id?: string
-        }
-        Relationships: []
-      }
       change_logs: {
         Row: {
           action: string

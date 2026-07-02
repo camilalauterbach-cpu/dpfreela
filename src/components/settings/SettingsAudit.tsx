@@ -30,7 +30,6 @@ import {
 import { TablePagination } from "@/components/TablePagination";
 import { Loader2, RotateCcw, Eye, Search } from "lucide-react";
 import { format } from "date-fns";
-import { AccessRepairLogs } from "./AccessRepairLogs";
 
 const PAGE_SIZE = 20;
 
@@ -197,8 +196,6 @@ export function SettingsAudit() {
   };
 
   return (
-    <div className="space-y-6">
-    <AccessRepairLogs />
     <Card>
       <CardHeader>
         <CardTitle>Auditoria do sistema</CardTitle>
@@ -426,6 +423,5 @@ export function SettingsAudit() {
         </DialogContent>
       </Dialog>
     </Card>
-    </div>
   );
 }
