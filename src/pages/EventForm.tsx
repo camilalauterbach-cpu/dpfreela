@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEvent } from "@/hooks/useEvents";
-import { useCompanies } from "@/hooks/useCompanies";
+import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,7 +51,20 @@ export default function EventForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: existing, isLoading: loadingExisting } = useEvent(id);
-  const { data: companies } = useCompanies("");
+  const { data: companies } = useQuery({
+    queryKey: ["companies-all-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("id, legal_name, trade_name")
+        .is("deleted_at", null)
+        .order("legal_name")
+        .limit(1000);
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 60_000,
+  });
 
   const [form, setForm] = useState<EventFormData>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -181,7 +194,7 @@ export default function EventForm() {
               <Select value={form.company_id} onValueChange={setSelect("company_id")}>
                 <SelectTrigger><SelectValue placeholder="Selecione uma empresa" /></SelectTrigger>
                 <SelectContent>
-                  {(companies as any)?.data?.map((c: any) => (
+                  {(companies as any[] | undefined)?.map((c: any) => (
                     <SelectItem key={c.id} value={c.id}>{c.legal_name}{c.trade_name ? ` (${c.trade_name})` : ""}</SelectItem>
                   ))}
                 </SelectContent>
