@@ -12,6 +12,7 @@ interface AuthContextType {
   hasRole: (role: AppRole) => boolean;
   hasAnyRole: (roles: AppRole[]) => boolean;
   signOut: () => Promise<void>;
+  refreshAccess: () => Promise<AppRole[]>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -86,8 +87,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRoles([]);
   };
 
+  const refreshAccess = async () => {
+    if (!user) return [];
+    setLoading(true);
+    try {
+      return await fetchRoles(user.id);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ session, user, roles, loading, hasRole, hasAnyRole, signOut }}>
+    <AuthContext.Provider value={{ session, user, roles, loading, hasRole, hasAnyRole, signOut, refreshAccess }}>
       {children}
     </AuthContext.Provider>
   );
