@@ -74,7 +74,7 @@ const App = () => (
               <Route path="/dashboard" element={<Navigate to="/" replace />} />
 
               {/* Protected routes with layout */}
-              <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+              <Route element={<ProtectedRoute requiredRoles={["admin", "manager", "operator", "viewer"]}><AppLayout /></ProtectedRoute>}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/workers" element={<Workers />} />
                 <Route path="/workers/new" element={<WorkerForm key="new" />} />
