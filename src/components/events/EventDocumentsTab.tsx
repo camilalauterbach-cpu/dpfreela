@@ -4,6 +4,7 @@
  * Futuramente, considerar tabela dedicada event_documents para separação completa.
  */
 import { useState, useRef } from "react";
+import { formatSupabaseError } from "@/lib/format-error";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -92,7 +93,7 @@ export function EventDocumentsTab({ eventId }: Props) {
       toast({ title: "Documento enviado" });
     },
     onError: (err: any) => {
-      toast({ title: "Erro no upload", description: err?.message, variant: "destructive" });
+      toast({ title: "Erro no upload", description: formatSupabaseError(err), variant: "destructive" });
     },
   });
 
@@ -131,7 +132,7 @@ export function EventDocumentsTab({ eventId }: Props) {
       queryClient.invalidateQueries({ queryKey: ["event-documents", eventId] });
       toast({ title: "Documento removido" });
     } catch (err: any) {
-      toast({ title: "Erro", description: err?.message, variant: "destructive" });
+      toast({ title: "Erro", description: formatSupabaseError(err), variant: "destructive" });
     } finally {
       setIsDeleting(false);
       setDeleteDoc(null);

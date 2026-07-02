@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { formatSupabaseError } from "@/lib/format-error";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -126,7 +127,7 @@ export function OperationalDocsChecklist({ employmentLinkId, workerId, event }: 
       toast({ title: "Documento enviado" });
     },
     onError: (err: any) => {
-      toast({ title: "Erro no upload", description: err?.message, variant: "destructive" });
+      toast({ title: "Erro no upload", description: formatSupabaseError(err), variant: "destructive" });
     },
   });
 

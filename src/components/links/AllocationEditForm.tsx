@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatSupabaseError } from "@/lib/format-error";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUpdateGroupWorker } from "@/hooks/useLinkGroups";
 import { Button } from "@/components/ui/button";
@@ -85,7 +86,7 @@ export function AllocationEditForm({ allocation, groupId, onSaved }: Props) {
         onSaved?.();
       },
       onError: (err: any) => {
-        toast({ title: "Erro ao salvar", description: err?.message, variant: "destructive" });
+        toast({ title: "Erro ao salvar", description: formatSupabaseError(err), variant: "destructive" });
       },
     });
   };

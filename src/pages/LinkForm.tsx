@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { formatSupabaseError } from "@/lib/format-error";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -197,7 +198,7 @@ export default function LinkForm() {
           navigate(`/links/${id}`);
         },
         onError: (err: any) => {
-          toast({ title: "Erro ao salvar", description: err?.message, variant: "destructive" });
+          toast({ title: "Erro ao salvar", description: formatSupabaseError(err), variant: "destructive" });
         },
       });
     } else {
@@ -207,7 +208,7 @@ export default function LinkForm() {
           navigate(`/links/${data.id}`);
         },
         onError: (err: any) => {
-          toast({ title: "Erro ao salvar", description: err?.message, variant: "destructive" });
+          toast({ title: "Erro ao salvar", description: formatSupabaseError(err), variant: "destructive" });
         },
       });
     }
