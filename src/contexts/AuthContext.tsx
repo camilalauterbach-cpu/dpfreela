@@ -23,22 +23,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchRoles = async (userId: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", userId);
-    if (data) {
-      setRoles(data.map((r) => r.role as AppRole));
+
+    if (error) {
+      setRoles([]);
+      return [];
     }
+
+    const nextRoles = (data || []).map((r) => r.role as AppRole);
+    setRoles(nextRoles);
+    return nextRoles;
   };
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        setLoading(true);
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          setTimeout(() => fetchRoles(session.user.id), 0);
+          setRoles([]);
+          await fetchRoles(session.user.id);
         } else {
           setRoles([]);
         }
@@ -50,7 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchRoles(session.user.id);
+        fetchRoles(session.user.id).finally(() => setLoading(false));
+        return;
       }
       setLoading(false);
     });
