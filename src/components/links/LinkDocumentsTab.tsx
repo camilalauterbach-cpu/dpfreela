@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { formatSupabaseError } from "@/lib/format-error";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -149,7 +150,7 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
       toast({ title: "Documento enviado" });
     },
     onError: (err: any) => {
-      toast({ title: "Erro no upload", description: err?.message, variant: "destructive" });
+      toast({ title: "Erro no upload", description: formatSupabaseError(err), variant: "destructive" });
     },
   });
 
