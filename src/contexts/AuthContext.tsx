@@ -40,13 +40,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      (_event, session) => {
         setLoading(true);
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
           setRoles([]);
-          await fetchRoles(session.user.id);
+          setTimeout(() => {
+            fetchRoles(session.user.id).finally(() => setLoading(false));
+          }, 0);
+          return;
         } else {
           setRoles([]);
         }
