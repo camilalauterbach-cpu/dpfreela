@@ -1,10 +1,10 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2, ShieldAlert, RefreshCw, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface ProtectedRouteProps {
@@ -13,8 +13,9 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
-  const { user, loading, hasAnyRole, roles, signOut } = useAuth();
+  const { user, loading, hasAnyRole, roles, signOut, refreshAccess } = useAuth();
   const [repairing, setRepairing] = useState(false);
+  const queryClient = useQueryClient();
 
   if (loading) {
     return (
@@ -34,13 +35,25 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
     const handleRepair = async () => {
       setRepairing(true);
       try {
-        const { error } = await supabase.rpc("ensure_current_user_access");
-        if (error) throw error;
-        window.location.reload();
+        const nextRoles = await refreshAccess();
+        if (!nextRoles.length) {
+          toast.error("Ainda sem papel de acesso", {
+            description:
+              "Sua conta pode estar desativada. Peça a um administrador para liberar em Configurações → Usuários.",
+          });
+          return;
+        }
+        // Discard any stale cached queries from the empty-state period so the
+        // next screen fetches fresh data with the new permissions.
+        await queryClient.invalidateQueries();
+        toast.success("Acesso reparado", {
+          description: `Papel atribuído: ${nextRoles.join(", ")}`,
+        });
       } catch (err: any) {
         toast.error("Não foi possível reparar o acesso", {
           description: err?.message ?? "Tente sair e entrar novamente.",
         });
+      } finally {
         setRepairing(false);
       }
     };
