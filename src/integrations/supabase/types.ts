@@ -829,6 +829,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          access_disabled_at: string | null
           avatar_url: string | null
           created_at: string
           full_name: string | null
@@ -837,6 +838,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          access_disabled_at?: string | null
           avatar_url?: string | null
           created_at?: string
           full_name?: string | null
@@ -845,6 +847,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          access_disabled_at?: string | null
           avatar_url?: string | null
           created_at?: string
           full_name?: string | null
