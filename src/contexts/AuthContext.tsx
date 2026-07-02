@@ -23,6 +23,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchRoles = async (userId: string) => {
+    const { data: ensuredAccess, error: ensureError } = await supabase.rpc("ensure_current_user_access");
+
+    if (!ensureError && ensuredAccess?.[0]?.roles?.length) {
+      const ensuredRoles = ensuredAccess[0].roles as AppRole[];
+      setRoles(ensuredRoles);
+      return ensuredRoles;
+    }
+
     const { data, error } = await supabase
       .from("user_roles")
       .select("role")

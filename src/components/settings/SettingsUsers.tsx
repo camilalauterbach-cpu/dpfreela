@@ -89,6 +89,11 @@ export function SettingsUsers() {
     if (error) {
       toast({ title: "Erro ao alterar permissão", description: error.message, variant: "destructive" });
     } else {
+      await supabase
+        .from("profiles")
+        .update({ access_disabled_at: null })
+        .eq("user_id", user.user_id);
+
       toast({
         title: user.role_id ? "Permissão atualizada" : "Permissão concedida",
         description: `${user.full_name || "Usuário"} agora é ${roleLabels[newRole]}.`,
