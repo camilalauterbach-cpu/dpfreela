@@ -33,6 +33,13 @@ function neutralError(status = 400): Response {
   );
 }
 
+function serviceUnavailable(): Response {
+  return new Response(
+    JSON.stringify({ ok: false, error: "Não foi possível concluir o cadastro neste momento." }),
+    { status: 503, headers: { "content-type": "application/json" } },
+  );
+}
+
 function neutralSuccess(): Response {
   return new Response(
     JSON.stringify({ ok: true }),
@@ -71,6 +78,13 @@ Deno.serve(async (req: Request) => {
   };
 
   try {
+    // 0. Fail-closed: sem segredo forte, nada é executado.
+    const inviteSecret = Deno.env.get("INVITE_TOKEN_SECRET");
+    if (!inviteSecret || inviteSecret.length < 64) {
+      console.error("INVITE_SECRET_NOT_CONFIGURED");
+      return wrap(serviceUnavailable());
+    }
+
     // 1. método
     if (req.method !== "POST") return wrap(neutralError(405));
 
@@ -100,10 +114,9 @@ Deno.serve(async (req: Request) => {
       return wrap(neutralError(400));
     }
 
-    // 5. hashes
-    const tokenSecret = Deno.env.get("INVITE_TOKEN_SECRET") ?? "";
-    const tokenHash = await sha256Hex(`${tokenSecret}:${token}`);
-    const ipHash = await sha256Hex(`${tokenSecret}:${extractIp(req)}`);
+    // 5. hashes (segredo já validado no passo 0)
+    const tokenHash = await sha256Hex(`${inviteSecret}:${token}`);
+    const ipHash = await sha256Hex(`${inviteSecret}:${extractIp(req)}`);
 
     // 6. clientes
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
