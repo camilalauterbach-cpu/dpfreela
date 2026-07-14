@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useMutationWithFeedback } from "@/hooks/useMutationWithFeedback";
+import { useUnsavedFormGuard } from "@/hooks/useUnsavedFormGuard";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +18,6 @@ interface Props {
 }
 
 export function PaymentMethodForm({ workerId, onClose }: Props) {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [methodType, setMethodType] = useState<"bank_account" | "pix">("bank_account");
   const [bankName, setBankName] = useState("");
@@ -28,7 +29,13 @@ export function PaymentMethodForm({ workerId, onClose }: Props) {
   const [pixKey, setPixKey] = useState("");
   const [isPreferred, setIsPreferred] = useState(false);
 
-  const mutation = useMutation({
+  const isDirty = !!(bankName || bankCode || agency || accountNumber || pixKey);
+  useUnsavedFormGuard(isDirty, `payment-method-${workerId}`);
+
+  const mutation = useMutationWithFeedback<void, unknown, void, unknown>({
+    pendingMessage: "Salvando forma de pagamento…",
+    successMessage: "Forma de pagamento adicionada",
+    errorTitle: "Erro ao salvar forma de pagamento",
     mutationFn: async () => {
       const payload: any = {
         worker_id: workerId,
@@ -60,21 +67,18 @@ export function PaymentMethodForm({ workerId, onClose }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["worker-payment-methods", workerId] });
-      toast({ title: "Forma de pagamento adicionada" });
       onClose();
-    },
-    onError: (err: any) => {
-      toast({ title: "Erro", description: err.message, variant: "destructive" });
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (mutation.isPending || mutation.isLocked()) return;
     if (methodType === "pix" && !pixKey.trim()) {
-      toast({ title: "Chave Pix é obrigatória", variant: "destructive" });
+      toast.error("Chave Pix é obrigatória");
       return;
     }
-    mutation.mutate();
+    mutation.mutate(undefined);
   };
 
   return (
@@ -148,11 +152,11 @@ export function PaymentMethodForm({ workerId, onClose }: Props) {
           </div>
 
           <div className="flex gap-2">
-            <Button type="submit" size="sm" disabled={mutation.isPending}>
+            <Button type="submit" size="sm" disabled={mutation.isPending} aria-busy={mutation.isPending}>
               {mutation.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-              Salvar
+              {mutation.isPending ? "Salvando…" : "Salvar"}
             </Button>
-            <Button type="button" size="sm" variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button type="button" size="sm" variant="outline" onClick={onClose} disabled={mutation.isPending}>Cancelar</Button>
           </div>
         </form>
       </CardContent>
