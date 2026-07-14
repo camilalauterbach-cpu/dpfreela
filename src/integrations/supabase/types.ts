@@ -458,6 +458,95 @@ export type Database = {
           },
         ]
       }
+      invite_attempts: {
+        Row: {
+          attempted_at: string
+          id: number
+          ip_hash: string
+          success: boolean
+          token_hash_prefix: string | null
+        }
+        Insert: {
+          attempted_at?: string
+          id?: never
+          ip_hash: string
+          success?: boolean
+          token_hash_prefix?: string | null
+        }
+        Update: {
+          attempted_at?: string
+          id?: never
+          ip_hash?: string
+          success?: boolean
+          token_hash_prefix?: string | null
+        }
+        Relationships: []
+      }
+      invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_auth_user_id: string | null
+          accepted_profile_id: string | null
+          attempt_count: number
+          created_at: string
+          created_by: string
+          email_normalized: string
+          expires_at: string
+          id: string
+          last_error_code: string | null
+          linked_worker_id: string | null
+          processing_nonce: string | null
+          processing_started_at: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          status: string
+          token_hash: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_auth_user_id?: string | null
+          accepted_profile_id?: string | null
+          attempt_count?: number
+          created_at?: string
+          created_by: string
+          email_normalized: string
+          expires_at: string
+          id?: string
+          last_error_code?: string | null
+          linked_worker_id?: string | null
+          processing_nonce?: string | null
+          processing_started_at?: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          status?: string
+          token_hash: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_auth_user_id?: string | null
+          accepted_profile_id?: string | null
+          attempt_count?: number
+          created_at?: string
+          created_by?: string
+          email_normalized?: string
+          expires_at?: string
+          id?: string
+          last_error_code?: string | null
+          linked_worker_id?: string | null
+          processing_nonce?: string | null
+          processing_started_at?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invites_linked_worker_id_fkey"
+            columns: ["linked_worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       link_group_workers: {
         Row: {
           call_time: string | null
@@ -1390,6 +1479,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_public_invite: {
+        Args: { _ip_hash: string; _token_hash: string }
+        Returns: Json
+      }
+      complete_public_invite: {
+        Args: {
+          _auth_user_id: string
+          _invite_id: string
+          _nonce: string
+          _profile_id: string
+        }
+        Returns: Json
+      }
       ensure_current_user_access: {
         Args: never
         Returns: {
@@ -1420,6 +1522,10 @@ export type Database = {
         Returns: boolean
       }
       is_valid_cpf: { Args: { _cpf: string }; Returns: boolean }
+      release_public_invite: {
+        Args: { _error_code: string; _invite_id: string; _nonce: string }
+        Returns: Json
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
