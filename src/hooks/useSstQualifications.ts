@@ -39,8 +39,8 @@ export function useSstOverview(filters: Filters) {
   return useQuery({
     queryKey: ["sst-overview", filters],
     queryFn: async () => {
-      const { data: quals, error } = await supabase
-        .from("worker_sst_qualifications_current" as any)
+      const { data: quals, error } = await (supabase as any)
+        .from("worker_sst_qualifications_current")
         .select("*");
       if (error) throw error;
       const rows = (quals || []) as SstCurrentRow[];
@@ -107,8 +107,8 @@ export function useSstSummary() {
   return useQuery({
     queryKey: ["sst-summary"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("worker_sst_qualifications_current" as any)
+      const { data, error } = await (supabase as any)
+        .from("worker_sst_qualifications_current")
         .select("worker_id, expiration_status, document_status");
       if (error) throw error;
       const rows = (data || []) as Array<Pick<SstCurrentRow, "worker_id" | "expiration_status" | "document_status">>;
