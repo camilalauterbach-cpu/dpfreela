@@ -623,6 +623,15 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
           )}
         </DialogContent>
       </Dialog>
+
+      {nrDialogCtx && (
+        <NrValidityDialog
+          open={nrDialogOpen}
+          onOpenChange={(v) => { setNrDialogOpen(v); if (!v) setNrDialogCtx(null); }}
+          initialPhase={nrDialogPhase}
+          context={nrDialogCtx}
+        />
+      )}
     </div>
   );
 }
