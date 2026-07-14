@@ -1,6 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useSstOverview, useSstSummary, ExpirationStatus, DocumentStatus, SstCurrentRow } from "@/hooks/useSstQualifications";
+import {
+  useSstOverview, useSstSummary, useSstAlertCounts,
+  ExpirationStatus, DocumentStatus, ValidityStatus, SstCurrentRow,
+} from "@/hooks/useSstQualifications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -56,21 +60,64 @@ export default function Sst() {
   const { hasAnyRole } = useAuth();
   const canWrite = hasAnyRole(["admin", "manager", "operator"]);
 
-  const [search, setSearch] = useState("");
-  const [nr, setNr] = useState<string>("");
-  const [expiration, setExpiration] = useState<"" | ExpirationStatus>("");
-  const [doc, setDoc] = useState<"" | DocumentStatus>("");
+  const [sp, setSp] = useSearchParams();
+  const [search, setSearch] = useState(sp.get("q") ?? "");
+  const [nr, setNr] = useState<string>(sp.get("nr") ?? "");
+  const [expiration, setExpiration] = useState<"" | ExpirationStatus>((sp.get("expiration") as ExpirationStatus) || "");
+  const [doc, setDoc] = useState<"" | DocumentStatus>((sp.get("doc") as DocumentStatus) || "");
+  const [validity, setValidity] = useState<"" | ValidityStatus>((sp.get("validity") as ValidityStatus) || "");
+  const [daysUntil, setDaysUntil] = useState<number | null>(sp.get("days") ? Number(sp.get("days")) : null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const filters = useMemo(() => ({ search, nr: nr || undefined, expiration: expiration || undefined, doc: doc || undefined }), [search, nr, expiration, doc]);
+  const filters = useMemo(
+    () => ({ search, nr: nr || undefined, expiration: expiration || undefined, doc: doc || undefined, validity: validity || undefined, daysUntil }),
+    [search, nr, expiration, doc, validity, daysUntil],
+  );
   const summary = useSstSummary();
+  const alerts = useSstAlertCounts();
   const overview = useSstOverview(filters);
+
+  // Sincroniza filtros ↔ URL
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (search) next.set("q", search);
+    if (nr) next.set("nr", nr);
+    if (expiration) next.set("expiration", expiration);
+    if (doc) next.set("doc", doc);
+    if (validity) next.set("validity", validity);
+    if (daysUntil) next.set("days", String(daysUntil));
+    setSp(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, nr, expiration, doc, validity, daysUntil]);
+
+  const clearFilters = () => {
+    setSearch(""); setNr(""); setExpiration(""); setDoc(""); setValidity(""); setDaysUntil(null);
+  };
 
   const nrOptions = useMemo(() => {
     const set = new Set<string>();
     for (const w of overview.data?.workers || []) for (const q of w.qualifications) set.add(q.nr_code);
     return Array.from(set).sort();
   }, [overview.data]);
+
+  const cards = [
+    { label: "Trabalhadores no SST", value: summary.data?.totalWorkers, icon: ShieldCheck, tone: "", onClick: () => clearFilters() },
+    { label: "Vencendo em 30d", value: (alerts.data?.expiringSoonOk ?? 0) + (alerts.data?.expiringSoonPending ?? 0), icon: Clock, tone: "text-amber-700", onClick: () => { clearFilters(); setExpiration("expiring_soon"); } },
+    { label: "Vencidos", value: (alerts.data?.expiredOk ?? 0) + (alerts.data?.expiredPending ?? 0), icon: AlertTriangle, tone: "text-red-700", onClick: () => { clearFilters(); setExpiration("expired"); } },
+    { label: "Docs pendentes", value: alerts.data?.pending, icon: FileWarning, tone: "text-amber-700", onClick: () => { clearFilters(); setDoc("pending"); } },
+  ];
+
+  const shortcuts: Array<{ label: string; onClick: () => void }> = [
+    { label: "Vencidas", onClick: () => { clearFilters(); setExpiration("expired"); } },
+    { label: "Vence em 7d", onClick: () => { clearFilters(); setDaysUntil(7); } },
+    { label: "Vence em 15d", onClick: () => { clearFilters(); setDaysUntil(15); } },
+    { label: "Vence em 30d", onClick: () => { clearFilters(); setDaysUntil(30); } },
+    { label: "Vence em 60d", onClick: () => { clearFilters(); setDaysUntil(60); } },
+    { label: "Pendentes", onClick: () => { clearFilters(); setDoc("pending"); } },
+    { label: "Rejeitadas", onClick: () => { clearFilters(); setDoc("rejected"); } },
+    { label: "Sem comprovante", onClick: () => { clearFilters(); setDoc("no_document"); } },
+    { label: "Validade desconhecida", onClick: () => { clearFilters(); setValidity("unknown"); } },
+  ];
 
   return (
     <div className="space-y-4">
@@ -87,10 +134,29 @@ export default function Sst() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> Trabalhadores no SST</CardTitle></CardHeader><CardContent className="pt-0 text-2xl font-bold">{summary.data?.totalWorkers ?? "—"}</CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> Vencendo em 30d</CardTitle></CardHeader><CardContent className="pt-0 text-2xl font-bold text-amber-700">{summary.data?.expiring ?? "—"}</CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Vencidos</CardTitle></CardHeader><CardContent className="pt-0 text-2xl font-bold text-red-700">{summary.data?.expired ?? "—"}</CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground flex items-center gap-1"><FileWarning className="h-3 w-3" /> Docs pendentes</CardTitle></CardHeader><CardContent className="pt-0 text-2xl font-bold text-amber-700">{summary.data?.pending ?? "—"}</CardContent></Card>
+        {cards.map((c) => (
+          <button key={c.label} onClick={c.onClick} className="text-left">
+            <Card className="hover:border-primary/30 hover:shadow-sm transition">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs text-muted-foreground flex items-center gap-1">
+                  <c.icon className="h-3 w-3" /> {c.label}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className={`pt-0 text-2xl font-bold ${c.tone}`}>{c.value ?? "—"}</CardContent>
+            </Card>
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {shortcuts.map((s) => (
+          <Button key={s.label} size="sm" variant="outline" onClick={s.onClick} className="h-7 text-xs">
+            {s.label}
+          </Button>
+        ))}
+        {(search || nr || expiration || doc || validity || daysUntil) && (
+          <Button size="sm" variant="ghost" onClick={clearFilters} className="h-7 text-xs">Limpar</Button>
+        )}
       </div>
 
       <div className="flex flex-col md:flex-row gap-2">
@@ -122,6 +188,7 @@ export default function Sst() {
             <SelectItem value="pending">Pendente</SelectItem>
             <SelectItem value="ok">Aprovado</SelectItem>
             <SelectItem value="rejected">Rejeitado</SelectItem>
+            <SelectItem value="no_document">Sem comprovante</SelectItem>
           </SelectContent>
         </Select>
       </div>
