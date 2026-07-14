@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useWorker } from "@/hooks/useWorkers";
 import { validateCpf, normalizeCpf } from "@/lib/validators";
 import { useToast } from "@/hooks/use-toast";
+import { DuplicateWorkerDialog, DuplicateDialogState } from "@/components/workers/DuplicateWorkerDialog";
+import { toast as sonnerToast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -102,6 +104,8 @@ export default function WorkerForm() {
   const [operationalOpen, setOperationalOpen] = useState(false);
   const [loadedId, setLoadedId] = useState<string | undefined>(undefined);
   const [isDirty, setIsDirty] = useState(false);
+  const [dupDialog, setDupDialog] = useState<DuplicateDialogState>(null);
+  const [forcePending, setForcePending] = useState(false);
   useUnsavedFormGuard(isDirty, `worker-form-${id ?? "new"}`);
 
   // Reset form when switching between workers or from edit to new
@@ -198,13 +202,9 @@ export default function WorkerForm() {
     return Object.keys(errs).length === 0;
   };
 
-  const mutation = useMutationWithFeedback<void, unknown, void, unknown>({
-    pendingMessage: isEdit ? "Salvando alterações…" : "Cadastrando trabalhador…",
-    successMessage: isEdit ? "Trabalhador atualizado" : "Trabalhador cadastrado",
-    errorTitle: "Erro ao salvar trabalhador",
-    mutationFn: async () => {
+  const buildPayload = () => {
       const cleanCpf = normalizeCpf(form.cpf);
-      const payload: Record<string, any> = {
+      return {
         full_name: form.full_name.trim(),
         nickname: form.nickname.trim() || null,
         social_name: form.social_name.trim() || null,
@@ -246,33 +246,106 @@ export default function WorkerForm() {
         emergency_contact_name: form.emergency_contact_name.trim() || null,
         emergency_contact_phone: form.emergency_contact_phone.replace(/\D/g, "") || null,
         notes: form.notes.trim() || null,
-      };
+      } as Record<string, any>;
+  };
 
+  // Traduz códigos técnicos da RPC ensure_worker para mensagens amigáveis.
+  const translateEnsureError = (msg: string): { field?: keyof WorkerFormData; message: string } => {
+    if (msg.includes("invalid_cpf")) return { field: "cpf", message: "CPF inválido" };
+    if (msg.includes("missing_full_name")) return { field: "full_name", message: "Nome é obrigatório" };
+    if (msg.includes("incomplete_worker_data")) return { message: "Dados obrigatórios ausentes para cadastro completo." };
+    if (msg.includes("forbidden_force_create")) return { message: "Somente administrador ou gestor pode confirmar criação como nova pessoa." };
+    if (msg.includes("forbidden_role")) return { message: "Você não tem permissão para cadastrar trabalhadores." };
+    if (msg.includes("not_authenticated")) return { message: "Sessão expirada. Faça login novamente." };
+    if (msg.includes("workers_cpf_key") || msg.includes("duplicate key")) return { field: "cpf", message: "Este CPF já está cadastrado." };
+    return { message: "Não foi possível concluir o cadastro. Tente novamente." };
+  };
+
+  const runEnsure = async (mode: "auto" | "force_create") => {
+    const payload = buildPayload();
+    const { data, error } = await supabase.rpc("ensure_worker", { payload: payload as any, mode });
+    if (error) throw error;
+    return data as { result: "existing" | "possible_duplicate" | "created"; workerId?: string; matches?: any[] };
+  };
+
+  const mutation = useMutationWithFeedback<
+    { kind: "edit" } | { kind: "created"; workerId: string } | { kind: "existing"; workerId: string } | { kind: "possible_duplicate"; matches: any[] },
+    unknown,
+    void,
+    unknown
+  >({
+    pendingMessage: isEdit ? "Salvando alterações…" : "Verificando cadastro…",
+    successMessage: null,
+    errorTitle: "Erro ao salvar trabalhador",
+    mutationFn: async () => {
       if (isEdit) {
+        const payload = buildPayload();
         const { error } = await supabase.from("workers").update(payload as any).eq("id", id);
         if (error) throw error;
-      } else {
-        const { error } = await supabase.from("workers").insert(payload as any);
-        if (error) throw error;
+        return { kind: "edit" };
       }
+      const res = await runEnsure("auto");
+      if (res.result === "created" && res.workerId) return { kind: "created", workerId: res.workerId };
+      if (res.result === "existing" && res.workerId) return { kind: "existing", workerId: res.workerId };
+      if (res.result === "possible_duplicate") return { kind: "possible_duplicate", matches: res.matches || [] };
+      throw new Error("unexpected_ensure_result");
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workers"] });
-      if (isEdit) {
+    onSuccess: (result) => {
+      if (result.kind === "edit") {
+        queryClient.invalidateQueries({ queryKey: ["workers"] });
         queryClient.invalidateQueries({ queryKey: ["worker", id] });
+        sonnerToast.success("Trabalhador atualizado");
+        setIsDirty(false);
+        navigate("/workers");
+        return;
       }
-      setIsDirty(false);
-      navigate("/workers");
+      if (result.kind === "created") {
+        queryClient.invalidateQueries({ queryKey: ["workers"] });
+        sonnerToast.success("Trabalhador cadastrado");
+        setIsDirty(false);
+        navigate("/workers");
+        return;
+      }
+      if (result.kind === "existing") {
+        setDupDialog({ kind: "existing", workerId: result.workerId });
+        return;
+      }
+      if (result.kind === "possible_duplicate") {
+        setDupDialog({ kind: "possible_duplicate", matches: result.matches as any });
+        return;
+      }
     },
     onError: (err: any) => {
       const msg = err?.message || "";
-      if (msg.includes("workers_cpf_key")) {
-        setErrors({ cpf: "Este CPF já está cadastrado" });
-      } else if (msg.includes("workers_cpf_check")) {
-        setErrors({ cpf: "CPF deve conter exatamente 11 dígitos numéricos" });
-      }
+      const t = translateEnsureError(msg);
+      if (t.field) setErrors({ [t.field]: t.message });
+      sonnerToast.error(t.message);
     },
   });
+
+  const handleForceCreate = async () => {
+    if (forcePending) return;
+    setForcePending(true);
+    try {
+      const res = await runEnsure("force_create");
+      if (res.result === "created" && res.workerId) {
+        queryClient.invalidateQueries({ queryKey: ["workers"] });
+        sonnerToast.success("Trabalhador cadastrado");
+        setDupDialog(null);
+        setIsDirty(false);
+        navigate("/workers");
+      } else if (res.result === "existing" && res.workerId) {
+        setDupDialog({ kind: "existing", workerId: res.workerId });
+      } else {
+        sonnerToast.error("Não foi possível concluir o cadastro.");
+      }
+    } catch (err: any) {
+      const t = translateEnsureError(err?.message || "");
+      sonnerToast.error(t.message);
+    } finally {
+      setForcePending(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -603,6 +676,12 @@ export default function WorkerForm() {
           <Button type="button" variant="outline" onClick={() => navigate("/workers")} disabled={mutation.isPending}>Cancelar</Button>
         </div>
       </form>
+      <DuplicateWorkerDialog
+        state={dupDialog}
+        onClose={() => setDupDialog(null)}
+        onForceCreate={handleForceCreate}
+        forcePending={forcePending}
+      />
     </div>
   );
 }
