@@ -84,7 +84,7 @@ export default function CompanyForm() {
     return Object.keys(errs).length === 0;
   };
 
-  const mutation = useMutationWithFeedback({
+  const mutation = useMutationWithFeedback<void, unknown, void, unknown>({
     pendingMessage: isEdit ? "Salvando alterações…" : "Cadastrando empresa…",
     successMessage: isEdit ? "Empresa atualizada" : "Empresa cadastrada",
     errorTitle: "Erro ao salvar empresa",
@@ -130,7 +130,7 @@ export default function CompanyForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (mutation.isPending || mutation.isLocked()) return;
-    if (validate()) mutation.mutate();
+    if (validate()) mutation.mutate(undefined);
   };
 
   if (isEdit && loadingExisting) {
