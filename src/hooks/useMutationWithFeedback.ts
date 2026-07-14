@@ -52,19 +52,21 @@ export function useMutationWithFeedback<TData, TError, TVariables, TContext>(
   // Synchronous lock — the source of truth for "am I already running?".
   // Independent of React state so two very fast clicks cannot both pass.
   const lockRef = useRef(false);
-  // Track active op IDs so we can flush them if the component unmounts mid-flight.
-  const activeOpsRef = useRef<Set<string>>(new Set());
-  // Track live toast IDs so success/error can replace the pending one.
-  const toastMapRef = useRef<Map<string, string | number>>(new Map());
+  // The sync lock guarantees at most one in-flight mutation per hook instance,
+  // so a single opId / toastId slot is enough. Storing them in refs avoids the
+  // need to mutate the `variables` object (which would require `any` casts and
+  // could clash with real payload fields).
+  const currentOpIdRef = useRef<string | null>(null);
+  const currentToastIdRef = useRef<string | number | null>(null);
 
   useEffect(() => {
     return () => {
-      // Component unmounted while mutations are in flight — release everything
-      // to avoid leaking activity slots or leaving orphan toasts.
-      activeOpsRef.current.forEach((id) => endMutation(id));
-      activeOpsRef.current.clear();
-      toastMapRef.current.forEach((tid) => toast.dismiss(tid));
-      toastMapRef.current.clear();
+      // Component unmounted while a mutation is in flight — release the slot
+      // and dismiss the pending toast so nothing lingers.
+      if (currentOpIdRef.current) endMutation(currentOpIdRef.current);
+      if (currentToastIdRef.current !== null) toast.dismiss(currentToastIdRef.current);
+      currentOpIdRef.current = null;
+      currentToastIdRef.current = null;
       lockRef.current = false;
     };
   }, []);
@@ -78,12 +80,9 @@ export function useMutationWithFeedback<TData, TError, TVariables, TContext>(
     mutationFn: wrappedMutationFn,
     onMutate: async (variables) => {
       const opId = beginMutation();
-      activeOpsRef.current.add(opId);
-      (variables as any).__opId = opId; // stash for onSettled cleanup
-
+      currentOpIdRef.current = opId;
       if (pendingMessage) {
-        const tid = toast.loading(pendingMessage);
-        toastMapRef.current.set(opId, tid);
+        currentToastIdRef.current = toast.loading(pendingMessage);
       }
 
       // Caller callback is isolated — its failure must not skip cleanup.
@@ -93,62 +92,55 @@ export function useMutationWithFeedback<TData, TError, TVariables, TContext>(
         // Release the lock/tracker immediately if the user's onMutate blew up.
         lockRef.current = false;
         endMutation(opId);
-        activeOpsRef.current.delete(opId);
-        const tid = toastMapRef.current.get(opId);
-        if (tid !== undefined) {
-          toast.dismiss(tid);
-          toastMapRef.current.delete(opId);
+        currentOpIdRef.current = null;
+        if (currentToastIdRef.current !== null) {
+          toast.dismiss(currentToastIdRef.current);
+          currentToastIdRef.current = null;
         }
         throw err;
       }
       return undefined as unknown as TContext;
     },
     onSuccess: async (data, variables, context) => {
-      const opId = (variables as any).__opId as string | undefined;
-      const tid = opId ? toastMapRef.current.get(opId) : undefined;
+      const tid = currentToastIdRef.current;
       if (successMessage) {
-        if (tid !== undefined) toast.success(successMessage, { id: tid });
+        if (tid !== null) toast.success(successMessage, { id: tid });
         else toast.success(successMessage);
-      } else if (tid !== undefined) {
+      } else if (tid !== null) {
         toast.dismiss(tid);
       }
       try {
         if (onSuccess) await onSuccess(data, variables, context);
       } catch (err) {
         // Never let a screen-specific onSuccess swallow the outcome.
-        // eslint-disable-next-line no-console
         console.error("[useMutationWithFeedback] onSuccess callback threw:", err);
       }
     },
     onError: async (error, variables, context) => {
-      const opId = (variables as any).__opId as string | undefined;
-      const tid = opId ? toastMapRef.current.get(opId) : undefined;
-      // eslint-disable-next-line no-console
+      const tid = currentToastIdRef.current;
       console.error(`[${errorTitle}]`, formatSupabaseError(error));
       const description = formatSupabaseErrorForUser(error);
-      if (tid !== undefined) toast.error(errorTitle, { id: tid, description });
+      if (tid !== null) toast.error(errorTitle, { id: tid, description });
       else toast.error(errorTitle, { description });
       try {
         if (onError) await onError(error, variables, context);
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error("[useMutationWithFeedback] onError callback threw:", err);
       }
     },
     onSettled: async (data, error, variables, context) => {
-      const opId = (variables as any).__opId as string | undefined;
+      const opId = currentOpIdRef.current;
       try {
         if (onSettled) await onSettled(data, error, variables, context);
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error("[useMutationWithFeedback] onSettled callback threw:", err);
       } finally {
         // Guaranteed cleanup — the whole point of the wrapper.
         if (opId) {
           endMutation(opId);
-          activeOpsRef.current.delete(opId);
-          toastMapRef.current.delete(opId);
         }
+        currentOpIdRef.current = null;
+        currentToastIdRef.current = null;
         lockRef.current = false;
       }
     },
@@ -158,9 +150,8 @@ export function useMutationWithFeedback<TData, TError, TVariables, TContext>(
   const originalMutate = mutation.mutate;
   const originalMutateAsync = mutation.mutateAsync;
 
-  mutation.mutate = ((variables: TVariables, opts?: any) => {
+  mutation.mutate = ((variables: TVariables, opts?: Parameters<typeof originalMutate>[1]) => {
     if (lockRef.current) {
-      // eslint-disable-next-line no-console
       console.warn("[useMutationWithFeedback] ignored duplicate mutate() while locked");
       return;
     }
@@ -173,7 +164,7 @@ export function useMutationWithFeedback<TData, TError, TVariables, TContext>(
     }
   }) as typeof mutation.mutate;
 
-  mutation.mutateAsync = (async (variables: TVariables, opts?: any) => {
+  mutation.mutateAsync = (async (variables: TVariables, opts?: Parameters<typeof originalMutateAsync>[1]) => {
     if (lockRef.current) {
       throw new Error("Operação já em andamento. Aguarde a conclusão antes de tentar novamente.");
     }
