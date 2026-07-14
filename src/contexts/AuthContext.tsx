@@ -59,15 +59,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ACCESS_RPC_TIMEOUT_MS,
         "ensure_current_user_access"
       );
-      const ensuredAccess = (res as any).data;
-      const ensureError = (res as any).error;
+      const { data: ensuredAccess, error: ensureError } = res as {
+        data: Array<{ roles: AppRole[] }> | null;
+        error: unknown;
+      };
       if (!ensureError && ensuredAccess?.[0]?.roles?.length) {
         return ensuredAccess[0].roles as AppRole[];
       }
     } catch (err) {
       // Timeout or network error — fall through to the direct read below,
       // which usually succeeds even when the RPC is slow.
-      // eslint-disable-next-line no-console
       console.warn("[auth] ensure_current_user_access failed:", err);
     }
 
@@ -79,12 +80,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ACCESS_RPC_TIMEOUT_MS,
         "user_roles"
       );
-      const data = (res as any).data;
-      const error = (res as any).error;
+      const { data, error } = res as {
+        data: Array<{ role: AppRole }> | null;
+        error: unknown;
+      };
       if (error) return [];
-      return (data || []).map((r: any) => r.role as AppRole);
+      return (data || []).map((r) => r.role);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.warn("[auth] user_roles read failed:", err);
       return [];
     }
