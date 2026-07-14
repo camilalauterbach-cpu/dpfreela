@@ -338,6 +338,17 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
                     </SelectContent>
                   </Select>
                 )}
+                {doc && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setDeleteConfirmDoc(doc)}
+                    aria-label="Excluir documento"
+                  >
+                    <Trash2 className="mr-1 h-3 w-3" /> Excluir
+                  </Button>
+                )}
               </>
             )}
           </div>
