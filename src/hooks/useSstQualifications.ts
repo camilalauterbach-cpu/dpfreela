@@ -156,3 +156,65 @@ export function useSstSummary() {
     staleTime: 60_000,
   });
 }
+
+export interface SstAlertCounts {
+  expiredOk: number;
+  expiredPending: number;
+  expiringSoonOk: number;
+  expiringSoonPending: number;
+  pending: number;         // document_status = 'pending'
+  rejected: number;        // document_status = 'rejected'
+  noDocument: number;      // document_status = 'no_document'
+  unknownValidity: number; // validity_status = 'unknown'
+  monitoredWorkers: number;
+  totalAttention: number;  // vencidas + vencendo (independente de doc)
+}
+
+/**
+ * Contagens segmentadas — apenas view _current (nunca histórico).
+ * Regras (banco): expired = expires_at < CURRENT_DATE;
+ *                 expiring_soon = expires_at entre hoje e +30d;
+ *                 no_expiry = validity_status='no_expiry' OU expires_at IS NULL;
+ *                 unknown = validity_status='unknown'.
+ */
+export function useSstAlertCounts() {
+  return useQuery({
+    queryKey: ["sst-alert-counts"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("worker_sst_qualifications_current")
+        .select("worker_id, expiration_status, document_status, validity_status");
+      if (error) throw error;
+      const rows = (data || []) as Array<
+        Pick<SstCurrentRow, "worker_id" | "expiration_status" | "document_status" | "validity_status">
+      >;
+
+      const c: SstAlertCounts = {
+        expiredOk: 0, expiredPending: 0,
+        expiringSoonOk: 0, expiringSoonPending: 0,
+        pending: 0, rejected: 0, noDocument: 0, unknownValidity: 0,
+        monitoredWorkers: 0, totalAttention: 0,
+      };
+      const workers = new Set<string>();
+      for (const r of rows) {
+        workers.add(r.worker_id);
+        if (r.expiration_status === "expired") {
+          if (r.document_status === "ok") c.expiredOk++;
+          else c.expiredPending++;
+          c.totalAttention++;
+        } else if (r.expiration_status === "expiring_soon") {
+          if (r.document_status === "ok") c.expiringSoonOk++;
+          else c.expiringSoonPending++;
+          c.totalAttention++;
+        }
+        if (r.document_status === "pending") c.pending++;
+        else if (r.document_status === "rejected") c.rejected++;
+        else if (r.document_status === "no_document") c.noDocument++;
+        if (r.validity_status === "unknown") c.unknownValidity++;
+      }
+      c.monitoredWorkers = workers.size;
+      return c;
+    },
+    staleTime: 60_000,
+  });
+}
