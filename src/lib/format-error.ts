@@ -10,21 +10,29 @@ export function formatSupabaseError(err: unknown): string {
   if (err == null) return "Erro desconhecido.";
   if (typeof err === "string") return err;
 
-  const anyErr = err as Record<string, any>;
+  const anyErr = err as Record<string, unknown> & {
+    response?: { status?: number; statusText?: string };
+  };
   const parts: string[] = [];
 
   const message: string | undefined =
-    anyErr.message || anyErr.error_description || anyErr.error;
+    (anyErr.message as string | undefined) ||
+    (anyErr.error_description as string | undefined) ||
+    (anyErr.error as string | undefined);
   if (message) parts.push(String(message));
 
   // PostgREST / PostgreSQL error metadata
-  if (anyErr.code) parts.push(`código ${anyErr.code}`);
+  if (anyErr.code) parts.push(`código ${String(anyErr.code)}`);
   if (anyErr.details) parts.push(String(anyErr.details));
-  if (anyErr.hint) parts.push(`dica: ${anyErr.hint}`);
+  if (anyErr.hint) parts.push(`dica: ${String(anyErr.hint)}`);
 
   // HTTP status when available (fetch Response, Supabase-JS error, etc.)
-  const status = anyErr.status ?? anyErr.statusCode ?? anyErr?.response?.status;
-  const statusText = anyErr.statusText ?? anyErr?.response?.statusText;
+  const status =
+    (anyErr.status as number | undefined) ??
+    (anyErr.statusCode as number | undefined) ??
+    anyErr.response?.status;
+  const statusText =
+    (anyErr.statusText as string | undefined) ?? anyErr.response?.statusText;
   if (status) parts.push(`HTTP ${status}${statusText ? ` ${statusText}` : ""}`);
 
   // Friendlier hint for the most common RLS failure so non-technical users
@@ -56,11 +64,19 @@ export function formatSupabaseErrorForUser(err: unknown): string {
   if (err == null) return "Erro desconhecido. Tente novamente em instantes.";
   if (typeof err === "string") return err;
 
-  const anyErr = err as Record<string, any>;
+  const anyErr = err as Record<string, unknown> & {
+    response?: { status?: number };
+  };
   const code = anyErr.code as string | undefined;
-  const status = anyErr.status ?? anyErr.statusCode ?? anyErr?.response?.status;
+  const status =
+    (anyErr.status as number | undefined) ??
+    (anyErr.statusCode as number | undefined) ??
+    anyErr.response?.status;
   const raw = String(
-    anyErr.message || anyErr.error_description || anyErr.error || ""
+    (anyErr.message as string | undefined) ||
+      (anyErr.error_description as string | undefined) ||
+      (anyErr.error as string | undefined) ||
+      ""
   ).toLowerCase();
 
   // Permission / RLS
