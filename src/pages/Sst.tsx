@@ -21,12 +21,13 @@ const EXP_CLASS: Record<ExpirationStatus, string> = {
   no_expiry: "bg-slate-100 text-slate-700 border-slate-200",
 };
 const DOC_LABEL: Record<DocumentStatus, string> = {
-  pending: "Doc. pendente", ok: "Doc. ok", rejected: "Doc. rejeitado",
+  pending: "Doc. pendente", ok: "Doc. ok", rejected: "Doc. rejeitado", no_document: "Sem comprovante",
 };
 const DOC_CLASS: Record<DocumentStatus, string> = {
   pending: "bg-amber-50 text-amber-800 border-amber-200",
   ok: "bg-emerald-50 text-emerald-800 border-emerald-200",
   rejected: "bg-red-50 text-red-800 border-red-200",
+  no_document: "bg-slate-50 text-slate-700 border-slate-200",
 };
 
 function fmt(d: string | null) {
