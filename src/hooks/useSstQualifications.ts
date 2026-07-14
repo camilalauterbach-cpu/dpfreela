@@ -1,13 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export type ExpirationStatus = "valid" | "expiring_soon" | "expired" | "no_expiry";
-export type DocumentStatus = "pending" | "ok" | "rejected";
+export type DocumentStatus = "pending" | "ok" | "rejected" | "no_document";
+export type RevisionType = "initial" | "renewal" | "replacement" | "additional";
+export type SourceType = "manual" | "link_document" | "import";
+export type ValidityStatus = "has_expiry" | "no_expiry" | "unknown";
 
 export interface SstCurrentRow {
   id: string;
   worker_id: string;
   nr_code: string;
+  chain_key: string;
   training_type: string | null;
   issued_at: string;
   expires_at: string | null;
@@ -16,6 +20,14 @@ export interface SstCurrentRow {
   instructor_name: string | null;
   document_url: string | null;
   document_status: DocumentStatus;
+  validity_status: ValidityStatus;
+  source_type: SourceType;
+  revision_type: RevisionType;
+  employment_link_document_id: string | null;
+  link_group_worker_id: string | null;
+  link_group_id: string | null;
+  event_id: string | null;
+  company_id: string | null;
   notes: string | null;
   expiration_status: ExpirationStatus;
 }
@@ -35,9 +47,21 @@ interface Filters {
   doc?: "" | DocumentStatus;
 }
 
+/** Invalida todas as queries relacionadas ao Controle SST e à listagem de docs de vínculo. */
+export function invalidateSstCaches(qc: QueryClient, opts?: { linkDocsOwnerId?: string }) {
+  qc.invalidateQueries({ queryKey: ["sst-qualifications"] });
+  qc.invalidateQueries({ queryKey: ["sst-summary"] });
+  qc.invalidateQueries({ queryKey: ["sst-worker-details"] });
+  if (opts?.linkDocsOwnerId) {
+    qc.invalidateQueries({ queryKey: ["link-docs", opts.linkDocsOwnerId] });
+  } else {
+    qc.invalidateQueries({ queryKey: ["link-docs"] });
+  }
+}
+
 export function useSstOverview(filters: Filters) {
   return useQuery({
-    queryKey: ["sst-overview", filters],
+    queryKey: ["sst-qualifications", filters],
     queryFn: async () => {
       const { data: quals, error } = await (supabase as any)
         .from("worker_sst_qualifications_current")
