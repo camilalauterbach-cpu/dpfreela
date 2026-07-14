@@ -1291,6 +1291,101 @@ export type Database = {
           },
         ]
       }
+      worker_sst_qualifications: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          document_status: string
+          document_url: string | null
+          expires_at: string | null
+          id: string
+          instructor_name: string | null
+          issued_at: string
+          notes: string | null
+          nr_code: string
+          provider_document: string | null
+          provider_name: string | null
+          superseded_at: string | null
+          supersedes_id: string | null
+          training_type: string | null
+          updated_at: string
+          worker_id: string
+          workload_hours: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          document_status?: string
+          document_url?: string | null
+          expires_at?: string | null
+          id?: string
+          instructor_name?: string | null
+          issued_at: string
+          notes?: string | null
+          nr_code: string
+          provider_document?: string | null
+          provider_name?: string | null
+          superseded_at?: string | null
+          supersedes_id?: string | null
+          training_type?: string | null
+          updated_at?: string
+          worker_id: string
+          workload_hours?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          document_status?: string
+          document_url?: string | null
+          expires_at?: string | null
+          id?: string
+          instructor_name?: string | null
+          issued_at?: string
+          notes?: string | null
+          nr_code?: string
+          provider_document?: string | null
+          provider_name?: string | null
+          superseded_at?: string | null
+          supersedes_id?: string | null
+          training_type?: string | null
+          updated_at?: string
+          worker_id?: string
+          workload_hours?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_sst_qualifications_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "worker_sst_qualifications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_sst_qualifications_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "worker_sst_qualifications_current"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_sst_qualifications_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "worker_sst_qualifications_history"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_sst_qualifications_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workers: {
         Row: {
           address: string | null
@@ -1476,7 +1571,126 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      worker_sst_qualifications_current: {
+        Row: {
+          created_at: string | null
+          document_status: string | null
+          document_url: string | null
+          expiration_status: string | null
+          expires_at: string | null
+          id: string | null
+          instructor_name: string | null
+          issued_at: string | null
+          notes: string | null
+          nr_code: string | null
+          provider_name: string | null
+          training_type: string | null
+          updated_at: string | null
+          worker_id: string | null
+          workload_hours: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_sst_qualifications_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      worker_sst_qualifications_history: {
+        Row: {
+          created_at: string | null
+          deleted_at: string | null
+          document_status: string | null
+          document_url: string | null
+          expiration_status: string | null
+          expires_at: string | null
+          id: string | null
+          instructor_name: string | null
+          issued_at: string | null
+          notes: string | null
+          nr_code: string | null
+          provider_name: string | null
+          superseded_at: string | null
+          supersedes_id: string | null
+          training_type: string | null
+          updated_at: string | null
+          worker_id: string | null
+          workload_hours: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          deleted_at?: string | null
+          document_status?: string | null
+          document_url?: string | null
+          expiration_status?: never
+          expires_at?: string | null
+          id?: string | null
+          instructor_name?: string | null
+          issued_at?: string | null
+          notes?: string | null
+          nr_code?: string | null
+          provider_name?: string | null
+          superseded_at?: string | null
+          supersedes_id?: string | null
+          training_type?: string | null
+          updated_at?: string | null
+          worker_id?: string | null
+          workload_hours?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          deleted_at?: string | null
+          document_status?: string | null
+          document_url?: string | null
+          expiration_status?: never
+          expires_at?: string | null
+          id?: string | null
+          instructor_name?: string | null
+          issued_at?: string | null
+          notes?: string | null
+          nr_code?: string | null
+          provider_name?: string | null
+          superseded_at?: string | null
+          supersedes_id?: string | null
+          training_type?: string | null
+          updated_at?: string | null
+          worker_id?: string | null
+          workload_hours?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_sst_qualifications_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "worker_sst_qualifications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_sst_qualifications_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "worker_sst_qualifications_current"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_sst_qualifications_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "worker_sst_qualifications_history"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_sst_qualifications_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       claim_public_invite: {
