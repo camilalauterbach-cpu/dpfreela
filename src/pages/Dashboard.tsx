@@ -1,12 +1,13 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Calendar, Building2, Link2, Eye, AlertCircle, RefreshCw } from "lucide-react";
+import { Users, Calendar, Building2, Link2, Eye, AlertCircle, RefreshCw, ShieldAlert } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { useSstAlertCounts } from "@/hooks/useSstQualifications";
 
 export default function Dashboard() {
   const { hasAnyRole } = useAuth();
@@ -44,6 +45,16 @@ export default function Dashboard() {
     { key: "events", label: "Eventos", value: counts?.events, icon: Calendar, href: "/events", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/30" },
     { key: "companies", label: "Empresas", value: counts?.companies, icon: Building2, href: "/companies", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-950/30" },
     { key: "links", label: "Vínculos", value: counts?.links, icon: Link2, href: "/links", color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-50 dark:bg-violet-950/30" },
+  ];
+
+  const sst = useSstAlertCounts();
+  const sstRows: Array<{ label: string; value: number; href: string; tone: string }> = [
+    { label: "Vencidas", value: (sst.data?.expiredOk ?? 0) + (sst.data?.expiredPending ?? 0), href: "/sst?expiration=expired", tone: "text-red-700" },
+    { label: "Próximas do vencimento (30d)", value: (sst.data?.expiringSoonOk ?? 0) + (sst.data?.expiringSoonPending ?? 0), href: "/sst?expiration=expiring_soon", tone: "text-amber-700" },
+    { label: "Documentos pendentes", value: sst.data?.pending ?? 0, href: "/sst?doc=pending", tone: "text-amber-700" },
+    { label: "Rejeitadas", value: sst.data?.rejected ?? 0, href: "/sst?doc=rejected", tone: "text-red-700" },
+    { label: "Sem comprovante", value: sst.data?.noDocument ?? 0, href: "/sst?doc=no_document", tone: "text-slate-700" },
+    { label: "Validade não informada", value: sst.data?.unknownValidity ?? 0, href: "/sst?validity=unknown", tone: "text-slate-700" },
   ];
 
   return (
@@ -104,6 +115,34 @@ export default function Dashboard() {
           </Card>
         ))}
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4 text-amber-600" />
+            SST — atenção necessária
+          </CardTitle>
+          <Button size="sm" variant="ghost" onClick={() => navigate("/sst")}>Abrir Controle SST</Button>
+        </CardHeader>
+        <CardContent>
+          {sst.isLoading ? (
+            <Skeleton className="h-24 w-full" />
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {sstRows.map((r) => (
+                <button
+                  key={r.label}
+                  onClick={() => navigate(r.href)}
+                  className="text-left rounded-md border px-3 py-2 hover:bg-accent transition-colors"
+                >
+                  <div className="text-xs text-muted-foreground">{r.label}</div>
+                  <div className={`text-xl font-bold ${r.tone}`}>{r.value}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
