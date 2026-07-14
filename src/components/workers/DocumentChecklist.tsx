@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Upload, FileText, Image as ImageIcon, CheckCircle2, XCircle, AlertCircle, Clock, RefreshCw, Loader2, Eye, Plus, CreditCard, ExternalLink, FileDown,
+  Upload, FileText, Image as ImageIcon, CheckCircle2, XCircle, AlertCircle, Clock, RefreshCw, Loader2, Eye, Plus, CreditCard, ExternalLink, FileDown, Trash2,
 } from "lucide-react";
 import {
   REQUIRED_DOC_CATEGORIES,
@@ -74,6 +74,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
   const [previewFileName, setPreviewFileName] = useState<string>("");
   const [showBankForm, setShowBankForm] = useState(false);
   const [bankReplaceAction, setBankReplaceAction] = useState<"upload" | "form" | null>(null);
+  const [deleteConfirmDoc, setDeleteConfirmDoc] = useState<any | null>(null);
 
   const uploadMutation = useMutation({
    mutationFn: async ({ category, file, alwaysInsert }: { category: string; file: File; alwaysInsert?: boolean }) => {
@@ -159,13 +160,17 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
   });
 
   const softDeleteMutation = useMutation({
-    mutationFn: async (docIds: string[]) => {
-      for (const id of docIds) {
+    mutationFn: async (docs: Array<{ id: string; file_path?: string | null }>) => {
+      for (const d of docs) {
         const { error } = await supabase
           .from("worker_documents")
           .update({ deleted_at: new Date().toISOString() })
-          .eq("id", id);
+          .eq("id", d.id);
         if (error) throw error;
+        if (d.file_path) {
+          // best-effort storage cleanup; ignore failures so the DB soft-delete stands
+          await supabase.storage.from("worker-documents").remove([d.file_path]).catch(() => {});
+        }
       }
     },
     onSuccess: () => {
@@ -236,7 +241,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     setBankReplaceAction(null);
 
     if (mode === "replace") {
-      await softDeleteMutation.mutateAsync(bankDocs.map((d) => d.id));
+      await softDeleteMutation.mutateAsync(bankDocs.map((d) => ({ id: d.id, file_path: d.file_path })));
     }
 
     if (action === "upload") {
