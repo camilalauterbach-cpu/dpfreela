@@ -99,6 +99,19 @@ export class ErrorBoundary extends Component<Props, State> {
                 Tentativas: {retryCount}
               </p>
             )}
+            <details className="rounded-md border bg-muted/40 p-2 text-xs">
+              <summary className="cursor-pointer select-none font-medium text-muted-foreground">
+                Detalhes técnicos
+              </summary>
+              <p className="mt-2 break-words font-mono text-[11px] text-destructive">
+                {error.name}: {error.message}
+              </p>
+              {error.stack && (
+                <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] text-muted-foreground">
+                  {error.stack}
+                </pre>
+              )}
+            </details>
           </CardContent>
         </Card>
       </div>
