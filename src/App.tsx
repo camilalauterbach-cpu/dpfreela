@@ -35,6 +35,7 @@ const PayrollForm = lazy(() => import("./pages/PayrollForm"));
 const PayrollDetail = lazy(() => import("./pages/PayrollDetail"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const Sst = lazy(() => import("./pages/Sst"));
+const SstImport = lazy(() => import("./pages/SstImport"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -99,6 +100,7 @@ const App = () => (
                 <Route path="/payroll/:id" element={<PayrollDetail />} />
                 <Route path="/payroll/:id/edit" element={<PayrollForm />} />
                 <Route path="/sst" element={<Sst />} />
+                <Route path="/sst/import" element={<ProtectedRoute requiredRoles={["admin", "manager"]}><SstImport /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute requiredRoles={["admin", "manager"]}><SettingsPage /></ProtectedRoute>} />
                 <Route path="/settings/:tab" element={<ProtectedRoute requiredRoles={["admin", "manager"]}><SettingsPage /></ProtectedRoute>} />
               </Route>
