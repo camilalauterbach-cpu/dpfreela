@@ -696,6 +696,37 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteConfirmDoc} onOpenChange={(open) => !open && setDeleteConfirmDoc(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir documento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O arquivo <strong>{deleteConfirmDoc?.file_name || "selecionado"}</strong> deixará de aparecer no cadastro do trabalhador. Esta ação não pode ser desfeita pela interface.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                const doc = deleteConfirmDoc;
+                setDeleteConfirmDoc(null);
+                if (!doc) return;
+                try {
+                  await softDeleteMutation.mutateAsync([{ id: doc.id, file_path: doc.file_path }]);
+                  toast({ title: "Documento excluído" });
+                } catch (err: any) {
+                  toast({ title: "Erro ao excluir", description: err.message, variant: "destructive" });
+                }
+              }}
+            >
+              Excluir documento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
