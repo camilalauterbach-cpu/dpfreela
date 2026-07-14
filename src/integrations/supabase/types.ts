@@ -1908,6 +1908,7 @@ export type Database = {
         Args: { _confirmation: string; _primary: string; _secondary: string }
         Returns: Json
       }
+      register_sst_revision: { Args: { payload: Json }; Returns: Json }
       release_public_invite: {
         Args: { _error_code: string; _invite_id: string; _nonce: string }
         Returns: Json
