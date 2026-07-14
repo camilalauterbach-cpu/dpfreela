@@ -5,3 +5,6 @@ verify_jwt = true
 
 [functions.admin-deactivate-user]
 verify_jwt = true
+
+[functions.public-invite-accept]
+verify_jwt = false
