@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { formatSupabaseError } from "@/lib/format-error";
 import { useNavigate, useParams } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useMutationWithFeedback } from "@/hooks/useMutationWithFeedback";
+import { useUnsavedFormGuard } from "@/hooks/useUnsavedFormGuard";
 import { supabase } from "@/integrations/supabase/client";
 import { useEvent } from "@/hooks/useEvents";
 import { useQuery } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -49,7 +49,6 @@ export default function EventForm() {
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: existing, isLoading: loadingExisting } = useEvent(id);
   const { data: companies } = useQuery({
@@ -69,6 +68,8 @@ export default function EventForm() {
 
   const [form, setForm] = useState<EventFormData>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isDirty, setIsDirty] = useState(false);
+  useUnsavedFormGuard(isDirty, `event-form-${id ?? "new"}`);
 
   useEffect(() => {
     if (existing) {
@@ -89,16 +90,19 @@ export default function EventForm() {
         required_nrs: ev.required_nrs ?? [],
         required_nrs_other: ev.required_nrs_other ?? "",
       });
+      setIsDirty(false);
     }
   }, [existing]);
 
   const set = (field: keyof EventFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm((f) => ({ ...f, [field]: e.target.value }));
     setErrors((prev) => ({ ...prev, [field]: "" }));
+    setIsDirty(true);
   };
 
   const setSelect = (field: keyof EventFormData) => (value: string) => {
     setForm((f) => ({ ...f, [field]: value }));
+    setIsDirty(true);
   };
 
   const toggleNr = (nr: string) => {
@@ -108,6 +112,7 @@ export default function EventForm() {
         ? f.required_nrs.filter((n) => n !== nr)
         : [...f.required_nrs, nr],
     }));
+    setIsDirty(true);
   };
 
   const validate = (): boolean => {
@@ -120,7 +125,10 @@ export default function EventForm() {
     return Object.keys(errs).length === 0;
   };
 
-  const mutation = useMutation({
+  const mutation = useMutationWithFeedback<void, unknown, void, unknown>({
+    pendingMessage: isEdit ? "Salvando alterações…" : "Cadastrando evento…",
+    successMessage: isEdit ? "Evento atualizado" : "Evento cadastrado",
+    errorTitle: "Erro ao salvar evento",
     mutationFn: async () => {
       const payload: Record<string, any> = {
         name: form.name.trim(),
@@ -149,17 +157,20 @@ export default function EventForm() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
-      toast({ title: isEdit ? "Evento atualizado" : "Evento cadastrado" });
+      if (isEdit) {
+        queryClient.invalidateQueries({ queryKey: ["event", id] });
+        queryClient.invalidateQueries({ queryKey: ["employment-links"] });
+        queryClient.invalidateQueries({ queryKey: ["link-groups"] });
+      }
+      setIsDirty(false);
       navigate("/events");
-    },
-    onError: (err: any) => {
-      toast({ title: "Erro ao salvar", description: formatSupabaseError(err), variant: "destructive" });
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) mutation.mutate();
+    if (mutation.isPending || mutation.isLocked()) return;
+    if (validate()) mutation.mutate(undefined);
   };
 
   if (isEdit && loadingExisting) {
@@ -307,11 +318,13 @@ export default function EventForm() {
         </Card>
 
         <div className="flex gap-3">
-          <Button type="submit" disabled={mutation.isPending}>
+          <Button type="submit" disabled={mutation.isPending} aria-busy={mutation.isPending}>
             {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEdit ? "Salvar alterações" : "Cadastrar"}
+            {mutation.isPending
+              ? (isEdit ? "Salvando…" : "Cadastrando…")
+              : (isEdit ? "Salvar alterações" : "Cadastrar")}
           </Button>
-          <Button type="button" variant="outline" onClick={() => navigate("/events")}>Cancelar</Button>
+          <Button type="button" variant="outline" onClick={() => navigate("/events")} disabled={mutation.isPending}>Cancelar</Button>
         </div>
       </form>
     </div>

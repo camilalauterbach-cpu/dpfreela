@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useMutationWithFeedback } from "@/hooks/useMutationWithFeedback";
+import { useUnsavedFormGuard } from "@/hooks/useUnsavedFormGuard";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/hooks/useCompanies";
-import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -35,12 +36,13 @@ export default function CompanyForm() {
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: existing, isLoading: loadingExisting } = useCompany(id);
 
   const [form, setForm] = useState<CompanyFormData>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isDirty, setIsDirty] = useState(false);
+  useUnsavedFormGuard(isDirty, `company-form-${id ?? "new"}`);
 
   useEffect(() => {
     if (existing) {
@@ -55,16 +57,19 @@ export default function CompanyForm() {
         state: existing.state || "",
         notes: existing.notes || "",
       });
+      setIsDirty(false);
     }
   }, [existing]);
 
   const set = (field: keyof CompanyFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm((f) => ({ ...f, [field]: e.target.value }));
     setErrors((prev) => ({ ...prev, [field]: "" }));
+    setIsDirty(true);
   };
 
   const setSelect = (field: keyof CompanyFormData) => (value: string) => {
     setForm((f) => ({ ...f, [field]: value }));
+    setIsDirty(true);
   };
 
   const validate = (): boolean => {
@@ -79,7 +84,10 @@ export default function CompanyForm() {
     return Object.keys(errs).length === 0;
   };
 
-  const mutation = useMutation({
+  const mutation = useMutationWithFeedback<void, unknown, void, unknown>({
+    pendingMessage: isEdit ? "Salvando alterações…" : "Cadastrando empresa…",
+    successMessage: isEdit ? "Empresa atualizada" : "Empresa cadastrada",
+    errorTitle: "Erro ao salvar empresa",
     mutationFn: async () => {
       const payload = {
         legal_name: form.legal_name.trim(),
@@ -103,22 +111,26 @@ export default function CompanyForm() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["companies"] });
-      toast({ title: isEdit ? "Empresa atualizada" : "Empresa cadastrada" });
+      if (isEdit) {
+        queryClient.invalidateQueries({ queryKey: ["company", id] });
+        queryClient.invalidateQueries({ queryKey: ["employment-links"] });
+        queryClient.invalidateQueries({ queryKey: ["events"] });
+      }
+      setIsDirty(false);
       navigate("/companies");
     },
     onError: (err: any) => {
       const msg = err?.message || "";
       if (msg.includes("companies_cnpj_key")) {
         setErrors({ cnpj: "Este CNPJ já está cadastrado" });
-      } else {
-        toast({ title: "Erro ao salvar", description: msg, variant: "destructive" });
       }
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) mutation.mutate();
+    if (mutation.isPending || mutation.isLocked()) return;
+    if (validate()) mutation.mutate(undefined);
   };
 
   if (isEdit && loadingExisting) {
@@ -203,11 +215,13 @@ export default function CompanyForm() {
         </Card>
 
         <div className="flex gap-3">
-          <Button type="submit" disabled={mutation.isPending}>
+          <Button type="submit" disabled={mutation.isPending} aria-busy={mutation.isPending}>
             {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEdit ? "Salvar alterações" : "Cadastrar"}
+            {mutation.isPending
+              ? (isEdit ? "Salvando…" : "Cadastrando…")
+              : (isEdit ? "Salvar alterações" : "Cadastrar")}
           </Button>
-          <Button type="button" variant="outline" onClick={() => navigate("/companies")}>Cancelar</Button>
+          <Button type="button" variant="outline" onClick={() => navigate("/companies")} disabled={mutation.isPending}>Cancelar</Button>
         </div>
       </form>
     </div>

@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutationWithFeedback } from "@/hooks/useMutationWithFeedback";
+import { useUnsavedFormGuard } from "@/hooks/useUnsavedFormGuard";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +19,6 @@ interface Props {
 }
 
 export function PayrollItemForm({ batchId, eventId, existing, onClose }: Props) {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const isEdit = !!existing;
 
@@ -29,6 +29,9 @@ export function PayrollItemForm({ batchId, eventId, existing, onClose }: Props) 
   const [bonuses, setBonuses] = useState(existing?.bonuses?.toString() || "0");
   const [deductions, setDeductions] = useState(existing?.deductions?.toString() || "0");
   const [notes, setNotes] = useState(existing?.notes || "");
+  const [isDirty, setIsDirty] = useState(false);
+  useUnsavedFormGuard(isDirty, `payroll-item-${existing?.id ?? `new-${batchId}`}`);
+  const markDirty = () => setIsDirty(true);
 
   const net = (Number(baseAmount) || 0) + (Number(overtimeAmount) || 0) + (Number(bonuses) || 0) - (Number(deductions) || 0);
 
@@ -64,7 +67,10 @@ export function PayrollItemForm({ batchId, eventId, existing, onClose }: Props) 
     },
   });
 
-  const mutation = useMutation({
+  const mutation = useMutationWithFeedback<void, unknown, void, unknown>({
+    pendingMessage: isEdit ? "Salvando item…" : "Adicionando item…",
+    successMessage: isEdit ? "Item atualizado" : "Item adicionado",
+    errorTitle: "Erro ao salvar item",
     mutationFn: async () => {
       const payload = {
         base_amount: Number(baseAmount) || 0,
@@ -90,11 +96,17 @@ export function PayrollItemForm({ batchId, eventId, existing, onClose }: Props) 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payroll-batch-items", batchId] });
-      toast({ title: isEdit ? "Item atualizado" : "Item adicionado" });
+      queryClient.invalidateQueries({ queryKey: ["payroll-batch", batchId] });
+      queryClient.invalidateQueries({ queryKey: ["payroll-batches"] });
+      setIsDirty(false);
       onClose();
     },
-    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
+
+  const handleSave = () => {
+    if (mutation.isPending || mutation.isLocked()) return;
+    mutation.mutate(undefined);
+  };
 
   return (
     <Card>
@@ -110,7 +122,7 @@ export function PayrollItemForm({ batchId, eventId, existing, onClose }: Props) 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Trabalhador *</Label>
-              <Select value={workerId} onValueChange={(v) => { setWorkerId(v); setLinkId(""); }}>
+              <Select value={workerId} onValueChange={(v) => { setWorkerId(v); setLinkId(""); markDirty(); }}>
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
                   {(workers ?? []).map((w: any) => (
@@ -123,7 +135,7 @@ export function PayrollItemForm({ batchId, eventId, existing, onClose }: Props) 
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Vínculo (opcional)</Label>
-              <Select value={linkId || "__none__"} onValueChange={(v) => setLinkId(v === "__none__" ? "" : v)} disabled={!workerId}>
+              <Select value={linkId || "__none__"} onValueChange={(v) => { setLinkId(v === "__none__" ? "" : v); markDirty(); }} disabled={!workerId}>
                 <SelectTrigger><SelectValue placeholder="Sem vínculo" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Sem vínculo</SelectItem>
@@ -141,19 +153,19 @@ export function PayrollItemForm({ batchId, eventId, existing, onClose }: Props) 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="space-y-1">
             <Label className="text-xs">Base (R$)</Label>
-            <Input type="number" step="0.01" value={baseAmount} onChange={(e) => setBaseAmount(e.target.value)} />
+            <Input type="number" step="0.01" value={baseAmount} onChange={(e) => { setBaseAmount(e.target.value); markDirty(); }} />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Extras (R$)</Label>
-            <Input type="number" step="0.01" value={overtimeAmount} onChange={(e) => setOvertimeAmount(e.target.value)} />
+            <Input type="number" step="0.01" value={overtimeAmount} onChange={(e) => { setOvertimeAmount(e.target.value); markDirty(); }} />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Bônus (R$)</Label>
-            <Input type="number" step="0.01" value={bonuses} onChange={(e) => setBonuses(e.target.value)} />
+            <Input type="number" step="0.01" value={bonuses} onChange={(e) => { setBonuses(e.target.value); markDirty(); }} />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Descontos (R$)</Label>
-            <Input type="number" step="0.01" value={deductions} onChange={(e) => setDeductions(e.target.value)} />
+            <Input type="number" step="0.01" value={deductions} onChange={(e) => { setDeductions(e.target.value); markDirty(); }} />
           </div>
         </div>
 
@@ -163,15 +175,15 @@ export function PayrollItemForm({ batchId, eventId, existing, onClose }: Props) 
 
         <div className="space-y-1">
           <Label className="text-xs">Observações</Label>
-          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+          <Textarea value={notes} onChange={(e) => { setNotes(e.target.value); markDirty(); }} rows={2} />
         </div>
 
         <div className="flex gap-2">
-          <Button size="sm" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+          <Button size="sm" onClick={handleSave} disabled={mutation.isPending} aria-busy={mutation.isPending}>
             {mutation.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
-            Salvar
+            {mutation.isPending ? "Salvando…" : "Salvar"}
           </Button>
-          <Button size="sm" variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button size="sm" variant="outline" onClick={onClose} disabled={mutation.isPending}>Cancelar</Button>
         </div>
       </CardContent>
     </Card>
