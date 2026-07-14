@@ -45,6 +45,9 @@ interface Filters {
   nr?: string;
   expiration?: "" | ExpirationStatus;
   doc?: "" | DocumentStatus;
+  validity?: "" | ValidityStatus;
+  /** Filtra vencendo nos próximos N dias (inclui já vencidos? — não; apenas próximos N a partir de hoje). */
+  daysUntil?: number | null;
 }
 
 /** Invalida todas as queries relacionadas ao Controle SST e à listagem de docs de vínculo. */
@@ -117,6 +120,22 @@ export function useSstOverview(filters: Filters) {
       if (filters.doc) {
         list = list.filter((w) =>
           w.qualifications.some((q) => q.document_status === filters.doc)
+        );
+      }
+      if (filters.validity) {
+        list = list.filter((w) =>
+          w.qualifications.some((q) => q.validity_status === filters.validity)
+        );
+      }
+      if (filters.daysUntil && filters.daysUntil > 0) {
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() + filters.daysUntil);
+        list = list.filter((w) =>
+          w.qualifications.some((q) => {
+            if (!q.expires_at) return false;
+            const d = new Date(q.expires_at + "T00:00:00");
+            return d >= today && d <= cutoff;
+          })
         );
       }
 
