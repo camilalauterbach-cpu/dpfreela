@@ -54,7 +54,9 @@ interface Filters {
 export function invalidateSstCaches(qc: QueryClient, opts?: { linkDocsOwnerId?: string }) {
   qc.invalidateQueries({ queryKey: ["sst-qualifications"] });
   qc.invalidateQueries({ queryKey: ["sst-summary"] });
+  qc.invalidateQueries({ queryKey: ["sst-alert-counts"] });
   qc.invalidateQueries({ queryKey: ["sst-worker-details"] });
+  qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
   if (opts?.linkDocsOwnerId) {
     qc.invalidateQueries({ queryKey: ["link-docs", opts.linkDocsOwnerId] });
   } else {
