@@ -20,6 +20,35 @@ import { exportLinkDocsZip } from "@/lib/export-docs-zip";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { validateUpload, ALLOWED_FILE_EXTENSIONS, getSafeContentType } from "@/lib/upload-validation";
+import { NrValidityDialog, type NrDialogContext, type NrDialogPhase } from "@/components/sst/NrValidityDialog";
+import { NR_OPTIONS } from "@/lib/link-document-config";
+import { invalidateSstCaches } from "@/hooks/useSstQualifications";
+
+// Categorias que NÃO devem disparar a pergunta "é NR/SST?" na área "Outros/Outros operacionais"
+const NON_SST_CATEGORIES = new Set<string>([
+  "ordem_servico",
+  "ficha_epi",
+  "aso_vinculo",
+  // legado / empresa
+  "apr", "ltcat", "pcmso", "pgr",
+  "seguro_equipamentos", "seguro_responsabilidade", "outros_empresa",
+]);
+
+function isNrCategory(cat: string): boolean {
+  if (cat === "nr_custom") return true;
+  return NR_OPTIONS.some((o) => o.value === cat);
+}
+function isOutrosCategory(cat: string): boolean {
+  return cat === "outros_operacionais" || cat === "operational_custom";
+}
+function nrCodeFromCategory(cat: string): string | undefined {
+  const match = cat.match(/^nr_(\d+)$/i);
+  return match ? `NR-${match[1]}` : undefined;
+}
+function nrLabelFromCategory(cat: string): string | undefined {
+  const opt = NR_OPTIONS.find((o) => o.value === cat);
+  return opt?.label;
+}
 
 interface Props {
   workerId: string;
@@ -56,6 +85,9 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
   const canManage = hasAnyRole(["admin", "manager", "operator"]);
   const queryClient = useQueryClient();
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [nrDialogOpen, setNrDialogOpen] = useState(false);
+  const [nrDialogPhase, setNrDialogPhase] = useState<Exclude<NrDialogPhase, null>>("ask_control");
+  const [nrDialogCtx, setNrDialogCtx] = useState<NrDialogContext | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewMime, setPreviewMime] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState(false);
@@ -111,6 +143,7 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
       if (uploadErr) throw uploadErr;
 
       const existing = linkDocs?.find((d: any) => d.category === category);
+      let docId: string | undefined;
       if (existing) {
         const { error } = await supabase
           .from("employment_link_documents")
@@ -123,6 +156,7 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
           } as any)
           .eq("id", existing.id);
         if (error) throw error;
+        docId = existing.id;
       } else {
         const insertPayload: Record<string, any> = {
           worker_id: workerId,
@@ -139,15 +173,39 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
         } else {
           insertPayload.employment_link_id = employmentLinkId;
         }
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
           .from("employment_link_documents")
-          .insert(insertPayload as any);
+          .insert(insertPayload as any)
+          .select("id")
+          .single();
         if (error) throw error;
+        docId = (inserted as any)?.id;
       }
+      return { category, docId };
     },
-    onSuccess: () => {
+    onSuccess: ({ category, docId }) => {
       queryClient.invalidateQueries({ queryKey: ["link-docs", docOwnerId] });
+      invalidateSstCaches(queryClient, { linkDocsOwnerId: docOwnerId as string });
       toast({ title: "Documento enviado" });
+      if (docId && canManage) {
+        const isNr = isNrCategory(category);
+        const isOutros = isOutrosCategory(category);
+        if (!isNr && !isOutros) return;
+        if (isOutros && NON_SST_CATEGORIES.has(category)) return;
+        setNrDialogCtx({
+          workerId,
+          linkGroupWorkerId: linkGroupWorkerId,
+          eventId: event?.id ?? null,
+          companyId: event?.company_id ?? null,
+          employmentLinkDocumentId: docId,
+          docStatus: "uploaded",
+          suggestedNrCode: nrCodeFromCategory(category),
+          suggestedLabel: nrLabelFromCategory(category),
+          isOutrosCategory: isOutros,
+        });
+        setNrDialogPhase(isOutros ? "ask_is_nr" : "ask_control");
+        setNrDialogOpen(true);
+      }
     },
     onError: (err: any) => {
       toast({ title: "Erro no upload", description: formatSupabaseError(err), variant: "destructive" });
@@ -164,6 +222,7 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["link-docs", docOwnerId] });
+      invalidateSstCaches(queryClient, { linkDocsOwnerId: docOwnerId as string });
     },
   });
 
