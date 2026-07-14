@@ -447,6 +447,17 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
                       </SelectContent>
                     </Select>
                   )}
+                  {canEdit && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => setDeleteConfirmDoc(doc)}
+                      aria-label="Excluir documento"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
               </div>
             );
@@ -535,6 +546,17 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
                         <SelectItem value="replace">Substituir</SelectItem>
                       </SelectContent>
                     </Select>
+                  )}
+                  {canEdit && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => setDeleteConfirmDoc(doc)}
+                      aria-label="Excluir documento"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
                   )}
                 </div>
               </div>
