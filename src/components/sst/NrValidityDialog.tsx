@@ -113,21 +113,21 @@ export function NrValidityDialog({ open, onOpenChange, initialPhase, context }: 
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (revision === "replacement") {
-        // Substituir preservando histórico: soft-delete o ativo principal e insere novo 'initial'
-        const active = (dupQuery.data || []).filter((d) => d.revision_type !== "additional");
-        for (const a of active) {
-          const { error } = await (supabase as any)
-            .from("worker_sst_qualifications")
-            .update({ deleted_at: new Date().toISOString() })
-            .eq("id", a.id);
-          if (error) throw error;
-        }
-      }
+      // Determina a operação (initial / renewal / replacement / additional)
+      const operation =
+        phase === "duplicity"
+          ? revision // 'renewal' | 'replacement' | 'additional'
+          : "initial";
+
+      // Previous ativa principal (para renewal/replacement)
+      const activeMain = (dupQuery.data || []).find((d) => d.revision_type !== "additional");
 
       const payload: Record<string, unknown> = {
         worker_id: context.workerId,
         nr_code: effectiveNr,
+        operation,
+        previous_qualification_id:
+          operation === "renewal" || operation === "replacement" ? activeMain?.id ?? null : null,
         training_type: description.trim() || null,
         issued_at: issuedAt,
         expires_at: validity === "has_expiry" && expiresAt ? expiresAt : null,
@@ -139,17 +139,10 @@ export function NrValidityDialog({ open, onOpenChange, initialPhase, context }: 
         event_id: context.eventId ?? null,
         company_id: context.companyId ?? null,
         source_type: "link_document",
-        revision_type:
-          phase === "duplicity"
-            ? revision === "additional" ? "additional"
-              : revision === "replacement" ? "initial"
-              : "renewal"
-            : "initial",
         document_status: docStatusFromLinkDoc(context.docStatus),
       };
-      const { error } = await (supabase as any)
-        .from("worker_sst_qualifications")
-        .insert(payload);
+
+      const { error } = await (supabase as any).rpc("register_sst_revision", { payload });
       if (error) throw error;
     },
     onSuccess: () => {
