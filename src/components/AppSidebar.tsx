@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { useSstAlertCounts } from "@/hooks/useSstQualifications";
 
 const mainItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -37,6 +39,12 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, hasAnyRole, user } = useAuth();
+  const alerts = useSstAlertCounts();
+  const sstBadge =
+    (alerts.data?.expiredOk ?? 0) +
+    (alerts.data?.expiredPending ?? 0) +
+    (alerts.data?.expiringSoonOk ?? 0) +
+    (alerts.data?.expiringSoonPending ?? 0);
 
   const isActive = (path: string) => {
     if (path === "/") return location.pathname === "/";
@@ -77,6 +85,11 @@ export function AppSidebar() {
                     <NavLink to={item.url} end={item.url === "/"} className="hover:bg-sidebar-accent/50" onClick={(e) => handleNavClick(e, item.url)}>
                       <item.icon className="h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
+                      {item.url === "/sst" && sstBadge > 0 && !collapsed && (
+                        <Badge variant="destructive" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px]">
+                          {sstBadge > 99 ? "99+" : sstBadge}
+                        </Badge>
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
