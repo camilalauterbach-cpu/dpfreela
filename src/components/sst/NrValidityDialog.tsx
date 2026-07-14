@@ -72,6 +72,22 @@ export function NrValidityDialog({ open, onOpenChange, initialPhase, context }: 
     }
   }, [open, initialPhase, context.suggestedNrCode, context.suggestedLabel]);
 
+  // Resolve link_group_id se somente linkGroupWorkerId veio
+  const groupQuery = useQuery({
+    queryKey: ["lgw-group-resolve", context.linkGroupWorkerId],
+    enabled: open && !!context.linkGroupWorkerId && !context.linkGroupId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("link_group_workers")
+        .select("link_group_id")
+        .eq("id", context.linkGroupWorkerId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.link_group_id ?? null;
+    },
+  });
+  const resolvedGroupId = context.linkGroupId ?? groupQuery.data ?? null;
+
   // Verifica duplicidade quando entra na fase de form (ou antes)
   const effectiveNr = (otherNr ? nrCode : (context.suggestedNrCode || nrCode)).trim().toUpperCase();
   const dupQuery = useQuery({
@@ -119,7 +135,7 @@ export function NrValidityDialog({ open, onOpenChange, initialPhase, context }: 
         notes: notes.trim() || null,
         employment_link_document_id: context.employmentLinkDocumentId,
         link_group_worker_id: context.linkGroupWorkerId ?? null,
-        link_group_id: context.linkGroupId ?? null,
+        link_group_id: resolvedGroupId,
         event_id: context.eventId ?? null,
         company_id: context.companyId ?? null,
         source_type: "link_document",
