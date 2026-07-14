@@ -1083,6 +1083,57 @@ export type Database = {
           },
         ]
       }
+      worker_duplicate_reviews: {
+        Row: {
+          created_at: string
+          criteria: string
+          decision: string
+          id: string
+          reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          worker_a_id: string
+          worker_b_id: string
+        }
+        Insert: {
+          created_at?: string
+          criteria: string
+          decision?: string
+          id?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          worker_a_id: string
+          worker_b_id: string
+        }
+        Update: {
+          created_at?: string
+          criteria?: string
+          decision?: string
+          id?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          worker_a_id?: string
+          worker_b_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_duplicate_reviews_worker_a_id_fkey"
+            columns: ["worker_a_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_duplicate_reviews_worker_b_id_fkey"
+            columns: ["worker_b_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       worker_payment_methods: {
         Row: {
           account_number: string | null
@@ -1162,6 +1213,7 @@ export type Database = {
           blood_type: string | null
           city: string | null
           cpf: string
+          cpf_normalized: string | null
           created_at: string
           ctps_number: string | null
           ctps_series: string | null
@@ -1177,8 +1229,12 @@ export type Database = {
           id: string
           is_pcd: boolean
           is_rehabilitated: boolean
+          linked_profile_id: string | null
           marital_status: string | null
           medical_conditions: string | null
+          merged_at: string | null
+          merged_by: string | null
+          merged_into_worker_id: string | null
           mother_name: string | null
           nationality: string | null
           neighborhood: string | null
@@ -1190,6 +1246,7 @@ export type Database = {
           phone_main: string | null
           phone_secondary: string | null
           race_color: string | null
+          registration_status: string
           rg: string | null
           rg_issue_date: string | null
           rg_issuer: string | null
@@ -1211,6 +1268,7 @@ export type Database = {
           blood_type?: string | null
           city?: string | null
           cpf: string
+          cpf_normalized?: string | null
           created_at?: string
           ctps_number?: string | null
           ctps_series?: string | null
@@ -1226,8 +1284,12 @@ export type Database = {
           id?: string
           is_pcd?: boolean
           is_rehabilitated?: boolean
+          linked_profile_id?: string | null
           marital_status?: string | null
           medical_conditions?: string | null
+          merged_at?: string | null
+          merged_by?: string | null
+          merged_into_worker_id?: string | null
           mother_name?: string | null
           nationality?: string | null
           neighborhood?: string | null
@@ -1239,6 +1301,7 @@ export type Database = {
           phone_main?: string | null
           phone_secondary?: string | null
           race_color?: string | null
+          registration_status?: string
           rg?: string | null
           rg_issue_date?: string | null
           rg_issuer?: string | null
@@ -1260,6 +1323,7 @@ export type Database = {
           blood_type?: string | null
           city?: string | null
           cpf?: string
+          cpf_normalized?: string | null
           created_at?: string
           ctps_number?: string | null
           ctps_series?: string | null
@@ -1275,8 +1339,12 @@ export type Database = {
           id?: string
           is_pcd?: boolean
           is_rehabilitated?: boolean
+          linked_profile_id?: string | null
           marital_status?: string | null
           medical_conditions?: string | null
+          merged_at?: string | null
+          merged_by?: string | null
+          merged_into_worker_id?: string | null
           mother_name?: string | null
           nationality?: string | null
           neighborhood?: string | null
@@ -1288,6 +1356,7 @@ export type Database = {
           phone_main?: string | null
           phone_secondary?: string | null
           race_color?: string | null
+          registration_status?: string
           rg?: string | null
           rg_issue_date?: string | null
           rg_issuer?: string | null
@@ -1299,7 +1368,22 @@ export type Database = {
           updated_at?: string
           zip_code?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "workers_linked_profile_id_fkey"
+            columns: ["linked_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workers_merged_into_worker_id_fkey"
+            columns: ["merged_into_worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -1334,6 +1418,9 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_valid_cpf: { Args: { _cpf: string }; Returns: boolean }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       app_role: "admin" | "manager" | "operator" | "viewer"
