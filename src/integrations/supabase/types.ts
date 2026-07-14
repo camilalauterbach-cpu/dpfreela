@@ -1396,6 +1396,7 @@ export type Database = {
           roles: Database["public"]["Enums"]["app_role"][]
         }[]
       }
+      ensure_worker: { Args: { mode?: string; payload: Json }; Returns: Json }
       get_audit_user_emails: {
         Args: { _user_ids: string[] }
         Returns: {
