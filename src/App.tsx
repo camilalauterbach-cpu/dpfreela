@@ -35,6 +35,7 @@ const PayrollForm = lazy(() => import("./pages/PayrollForm"));
 const PayrollDetail = lazy(() => import("./pages/PayrollDetail"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const Sst = lazy(() => import("./pages/Sst"));
+const SstImport = lazy(() => import("./pages/SstImport"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
