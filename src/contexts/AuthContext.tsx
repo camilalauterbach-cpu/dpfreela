@@ -54,11 +54,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchRolesFresh = async (userId: string): Promise<AppRole[]> => {
     try {
-      const { data: ensuredAccess, error: ensureError } = await withTimeout(
-        supabase.rpc("ensure_current_user_access"),
+      const res = await withTimeout(
+        Promise.resolve(supabase.rpc("ensure_current_user_access")),
         ACCESS_RPC_TIMEOUT_MS,
         "ensure_current_user_access"
       );
+      const ensuredAccess = (res as any).data;
+      const ensureError = (res as any).error;
       if (!ensureError && ensuredAccess?.[0]?.roles?.length) {
         return ensuredAccess[0].roles as AppRole[];
       }
@@ -70,13 +72,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const { data, error } = await withTimeout(
-        supabase.from("user_roles").select("role").eq("user_id", userId),
+      const res = await withTimeout(
+        Promise.resolve(
+          supabase.from("user_roles").select("role").eq("user_id", userId)
+        ),
         ACCESS_RPC_TIMEOUT_MS,
         "user_roles"
       );
+      const data = (res as any).data;
+      const error = (res as any).error;
       if (error) return [];
-      return (data || []).map((r) => r.role as AppRole);
+      return (data || []).map((r: any) => r.role as AppRole);
     } catch (err) {
       // eslint-disable-next-line no-console
       console.warn("[auth] user_roles read failed:", err);
