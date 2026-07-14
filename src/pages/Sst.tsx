@@ -16,13 +16,18 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 const EXP_LABEL: Record<ExpirationStatus, string> = {
-  valid: "Válido", expiring_soon: "Vence em 30d", expired: "Vencido", no_expiry: "Sem validade",
+  valid: "Válido",
+  expiring_soon: "Vence em 30d",
+  expired: "Vencido",
+  no_expiry: "Sem validade",
+  unknown: "Validade desconhecida",
 };
 const EXP_CLASS: Record<ExpirationStatus, string> = {
   valid: "bg-emerald-100 text-emerald-800 border-emerald-200",
   expiring_soon: "bg-amber-100 text-amber-800 border-amber-200",
   expired: "bg-red-100 text-red-800 border-red-200",
   no_expiry: "bg-slate-100 text-slate-700 border-slate-200",
+  unknown: "bg-slate-100 text-slate-700 border-slate-200",
 };
 const DOC_LABEL: Record<DocumentStatus, string> = {
   pending: "Doc. pendente", ok: "Doc. ok", rejected: "Doc. rejeitado", no_document: "Sem comprovante",
