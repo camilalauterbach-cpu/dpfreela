@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useMutationWithFeedback } from "@/hooks/useMutationWithFeedback";
+import { useUnsavedFormGuard } from "@/hooks/useUnsavedFormGuard";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorker } from "@/hooks/useWorkers";
 import { validateCpf, normalizeCpf } from "@/lib/validators";
@@ -99,6 +101,8 @@ export default function WorkerForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [operationalOpen, setOperationalOpen] = useState(false);
   const [loadedId, setLoadedId] = useState<string | undefined>(undefined);
+  const [isDirty, setIsDirty] = useState(false);
+  useUnsavedFormGuard(isDirty, `worker-form-${id ?? "new"}`);
 
   // Reset form when switching between workers or from edit to new
   useEffect(() => {
@@ -106,6 +110,7 @@ export default function WorkerForm() {
       setForm(emptyForm);
       setErrors({});
       setLoadedId(undefined);
+      setIsDirty(false);
     }
   }, [isEdit, id]);
 
@@ -156,21 +161,25 @@ export default function WorkerForm() {
       });
       setLoadedId(existing.id);
       setErrors({});
+      setIsDirty(false);
     }
   }, [existing, loadedId]);
 
   const set = (field: keyof WorkerFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm((f) => ({ ...f, [field]: e.target.value }));
     setErrors((prev) => ({ ...prev, [field]: "" }));
+    setIsDirty(true);
   };
 
   const setSelect = (field: keyof WorkerFormData) => (value: string) => {
     setForm((f) => ({ ...f, [field]: value }));
     setErrors((prev) => ({ ...prev, [field]: "" }));
+    setIsDirty(true);
   };
 
   const setSwitch = (field: keyof WorkerFormData) => (checked: boolean) => {
     setForm((f) => ({ ...f, [field]: checked }));
+    setIsDirty(true);
   };
 
   const validate = (): boolean => {
@@ -189,7 +198,10 @@ export default function WorkerForm() {
     return Object.keys(errs).length === 0;
   };
 
-  const mutation = useMutation({
+  const mutation = useMutationWithFeedback<void, unknown, void, unknown>({
+    pendingMessage: isEdit ? "Salvando alterações…" : "Cadastrando trabalhador…",
+    successMessage: isEdit ? "Trabalhador atualizado" : "Trabalhador cadastrado",
+    errorTitle: "Erro ao salvar trabalhador",
     mutationFn: async () => {
       const cleanCpf = normalizeCpf(form.cpf);
       const payload: Record<string, any> = {
@@ -246,7 +258,10 @@ export default function WorkerForm() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workers"] });
-      toast({ title: isEdit ? "Trabalhador atualizado" : "Trabalhador cadastrado" });
+      if (isEdit) {
+        queryClient.invalidateQueries({ queryKey: ["worker", id] });
+      }
+      setIsDirty(false);
       navigate("/workers");
     },
     onError: (err: any) => {
@@ -255,15 +270,14 @@ export default function WorkerForm() {
         setErrors({ cpf: "Este CPF já está cadastrado" });
       } else if (msg.includes("workers_cpf_check")) {
         setErrors({ cpf: "CPF deve conter exatamente 11 dígitos numéricos" });
-      } else {
-        toast({ title: "Erro ao salvar", description: msg, variant: "destructive" });
       }
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) mutation.mutate();
+    if (mutation.isPending || mutation.isLocked()) return;
+    if (validate()) mutation.mutate(undefined);
   };
 
   if (isEdit && loadingExisting) {
@@ -580,11 +594,13 @@ export default function WorkerForm() {
         </Card>
 
         <div className="flex gap-3">
-          <Button type="submit" disabled={mutation.isPending}>
+          <Button type="submit" disabled={mutation.isPending} aria-busy={mutation.isPending}>
             {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEdit ? "Salvar alterações" : "Cadastrar"}
+            {mutation.isPending
+              ? (isEdit ? "Salvando…" : "Cadastrando…")
+              : (isEdit ? "Salvar alterações" : "Cadastrar")}
           </Button>
-          <Button type="button" variant="outline" onClick={() => navigate("/workers")}>Cancelar</Button>
+          <Button type="button" variant="outline" onClick={() => navigate("/workers")} disabled={mutation.isPending}>Cancelar</Button>
         </div>
       </form>
     </div>
