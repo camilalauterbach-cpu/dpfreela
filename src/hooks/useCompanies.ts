@@ -3,6 +3,18 @@ import { supabase } from "@/integrations/supabase/client";
 
 const PAGE_SIZE = 20;
 
+// Escape characters that carry meaning in PostgREST filter grammar (`,`, `(`, `)`)
+// and in SQL LIKE patterns (`%`, `_`, `\`). Without this, a crafted search term
+// can inject additional OR-conditions into a `.or()` call.
+function escapePostgrestLike(term: string): string {
+  return term
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_")
+    .replace(/[(),]/g, " ")
+    .trim();
+}
+
 interface CompanyFilters {
   search: string;
   city?: string;
@@ -24,11 +36,12 @@ export function useCompanies(filters: CompanyFilters | string, page: number = 0)
       const { search, city, state } = normalizedFilters;
 
       if (search?.trim()) {
-        const term = search.trim();
-        const cleanTerm = term.replace(/\D/g, "");
+        const rawTerm = search.trim();
+        const cleanTerm = rawTerm.replace(/\D/g, "");
+        const term = escapePostgrestLike(rawTerm);
         if (cleanTerm.length >= 3 && /^\d+$/.test(cleanTerm)) {
           query = query.ilike("cnpj", `%${cleanTerm}%`);
-        } else {
+        } else if (term) {
           query = query.or(`legal_name.ilike.%${term}%,trade_name.ilike.%${term}%`);
         }
       }
