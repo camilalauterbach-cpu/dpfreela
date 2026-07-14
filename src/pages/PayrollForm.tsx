@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useMutationWithFeedback } from "@/hooks/useMutationWithFeedback";
+import { useUnsavedFormGuard } from "@/hooks/useUnsavedFormGuard";
 import { supabase } from "@/integrations/supabase/client";
 import { usePayrollBatch } from "@/hooks/usePayroll";
 import { useEvents } from "@/hooks/useEvents";
-import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +18,6 @@ export default function PayrollForm() {
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: existing, isLoading: loadingExisting } = usePayrollBatch(id);
   const { data: events } = useEvents("", "all");
@@ -26,6 +26,8 @@ export default function PayrollForm() {
   const [eventId, setEventId] = useState<string>("");
   const [referenceMonth, setReferenceMonth] = useState("");
   const [notes, setNotes] = useState("");
+  const [isDirty, setIsDirty] = useState(false);
+  useUnsavedFormGuard(isDirty, `payroll-form-${id ?? "new"}`);
 
   useEffect(() => {
     if (existing) {
@@ -33,10 +35,14 @@ export default function PayrollForm() {
       setEventId(existing.event_id || "");
       setReferenceMonth(existing.reference_month || "");
       setNotes(existing.notes || "");
+      setIsDirty(false);
     }
   }, [existing]);
 
-  const mutation = useMutation({
+  const mutation = useMutationWithFeedback<string | undefined, unknown, void, unknown>({
+    pendingMessage: isEdit ? "Salvando lote…" : "Criando lote…",
+    successMessage: isEdit ? "Lote atualizado" : "Lote criado",
+    errorTitle: "Erro ao salvar lote",
     mutationFn: async () => {
       const payload = {
         batch_name: batchName.trim(),
@@ -47,20 +53,28 @@ export default function PayrollForm() {
       if (isEdit) {
         const { error } = await supabase.from("payroll_batches").update(payload).eq("id", id!);
         if (error) throw error;
+        return undefined;
       } else {
         const { data, error } = await supabase.from("payroll_batches").insert(payload).select("id").single();
         if (error) throw error;
-        return data.id;
+        return data.id as string;
       }
     },
     onSuccess: (newId) => {
       queryClient.invalidateQueries({ queryKey: ["payroll-batches"] });
-      queryClient.invalidateQueries({ queryKey: ["payroll-batch", id] });
-      toast({ title: isEdit ? "Lote atualizado" : "Lote criado" });
+      if (isEdit) {
+        queryClient.invalidateQueries({ queryKey: ["payroll-batch", id] });
+        queryClient.invalidateQueries({ queryKey: ["payroll-batch-items", id] });
+      }
+      setIsDirty(false);
       navigate(`/payroll/${isEdit ? id : newId}`);
     },
-    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
+
+  const handleSubmit = () => {
+    if (mutation.isPending || mutation.isLocked() || !batchName.trim()) return;
+    mutation.mutate(undefined);
+  };
 
   if (isEdit && loadingExisting) {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" /></div>;
@@ -84,12 +98,12 @@ export default function PayrollForm() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Nome do lote *</Label>
-            <Input value={batchName} onChange={(e) => setBatchName(e.target.value)} placeholder="Ex: Pagamento Rock in Rio - Abril" />
+            <Input value={batchName} onChange={(e) => { setBatchName(e.target.value); setIsDirty(true); }} placeholder="Ex: Pagamento Rock in Rio - Abril" />
           </div>
 
           <div className="space-y-2">
             <Label>Evento</Label>
-            <Select value={eventId} onValueChange={setEventId}>
+            <Select value={eventId} onValueChange={(v) => { setEventId(v); setIsDirty(true); }}>
               <SelectTrigger><SelectValue placeholder="Selecione um evento" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Nenhum</SelectItem>
@@ -102,20 +116,20 @@ export default function PayrollForm() {
 
           <div className="space-y-2">
             <Label>Mês de referência</Label>
-            <Input type="month" value={referenceMonth} onChange={(e) => setReferenceMonth(e.target.value)} />
+            <Input type="month" value={referenceMonth} onChange={(e) => { setReferenceMonth(e.target.value); setIsDirty(true); }} />
           </div>
 
           <div className="space-y-2">
             <Label>Observações</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+            <Textarea value={notes} onChange={(e) => { setNotes(e.target.value); setIsDirty(true); }} rows={3} />
           </div>
 
           <div className="flex gap-2 pt-2">
-            <Button onClick={() => mutation.mutate()} disabled={!batchName.trim() || mutation.isPending}>
+            <Button onClick={handleSubmit} disabled={!batchName.trim() || mutation.isPending} aria-busy={mutation.isPending}>
               {mutation.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
-              {isEdit ? "Salvar" : "Criar Lote"}
+              {mutation.isPending ? (isEdit ? "Salvando…" : "Criando…") : (isEdit ? "Salvar" : "Criar Lote")}
             </Button>
-            <Button variant="outline" onClick={() => navigate("/payroll")}>Cancelar</Button>
+            <Button variant="outline" onClick={() => navigate("/payroll")} disabled={mutation.isPending}>Cancelar</Button>
           </div>
         </CardContent>
       </Card>
