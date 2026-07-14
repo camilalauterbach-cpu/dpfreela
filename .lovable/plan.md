@@ -1,54 +1,31 @@
+# Entrega 1 — Execução da especificação congelada
 
+**Fonte única e literal:** o conteúdo integral que você acabou de enviar será salvo em `.lovable/entrega-1-deduplicacao-convites.md` e servirá como especificação exclusiva. Nada será resumido, reescrito ou reordenado.
 
-## Exportações operacionais do grupo para contabilidade
+## Ações ao entrar em build
 
-### Resumo
-Criar novo arquivo `src/lib/export-group.ts` com duas funções (Excel e PDF) e adicionar botões na aba Trabalhadores do `LinkDetail.tsx`.
+1. Salvar cópia literal em `.lovable/entrega-1-deduplicacao-convites.md` (sem tocar em `.lovable/plan.md`).
+2. Confirmar schema real via `information_schema` antes de gerar DDLs (colunas de `workers`, `link_group_workers`, `payroll_batch_items`, `change_logs`, `profiles`, `worker_dependents`, `worker_documents`, `worker_payment_methods`, `employment_link_documents`, `employment_links`).
+3. Gerar a matriz real em `.lovable/matrices/payroll_batch_items.md` a partir de `information_schema.columns`.
+4. Criar, exatamente na ordem e com os contratos da spec:
+   - Migração 0 (`_lgw_partial_unique.sql`) com dry-run interno `RAISE EXCEPTION` se houver duplicidade ativa.
+   - Migração A1 (`_workers_normalization_prep.sql`) com `pg_trgm`, colunas geradas `cpf_normalized` e `document_number_normalized`, colunas novas em `workers`, `is_valid_cpf`, `workers_valid_cpf_check NOT VALID`, índices não-únicos, tabela `worker_duplicate_reviews` com GRANT + RLS admin-only.
+   - `scripts/sst-dedup-dry-run.sql` somente-leitura (sem `INSERT/UPDATE/DELETE/ALTER/DROP/CREATE`), com máscaras e `\copy` para `/mnt/documents/sst-dedup-dry-run-<data>.csv`.
+   - Migração `_rpc_ensure_worker.sql` — assinatura `ensure_worker(payload jsonb, mode text default 'auto')`, `SECURITY DEFINER`, REVOKE/GRANT, validação estrita de CPF (11 dígitos + `is_valid_cpf`), matriz de roles por `mode`, busca exata → fuzzy mascarada → criação.
+   - Migração A5 (`_invites.sql`) — tabelas `invites` (com `accepted_auth_user_id`, `accepted_profile_id`, `attempt_count`, `last_error_code`, estados `pending/processing/accepted/expired/revoked`) e `invite_attempts`, uniques (incluindo parcial em `email_normalized`), RLS, e as três RPCs `claim_public_invite` / `complete_public_invite` / `release_public_invite` (service_role only) com rate limit persistente conforme spec (10/IP/10min, 5/token/10min, 3 falhas consecutivas, bloqueio 30min, processing abandonado 2min).
+   - Edge Function `supabase/functions/public-invite-accept/index.ts` + entrada em `supabase/config.toml` com `verify_jwt = false`. Solicitação do secret `INVITE_TOKEN_SECRET` (64 chars) via fluxo de secrets — sem gravar no repo.
+   - Migração `_rpc_merge_workers_v1.sql` — assinatura `merge_workers(_primary uuid, _secondary uuid, _confirmation text)`, admin-only, fase de detecção completa antes de qualquer alteração, retorno `{result:"conflict", conflicts:[]}` sem exceção, matriz `payroll_batch_items` restrita a colunas confirmadas, políticas específicas por tabela conforme spec, sem referência a `worker_sst_qualifications`.
+5. Criar `.lovable/rollback/entrega-1.md` conforme spec.
+6. Rodar `vite build` e `tsgo --noEmit`.
 
-### Arquivos
+## Não farei nesta entrega
 
-| Arquivo | Ação |
-|---|---|
-| `src/lib/export-group.ts` | **Novo** — `exportGroupXlsx` e `exportGroupPdf` |
-| `src/pages/LinkDetail.tsx` | Botões "Excel" e "PDF" na aba Trabalhadores |
+A10, `VALIDATE CONSTRAINT`, mesclagens reais, índices únicos definitivos, qualquer artefato SST, aplicação de `ensure_worker` em formulários, tela `/settings/duplicates`.
 
-### 1. `src/lib/export-group.ts`
+## Interrupções previstas
 
-**`exportGroupXlsx(groupId, groupName, eventName, companyName, period)`**
-- Fetch on-demand: `link_group_workers` do grupo (com `workers(*)` completo via select join)
-- Para cada worker_id, buscar `worker_payment_methods` ordenado por `is_preferred DESC, created_at DESC`, pegar o primeiro ativo (deleted_at IS NULL)
-- Montar planilha ExcelJS com ~75 colunas, mesma estrutura do `export-admission.ts` adaptada ao modelo de grupos:
-  - Dados cadastrais do trabalhador (todos os campos da tabela `workers`, mesmo vazios)
-  - Dados da alocação (job_role, job_function, department, contract_type, status, hire_date, end_date, remuneration_type, daily_rate, hourly_rate, fixed_salary, category_reference_rate, payment_frequency, VT, VR/VA, horas, turno, escala, horário, call_time, notes)
-  - Dados bancários (method_type, pix_key, pix_key_type, bank_name, bank_code, agency, account_number, account_type, holder_name, holder_cpf)
-  - Grupo, Evento, Empresa como colunas contextuais
-- Campos vazios saem em branco (string vazia), nunca omitidos
-- Nome do arquivo: `grupo_<nome>_contabilidade_YYYY-MM-DD.xlsx`
+Se uma coluna citada na spec não existir no schema real, interrompo apenas o artefato afetado e registro a divergência no relatório final — sem improvisar estrutura.
 
-**`exportGroupPdf(groupId, groupName, eventName, companyName, period, workerCount)`**
-- Fetch on-demand: mesmos dados mas renderiza resumido
-- jsPDF + autoTable
-- Header: nome do grupo, evento, empresa, período (hire_date – end_date), quantidade de trabalhadores, data de geração
-- Tabela resumida: Nome, CPF, Função, Contrato, Tipo Remuneração, Valor efetivo, VT, VR/VA, Status
-- Nome do arquivo: `grupo_<nome>_resumo_YYYY-MM-DD.pdf`
+## Retorno ao final
 
-### 2. `src/pages/LinkDetail.tsx`
-
-Na aba "Trabalhadores" (linha 334-340), ao lado do botão "Alocar trabalhador":
-- Botão "Excel" (ícone Download) e botão "PDF" (ícone FileText)
-- Desabilitados quando `!workers?.length`
-- Loading state individual por botão
-- Chamam as funções passando `id`, `g.group_name`, `eventName`, `companyName`, período (`g.hire_date` – `g.end_date`)
-- Toast de sucesso/erro
-
-### Dados bancários — regra de seleção
-1. Método com `is_preferred = true` e `deleted_at IS NULL`
-2. Se não existir preferido, o mais recente ativo (`ORDER BY created_at DESC LIMIT 1`)
-3. Se nenhum, colunas bancárias em branco
-
-### Garantias
-- Sem alterar dados existentes
-- Sem mexer no legado de `employment_links`
-- Sem remover `export-admission.ts` ou `export-payroll.ts`
-- Fetch pesado apenas no momento do clique de exportação
-
+Exclusivamente: arquivos criados/alterados, migrations criadas, resultado e contagens do dry-run, riscos, `vite build`, `tsgo --noEmit`, itens aguardando aprovação.

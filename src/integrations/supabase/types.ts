@@ -458,6 +458,95 @@ export type Database = {
           },
         ]
       }
+      invite_attempts: {
+        Row: {
+          attempted_at: string
+          id: number
+          ip_hash: string
+          success: boolean
+          token_hash_prefix: string | null
+        }
+        Insert: {
+          attempted_at?: string
+          id?: never
+          ip_hash: string
+          success?: boolean
+          token_hash_prefix?: string | null
+        }
+        Update: {
+          attempted_at?: string
+          id?: never
+          ip_hash?: string
+          success?: boolean
+          token_hash_prefix?: string | null
+        }
+        Relationships: []
+      }
+      invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_auth_user_id: string | null
+          accepted_profile_id: string | null
+          attempt_count: number
+          created_at: string
+          created_by: string
+          email_normalized: string
+          expires_at: string
+          id: string
+          last_error_code: string | null
+          linked_worker_id: string | null
+          processing_nonce: string | null
+          processing_started_at: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          status: string
+          token_hash: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_auth_user_id?: string | null
+          accepted_profile_id?: string | null
+          attempt_count?: number
+          created_at?: string
+          created_by: string
+          email_normalized: string
+          expires_at: string
+          id?: string
+          last_error_code?: string | null
+          linked_worker_id?: string | null
+          processing_nonce?: string | null
+          processing_started_at?: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          status?: string
+          token_hash: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_auth_user_id?: string | null
+          accepted_profile_id?: string | null
+          attempt_count?: number
+          created_at?: string
+          created_by?: string
+          email_normalized?: string
+          expires_at?: string
+          id?: string
+          last_error_code?: string | null
+          linked_worker_id?: string | null
+          processing_nonce?: string | null
+          processing_started_at?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invites_linked_worker_id_fkey"
+            columns: ["linked_worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       link_group_workers: {
         Row: {
           call_time: string | null
@@ -1083,6 +1172,57 @@ export type Database = {
           },
         ]
       }
+      worker_duplicate_reviews: {
+        Row: {
+          created_at: string
+          criteria: string
+          decision: string
+          id: string
+          reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          worker_a_id: string
+          worker_b_id: string
+        }
+        Insert: {
+          created_at?: string
+          criteria: string
+          decision?: string
+          id?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          worker_a_id: string
+          worker_b_id: string
+        }
+        Update: {
+          created_at?: string
+          criteria?: string
+          decision?: string
+          id?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          worker_a_id?: string
+          worker_b_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_duplicate_reviews_worker_a_id_fkey"
+            columns: ["worker_a_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_duplicate_reviews_worker_b_id_fkey"
+            columns: ["worker_b_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       worker_payment_methods: {
         Row: {
           account_number: string | null
@@ -1162,6 +1302,7 @@ export type Database = {
           blood_type: string | null
           city: string | null
           cpf: string
+          cpf_normalized: string | null
           created_at: string
           ctps_number: string | null
           ctps_series: string | null
@@ -1177,8 +1318,12 @@ export type Database = {
           id: string
           is_pcd: boolean
           is_rehabilitated: boolean
+          linked_profile_id: string | null
           marital_status: string | null
           medical_conditions: string | null
+          merged_at: string | null
+          merged_by: string | null
+          merged_into_worker_id: string | null
           mother_name: string | null
           nationality: string | null
           neighborhood: string | null
@@ -1190,6 +1335,7 @@ export type Database = {
           phone_main: string | null
           phone_secondary: string | null
           race_color: string | null
+          registration_status: string
           rg: string | null
           rg_issue_date: string | null
           rg_issuer: string | null
@@ -1211,6 +1357,7 @@ export type Database = {
           blood_type?: string | null
           city?: string | null
           cpf: string
+          cpf_normalized?: string | null
           created_at?: string
           ctps_number?: string | null
           ctps_series?: string | null
@@ -1226,8 +1373,12 @@ export type Database = {
           id?: string
           is_pcd?: boolean
           is_rehabilitated?: boolean
+          linked_profile_id?: string | null
           marital_status?: string | null
           medical_conditions?: string | null
+          merged_at?: string | null
+          merged_by?: string | null
+          merged_into_worker_id?: string | null
           mother_name?: string | null
           nationality?: string | null
           neighborhood?: string | null
@@ -1239,6 +1390,7 @@ export type Database = {
           phone_main?: string | null
           phone_secondary?: string | null
           race_color?: string | null
+          registration_status?: string
           rg?: string | null
           rg_issue_date?: string | null
           rg_issuer?: string | null
@@ -1260,6 +1412,7 @@ export type Database = {
           blood_type?: string | null
           city?: string | null
           cpf?: string
+          cpf_normalized?: string | null
           created_at?: string
           ctps_number?: string | null
           ctps_series?: string | null
@@ -1275,8 +1428,12 @@ export type Database = {
           id?: string
           is_pcd?: boolean
           is_rehabilitated?: boolean
+          linked_profile_id?: string | null
           marital_status?: string | null
           medical_conditions?: string | null
+          merged_at?: string | null
+          merged_by?: string | null
+          merged_into_worker_id?: string | null
           mother_name?: string | null
           nationality?: string | null
           neighborhood?: string | null
@@ -1288,6 +1445,7 @@ export type Database = {
           phone_main?: string | null
           phone_secondary?: string | null
           race_color?: string | null
+          registration_status?: string
           rg?: string | null
           rg_issue_date?: string | null
           rg_issuer?: string | null
@@ -1299,19 +1457,48 @@ export type Database = {
           updated_at?: string
           zip_code?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "workers_linked_profile_id_fkey"
+            columns: ["linked_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workers_merged_into_worker_id_fkey"
+            columns: ["merged_into_worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      claim_public_invite: {
+        Args: { _ip_hash: string; _token_hash: string }
+        Returns: Json
+      }
+      complete_public_invite: {
+        Args: {
+          _auth_user_id: string
+          _invite_id: string
+          _nonce: string
+          _profile_id: string
+        }
+        Returns: Json
+      }
       ensure_current_user_access: {
         Args: never
         Returns: {
           roles: Database["public"]["Enums"]["app_role"][]
         }[]
       }
+      ensure_worker: { Args: { mode?: string; payload: Json }; Returns: Json }
       get_audit_user_emails: {
         Args: { _user_ids: string[] }
         Returns: {
@@ -1334,6 +1521,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_valid_cpf: { Args: { _cpf: string }; Returns: boolean }
+      merge_workers: {
+        Args: { _confirmation: string; _primary: string; _secondary: string }
+        Returns: Json
+      }
+      release_public_invite: {
+        Args: { _error_code: string; _invite_id: string; _nonce: string }
+        Returns: Json
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       app_role: "admin" | "manager" | "operator" | "viewer"
