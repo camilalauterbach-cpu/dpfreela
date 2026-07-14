@@ -1522,6 +1522,10 @@ export type Database = {
         Returns: boolean
       }
       is_valid_cpf: { Args: { _cpf: string }; Returns: boolean }
+      merge_workers: {
+        Args: { _confirmation: string; _primary: string; _secondary: string }
+        Returns: Json
+      }
       release_public_invite: {
         Args: { _error_code: string; _invite_id: string; _nonce: string }
         Returns: Json
