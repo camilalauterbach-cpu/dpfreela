@@ -1,12 +1,15 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export function AppLayout() {
   const { roles } = useAuth();
   const primaryRole = roles[0];
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const roleLabels: Record<string, string> = {
     admin: "Admin",
@@ -40,7 +43,11 @@ export function AppLayout() {
             </div>
           </header>
           <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-auto">
-            <Outlet />
+            {/* Keying the boundary on pathname lets the user recover by
+                navigating to another page after a component crash. */}
+            <ErrorBoundary resetKey={location.pathname} onNavigateHome={() => navigate("/")}>
+              <Outlet />
+            </ErrorBoundary>
           </main>
         </div>
       </div>
