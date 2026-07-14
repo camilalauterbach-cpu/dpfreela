@@ -1,7 +1,12 @@
 import { useQuery, type QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export type ExpirationStatus = "valid" | "expiring_soon" | "expired" | "no_expiry";
+export type ExpirationStatus =
+  | "valid"
+  | "expiring_soon"
+  | "expired"
+  | "no_expiry"
+  | "unknown";
 export type DocumentStatus = "pending" | "ok" | "rejected" | "no_document";
 export type RevisionType = "initial" | "renewal" | "replacement" | "additional";
 export type SourceType = "manual" | "link_document" | "import";
@@ -186,17 +191,19 @@ export interface SstAlertCounts {
   pending: number;         // document_status = 'pending'
   rejected: number;        // document_status = 'rejected'
   noDocument: number;      // document_status = 'no_document'
-  unknownValidity: number; // validity_status = 'unknown'
+  unknownValidity: number; // validity_status = 'unknown' OU has_expiry sem data
   monitoredWorkers: number;
   totalAttention: number;  // vencidas + vencendo (independente de doc)
 }
 
 /**
  * Contagens segmentadas — apenas view _current (nunca histórico).
- * Regras (banco): expired = expires_at < CURRENT_DATE;
- *                 expiring_soon = expires_at entre hoje e +30d;
- *                 no_expiry = validity_status='no_expiry' OU expires_at IS NULL;
- *                 unknown = validity_status='unknown'.
+ * Fonte canônica: validity_status.
+ *   no_expiry     => somente validity_status='no_expiry'
+ *   unknown       => validity_status='unknown' OU has_expiry sem data (inconsistência)
+ *   expired/expiring_soon/valid => somente has_expiry com data preenchida
+ * expired e expiring_soon são mutuamente exclusivos => totalAttention conta cada
+ * qualificação no máximo uma vez, independentemente do document_status.
  */
 export function useSstAlertCounts() {
   return useQuery({
@@ -231,7 +238,14 @@ export function useSstAlertCounts() {
         if (r.document_status === "pending") c.pending++;
         else if (r.document_status === "rejected") c.rejected++;
         else if (r.document_status === "no_document") c.noDocument++;
-        if (r.validity_status === "unknown") c.unknownValidity++;
+        // Fonte canônica: validity_status. Inclui também has_expiry sem data
+        // (que a view classifica como expiration_status='unknown').
+        if (
+          r.validity_status === "unknown" ||
+          (r.validity_status === "has_expiry" && r.expiration_status === "unknown")
+        ) {
+          c.unknownValidity++;
+        }
       }
       c.monitoredWorkers = workers.size;
       return c;
