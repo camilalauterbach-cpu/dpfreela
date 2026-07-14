@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useMutationWithFeedback } from "@/hooks/useMutationWithFeedback";
+import { useUnsavedFormGuard } from "@/hooks/useUnsavedFormGuard";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
 import { generateBankReceipt } from "@/lib/generate-bank-receipt";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,6 @@ interface Props {
 }
 
 export function BankDataForm({ workerId, workerName, workerCpf, onSuccess }: Props) {
-  const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -36,7 +36,13 @@ export function BankDataForm({ workerId, workerName, workerCpf, onSuccess }: Pro
   const [holderCpf, setHolderCpf] = useState(workerCpf);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  const saveMutation = useMutation({
+  const isDirty = !!(pixKey.trim() || accountNumber.trim() || bankName.trim());
+  useUnsavedFormGuard(isDirty, `bank-data-${workerId}`);
+
+  const saveMutation = useMutationWithFeedback<void, unknown, void, unknown>({
+    pendingMessage: "Salvando dados bancários…",
+    successMessage: "Dados bancários salvos — comprovante gerado.",
+    errorTitle: "Erro ao salvar dados bancários",
     mutationFn: async () => {
       // 1. Insert payment method
       const { error: pmError } = await supabase
@@ -99,11 +105,7 @@ export function BankDataForm({ workerId, workerName, workerCpf, onSuccess }: Pro
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["worker-documents", workerId] });
       queryClient.invalidateQueries({ queryKey: ["worker-payment-methods", workerId] });
-      toast({ title: "Dados bancários salvos", description: "Comprovante gerado automaticamente." });
       onSuccess();
-    },
-    onError: (err: any) => {
-      toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
     },
   });
 
@@ -207,10 +209,14 @@ export function BankDataForm({ workerId, workerName, workerCpf, onSuccess }: Pro
       <Button
         className="w-full"
         disabled={!canSubmit || saveMutation.isPending}
-        onClick={() => saveMutation.mutate()}
+        aria-busy={saveMutation.isPending}
+        onClick={() => {
+          if (saveMutation.isPending || saveMutation.isLocked()) return;
+          saveMutation.mutate(undefined);
+        }}
       >
         {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        Salvar e gerar comprovante
+        {saveMutation.isPending ? "Salvando…" : "Salvar e gerar comprovante"}
       </Button>
     </div>
   );

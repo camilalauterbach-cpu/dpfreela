@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { formatSupabaseError } from "@/lib/format-error";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useLinkGroup, useCreateLinkGroup, useUpdateLinkGroup } from "@/hooks/useLinkGroups";
+import { useMutationWithFeedback } from "@/hooks/useMutationWithFeedback";
+import { useUnsavedFormGuard } from "@/hooks/useUnsavedFormGuard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -99,6 +100,8 @@ export default function LinkForm() {
   const [docConfig, setDocConfig] = useState<LinkDocumentConfig>({ ...EMPTY_CONFIG });
   const [newDate, setNewDate] = useState("");
   const [highlightDates, setHighlightDates] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  useUnsavedFormGuard(isDirty, `link-form-${id ?? "new"}`);
   const hireDateRef = useRef<HTMLInputElement>(null);
   const contractSectionRef = useRef<HTMLDivElement>(null);
 
@@ -124,10 +127,19 @@ export default function LinkForm() {
         notes: e.notes || "",
       });
       setDocConfig(parseConfig(e.required_documents));
+      setIsDirty(false);
     }
   }, [isEdit, existing]);
 
-  const set = (key: string, value: any) => setForm((p) => ({ ...p, [key]: value }));
+  const set = (key: string, value: any) => {
+    setForm((p) => ({ ...p, [key]: value }));
+    setIsDirty(true);
+  };
+
+  const setDocConfigDirty = (cfg: LinkDocumentConfig) => {
+    setDocConfig(cfg);
+    setIsDirty(true);
+  };
 
   useEffect(() => {
     if (form.event_id && events) {
@@ -160,8 +172,32 @@ export default function LinkForm() {
     set("specific_work_dates", form.specific_work_dates.filter((x: string) => x !== d));
   };
 
+  const saveMutation = useMutationWithFeedback<void, unknown, Record<string, any>, unknown>({
+    pendingMessage: isEdit ? "Salvando grupo…" : "Criando grupo…",
+    successMessage: isEdit ? "Grupo atualizado" : "Grupo criado",
+    errorTitle: "Erro ao salvar grupo",
+    mutationFn: async (payload) => {
+      if (isEdit) {
+        await updateMutation.mutateAsync({ id: id!, ...payload });
+      } else {
+        const data = await createMutation.mutateAsync(payload);
+        (payload as any).__createdId = data.id;
+      }
+    },
+    onSuccess: (_data, payload) => {
+      setIsDirty(false);
+      if (isEdit) {
+        navigate(`/links/${id}`);
+      } else {
+        const newId = (payload as any).__createdId;
+        navigate(`/links/${newId}`);
+      }
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (saveMutation.isPending || saveMutation.isLocked()) return;
     if (!form.group_name.trim()) {
       toast({ title: "Nome do grupo é obrigatório", variant: "destructive" });
       return;
@@ -191,27 +227,7 @@ export default function LinkForm() {
       required_documents: docConfig,
     };
 
-    if (isEdit) {
-      updateMutation.mutate({ id: id!, ...payload }, {
-        onSuccess: () => {
-          toast({ title: "Grupo atualizado" });
-          navigate(`/links/${id}`);
-        },
-        onError: (err: any) => {
-          toast({ title: "Erro ao salvar", description: formatSupabaseError(err), variant: "destructive" });
-        },
-      });
-    } else {
-      createMutation.mutate(payload, {
-        onSuccess: (data) => {
-          toast({ title: "Grupo criado" });
-          navigate(`/links/${data.id}`);
-        },
-        onError: (err: any) => {
-          toast({ title: "Erro ao salvar", description: formatSupabaseError(err), variant: "destructive" });
-        },
-      });
-    }
+    saveMutation.mutate(payload);
   };
 
   if (isEdit && loadingExisting) {
@@ -226,7 +242,7 @@ export default function LinkForm() {
   const currentStatusInfo = statusOptions.find((s) => s.value === form.status);
   const currentEvent = events?.find((e: any) => e.id === form.event_id);
   const currentCompany = companies?.find((c: any) => c.id === form.company_id);
-  const isPending = createMutation.isPending || updateMutation.isPending;
+  const isPending = saveMutation.isPending;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-3xl">
@@ -435,7 +451,7 @@ export default function LinkForm() {
       </Card>
 
       {/* Configuração documental */}
-      <LinkDocumentConfigForm config={docConfig} onChange={setDocConfig} />
+      <LinkDocumentConfigForm config={docConfig} onChange={setDocConfigDirty} />
 
       {/* Observações */}
       <Card>
@@ -446,10 +462,10 @@ export default function LinkForm() {
       </Card>
 
       <div className="flex justify-end gap-2 pb-4">
-        <Button type="button" variant="outline" onClick={() => navigate("/links")}>Cancelar</Button>
-        <Button type="submit" disabled={isPending}>
+        <Button type="button" variant="outline" onClick={() => navigate("/links")} disabled={isPending}>Cancelar</Button>
+        <Button type="submit" disabled={isPending} aria-busy={isPending}>
           {isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
-          Salvar
+          {isPending ? "Salvando…" : "Salvar"}
         </Button>
       </div>
     </form>
