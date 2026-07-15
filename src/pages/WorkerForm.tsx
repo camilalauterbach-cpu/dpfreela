@@ -268,6 +268,17 @@ export default function WorkerForm() {
     return data as { result: "existing" | "possible_duplicate" | "created"; workerId?: string; matches?: any[] };
   };
 
+  // A RPC ensure_worker persiste apenas os campos de identidade/deduplicação.
+  // Após criar o trabalhador, aplicamos o restante do payload via UPDATE para
+  // não perder RG, CTPS, endereço, contatos de emergência, dados operacionais etc.
+  const persistFullPayloadAfterCreate = async (workerId: string) => {
+    const payload = buildPayload() as Record<string, any>;
+    // cpf é normalizado/validado pela RPC; evitar reenviar para não colidir com a unique key.
+    delete payload.cpf;
+    const { error } = await supabase.from("workers").update(payload as any).eq("id", workerId);
+    if (error) throw error;
+  };
+
   const mutation = useMutationWithFeedback<
     { kind: "edit" } | { kind: "created"; workerId: string } | { kind: "existing"; workerId: string } | { kind: "possible_duplicate"; matches: any[] },
     unknown,
@@ -285,7 +296,10 @@ export default function WorkerForm() {
         return { kind: "edit" };
       }
       const res = await runEnsure("auto");
-      if (res.result === "created" && res.workerId) return { kind: "created", workerId: res.workerId };
+      if (res.result === "created" && res.workerId) {
+        await persistFullPayloadAfterCreate(res.workerId);
+        return { kind: "created", workerId: res.workerId };
+      }
       if (res.result === "existing" && res.workerId) return { kind: "existing", workerId: res.workerId };
       if (res.result === "possible_duplicate") return { kind: "possible_duplicate", matches: res.matches || [] };
       throw new Error("unexpected_ensure_result");
@@ -329,6 +343,7 @@ export default function WorkerForm() {
     try {
       const res = await runEnsure("force_create");
       if (res.result === "created" && res.workerId) {
+        await persistFullPayloadAfterCreate(res.workerId);
         queryClient.invalidateQueries({ queryKey: ["workers"] });
         sonnerToast.success("Trabalhador cadastrado");
         setDupDialog(null);
