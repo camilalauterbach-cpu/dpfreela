@@ -10,8 +10,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, ShieldCheck, AlertTriangle, Clock, FileWarning, Loader2 } from "lucide-react";
+import { Plus, Search, ShieldCheck, AlertTriangle, Clock, FileWarning, Loader2, Download, FileText } from "lucide-react";
 import { AddSstDialog } from "@/components/sst/AddSstDialog";
+import { SstPendenciesPanel } from "@/components/sst/SstPendenciesPanel";
+import { flattenWorkers, exportCsv, exportXlsx, exportPdfSummary } from "@/lib/sst/export";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -124,6 +131,25 @@ export default function Sst() {
     { label: "Validade desconhecida", onClick: () => { clearFilters(); setValidity("unknown"); } },
   ];
 
+  const currentWorkers = overview.data?.workers || [];
+  const flat = useMemo(() => flattenWorkers(currentWorkers), [currentWorkers]);
+
+  async function runExport(kind: "csv" | "xlsx" | "pdf") {
+    if (flat.length === 0) { toast.info("Nada para exportar com os filtros atuais."); return; }
+    try {
+      const parts = [
+        nr && `nr-${nr}`, expiration && `exp-${expiration}`, doc && `doc-${doc}`,
+        validity && `val-${validity}`, daysUntil && `d${daysUntil}`,
+      ].filter(Boolean).join("_");
+      if (kind === "csv") exportCsv(flat, parts);
+      else if (kind === "xlsx") await exportXlsx(flat, parts);
+      else await exportPdfSummary(currentWorkers, parts);
+      toast.success("Exportação concluída.");
+    } catch (e: any) {
+      toast.error(String(e?.message || "Falha ao exportar."));
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -131,11 +157,34 @@ export default function Sst() {
           <h1 className="text-2xl font-bold tracking-tight">Controle SST</h1>
           <p className="text-sm text-muted-foreground">Acompanhamento de NRs e documentos de SST.</p>
         </div>
-        {canWrite && (
-          <Button onClick={() => setDialogOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" /> Adicionar ao Controle SST
-          </Button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Download className="h-4 w-4" /> Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Listagem filtrada</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => runExport("xlsx")}>
+                <Download className="mr-2 h-4 w-4" /> Planilha (.xlsx)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => runExport("csv")}>
+                <Download className="mr-2 h-4 w-4" /> CSV (.csv)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Conferência</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => runExport("pdf")}>
+                <FileText className="mr-2 h-4 w-4" /> Resumo por trabalhador (PDF)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {canWrite && (
+            <Button onClick={() => setDialogOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" /> Adicionar ao Controle SST
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -201,14 +250,18 @@ export default function Sst() {
       {overview.isLoading && (
         <div className="flex justify-center py-10 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
       )}
-      {!overview.isLoading && (overview.data?.workers || []).length === 0 && (
+      {!overview.isLoading && currentWorkers.length === 0 && (
         <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
           Nenhum trabalhador no Controle SST ainda.{canWrite && " Use o botão “Adicionar ao Controle SST” para começar."}
         </CardContent></Card>
       )}
 
+      {!overview.isLoading && currentWorkers.length > 0 && (
+        <SstPendenciesPanel workers={currentWorkers} />
+      )}
+
       <div className="space-y-2">
-        {(overview.data?.workers || []).map((w) => (
+        {currentWorkers.map((w) => (
           <Card key={w.worker_id}>
             <CardContent className="py-3 flex flex-col md:flex-row md:items-center gap-3">
               <div className="min-w-[220px]">
