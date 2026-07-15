@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, AlertTriangle, ArrowLeftRight, ShieldAlert } from "lucide-react";
 import { useMergePreview, useExecuteMerge, type DupWorker } from "@/hooks/useDuplicates";
+import { toast } from "sonner";
 
 interface Props {
   open: boolean;
@@ -52,13 +53,29 @@ export function DuplicateCompareDialog({ open, onClose, a, b }: Props) {
   const preview = useMergePreview(primaryId, secondaryId);
   const execMerge = useExecuteMerge();
 
+  const normalizedConfirmation = confirmation.trim();
+  const confirmationValid =
+    normalizedConfirmation.toUpperCase() === "CONFIRMAR" ||
+    normalizedConfirmation.toLowerCase() === primary.full_name.trim().toLowerCase();
+
   const canMerge =
     preview.data?.result === "ready" &&
-    confirmation.trim().length > 0 &&
+    confirmationValid &&
     !execMerge.isPending;
 
   async function handleMerge() {
-    await execMerge.mutateAsync({ primaryId, secondaryId, confirmation });
+    // Força novo preview imediatamente antes do merge para impedir execução
+    // com base em contagens/conflitos defasados desde a análise inicial.
+    const fresh = await preview.refetch();
+    if (fresh.error) {
+      toast.error("Não foi possível revalidar o preview: " + (fresh.error as Error).message);
+      return;
+    }
+    if (fresh.data?.result !== "ready") {
+      toast.error("Estado mudou desde a análise inicial — revise os conflitos antes de tentar novamente.");
+      return;
+    }
+    await execMerge.mutateAsync({ primaryId, secondaryId, confirmation: normalizedConfirmation });
     if (!execMerge.isError) onClose();
   }
 
@@ -148,6 +165,11 @@ export function DuplicateCompareDialog({ open, onClose, a, b }: Props) {
               placeholder="CONFIRMAR"
               disabled={execMerge.isPending || preview.data?.result !== "ready"}
             />
+            {normalizedConfirmation.length > 0 && !confirmationValid && (
+              <p className="text-[11px] text-destructive">
+                Digite exatamente <strong>CONFIRMAR</strong> ou o nome completo do primário.
+              </p>
+            )}
           </div>
         </div>
 
