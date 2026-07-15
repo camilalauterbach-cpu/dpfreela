@@ -37,6 +37,7 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const Sst = lazy(() => import("./pages/Sst"));
 const SstImport = lazy(() => import("./pages/SstImport"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -71,6 +72,7 @@ const App = () => (
               <Route path="/signup" element={<Signup />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/invite/:token" element={<AcceptInvite />} />
 
               {/* Protected routes with layout */}
               <Route path="/dashboard" element={<Navigate to="/" replace />} />
