@@ -286,7 +286,12 @@ export default function WorkerForm() {
   };
 
   const mutation = useMutationWithFeedback<
-    { kind: "edit" } | { kind: "created"; workerId: string } | { kind: "existing"; workerId: string } | { kind: "possible_duplicate"; matches: any[] },
+    | { kind: "edit" }
+    | { kind: "created"; workerId: string }
+    | { kind: "existing"; workerId: string }
+    | { kind: "merged"; workerId: string; mergedWorkerId: string }
+    | { kind: "inactive"; workerId: string; canRestore: boolean }
+    | { kind: "possible_duplicate"; matches: any[] },
     unknown,
     void,
     unknown
@@ -307,6 +312,8 @@ export default function WorkerForm() {
         return { kind: "created", workerId: res.workerId };
       }
       if (res.result === "existing" && res.workerId) return { kind: "existing", workerId: res.workerId };
+      if (res.result === "merged" && res.workerId) return { kind: "merged", workerId: res.workerId, mergedWorkerId: res.mergedWorkerId! };
+      if (res.result === "inactive" && res.workerId) return { kind: "inactive", workerId: res.workerId, canRestore: !!res.canRestore };
       if (res.result === "possible_duplicate") return { kind: "possible_duplicate", matches: res.matches || [] };
       throw new Error("unexpected_ensure_result");
     },
@@ -328,6 +335,14 @@ export default function WorkerForm() {
       }
       if (result.kind === "existing") {
         setDupDialog({ kind: "existing", workerId: result.workerId });
+        return;
+      }
+      if (result.kind === "merged") {
+        setDupDialog({ kind: "merged", workerId: result.workerId, mergedWorkerId: result.mergedWorkerId });
+        return;
+      }
+      if (result.kind === "inactive") {
+        setDupDialog({ kind: "inactive", workerId: result.workerId, canRestore: result.canRestore });
         return;
       }
       if (result.kind === "possible_duplicate") {
