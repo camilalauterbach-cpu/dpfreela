@@ -1904,8 +1904,13 @@ export type Database = {
         Returns: boolean
       }
       is_valid_cpf: { Args: { _cpf: string }; Returns: boolean }
+      list_worker_duplicate_candidates: { Args: never; Returns: Json }
       merge_workers: {
         Args: { _confirmation: string; _primary: string; _secondary: string }
+        Returns: Json
+      }
+      merge_workers_preview: {
+        Args: { _primary: string; _secondary: string }
         Returns: Json
       }
       register_sst_revision: { Args: { payload: Json }; Returns: Json }
