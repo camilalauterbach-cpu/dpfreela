@@ -265,7 +265,13 @@ export default function WorkerForm() {
     const payload = buildPayload();
     const { data, error } = await supabase.rpc("ensure_worker", { payload: payload as any, mode });
     if (error) throw error;
-    return data as { result: "existing" | "possible_duplicate" | "created"; workerId?: string; matches?: any[] };
+    return data as {
+      result: "existing" | "possible_duplicate" | "created" | "merged" | "inactive";
+      workerId?: string;
+      mergedWorkerId?: string;
+      canRestore?: boolean;
+      matches?: any[];
+    };
   };
 
   // A RPC ensure_worker persiste apenas os campos de identidade/deduplicação.
