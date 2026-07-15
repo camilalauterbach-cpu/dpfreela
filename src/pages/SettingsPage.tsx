@@ -1,5 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, UserCircle, Building2, Palette, FileText, ShieldCheck } from "lucide-react";
+import { Users, UserCircle, Building2, Palette, FileText, ShieldCheck, Users2 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { SettingsUsers } from "@/components/settings/SettingsUsers";
@@ -8,6 +8,7 @@ import { SettingsCompany } from "@/components/settings/SettingsCompany";
 import { SettingsPreferences } from "@/components/settings/SettingsPreferences";
 import { SettingsLinksAdmission } from "@/components/settings/SettingsLinksAdmission";
 import { SettingsAudit } from "@/components/settings/SettingsAudit";
+import { SettingsDuplicates } from "@/components/settings/SettingsDuplicates";
 
 export default function SettingsPage() {
   const { hasAnyRole, hasRole } = useAuth();
@@ -15,7 +16,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const isAdmin = hasRole("admin");
   const canEditGlobal = hasAnyRole(["admin", "manager"]);
-  const defaultTab = tab && (isAdmin || !["users", "audit"].includes(tab)) ? tab : "profile";
+  const defaultTab = tab && (isAdmin || !["users", "audit", "duplicates"].includes(tab)) ? tab : "profile";
 
   return (
     <div className="space-y-4">
@@ -55,6 +56,12 @@ export default function SettingsPage() {
               <span className="hidden sm:inline">Auditoria</span>
             </TabsTrigger>
           )}
+          {isAdmin && (
+            <TabsTrigger value="duplicates" className="gap-1.5 text-xs sm:text-sm">
+              <Users2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Duplicidades</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="profile">
@@ -82,6 +89,12 @@ export default function SettingsPage() {
         {isAdmin && (
           <TabsContent value="audit">
             <SettingsAudit />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="duplicates">
+            <SettingsDuplicates />
           </TabsContent>
         )}
       </Tabs>
