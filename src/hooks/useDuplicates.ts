@@ -94,6 +94,17 @@ export function useExecuteMerge() {
         qc.invalidateQueries({ queryKey: ["duplicate-candidates"] });
         qc.invalidateQueries({ queryKey: ["merge-logs"] });
         qc.invalidateQueries({ queryKey: ["workers"] });
+        qc.invalidateQueries({ queryKey: ["worker"] });
+        qc.invalidateQueries({ queryKey: ["employment-links"] });
+        qc.invalidateQueries({ queryKey: ["link-groups"] });
+        qc.invalidateQueries({ queryKey: ["link-group-workers"] });
+        qc.invalidateQueries({ queryKey: ["link-docs"] });
+        qc.invalidateQueries({ queryKey: ["worker-documents"] });
+        qc.invalidateQueries({ queryKey: ["payroll-batches"] });
+        qc.invalidateQueries({ queryKey: ["payroll-batch-items"] });
+        qc.invalidateQueries({ queryKey: ["dashboard"] });
+        qc.invalidateQueries({ queryKey: ["sst"] });
+        qc.invalidateQueries({ queryKey: ["sst-alerts"] });
       } else if (res?.result === "conflict") {
         toast.error("Merge bloqueado por conflito — revise antes de tentar novamente");
       }
