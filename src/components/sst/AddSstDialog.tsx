@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Loader2, Search, UserPlus, ArrowLeft } from "lucide-react";
+import { invalidateSstCaches } from "@/hooks/useSstQualifications";
 
 interface Props {
   open: boolean;
@@ -112,8 +113,7 @@ export function AddSstDialog({ open, onOpenChange }: Props) {
     },
     onSuccess: () => {
       toast.success("Qualificação SST registrada.");
-      qc.invalidateQueries({ queryKey: ["sst-overview"] });
-      qc.invalidateQueries({ queryKey: ["sst-summary"] });
+      invalidateSstCaches(qc);
       onOpenChange(false);
       reset();
     },
