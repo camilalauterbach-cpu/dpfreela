@@ -3,27 +3,25 @@
 // Sem verify_jwt (endpoint público, protegido por rate limit + hash de token).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { allowedOrigins } from "../_shared/invite-cors.ts";
 
 // ---------------------------------------------------------------------
 // Configuração
 // ---------------------------------------------------------------------
-const ALLOWED_ORIGINS = new Set([
-  "https://dpfreela.lovable.app",
-  "https://dpfreela.com",
-  "https://www.dpfreela.com",
-]);
-
 const MAX_BODY_BYTES = 2 * 1024; // 2 KB
 
 function corsHeaders(origin: string | null): HeadersInit {
-  const allow = origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://dpfreela.com";
-  return {
-    "Access-Control-Allow-Origin": allow,
+  const list = allowedOrigins();
+  const h: Record<string, string> = {
     "Vary": "Origin",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "content-type",
     "Access-Control-Max-Age": "600",
   };
+  if (origin && list.includes(origin)) {
+    h["Access-Control-Allow-Origin"] = origin;
+  }
+  return h;
 }
 
 function neutralError(status = 400): Response {

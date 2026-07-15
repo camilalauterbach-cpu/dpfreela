@@ -1,5 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, UserCircle, Building2, Palette, FileText, ShieldCheck, Users2 } from "lucide-react";
+import { Users, UserCircle, Building2, Palette, FileText, ShieldCheck, Users2, Mail } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { SettingsUsers } from "@/components/settings/SettingsUsers";
@@ -9,6 +9,7 @@ import { SettingsPreferences } from "@/components/settings/SettingsPreferences";
 import { SettingsLinksAdmission } from "@/components/settings/SettingsLinksAdmission";
 import { SettingsAudit } from "@/components/settings/SettingsAudit";
 import { SettingsDuplicates } from "@/components/settings/SettingsDuplicates";
+import { SettingsInvites } from "@/components/settings/SettingsInvites";
 
 export default function SettingsPage() {
   const { hasAnyRole, hasRole } = useAuth();
@@ -16,7 +17,14 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const isAdmin = hasRole("admin");
   const canEditGlobal = hasAnyRole(["admin", "manager"]);
-  const defaultTab = tab && (isAdmin || !["users", "audit", "duplicates"].includes(tab)) ? tab : "profile";
+  const isManager = hasAnyRole(["admin", "manager"]);
+  const adminOnlyTabs = ["users", "audit", "duplicates"];
+  const managerTabs = ["invites"];
+  const defaultTab =
+    tab && (
+      (isAdmin || !adminOnlyTabs.includes(tab)) &&
+      (isManager || !managerTabs.includes(tab))
+    ) ? tab : "profile";
 
   return (
     <div className="space-y-4">
@@ -62,6 +70,12 @@ export default function SettingsPage() {
               <span className="hidden sm:inline">Duplicidades</span>
             </TabsTrigger>
           )}
+          {isManager && (
+            <TabsTrigger value="invites" className="gap-1.5 text-xs sm:text-sm">
+              <Mail className="h-4 w-4" />
+              <span className="hidden sm:inline">Convites</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="profile">
@@ -95,6 +109,11 @@ export default function SettingsPage() {
         {isAdmin && (
           <TabsContent value="duplicates">
             <SettingsDuplicates />
+          </TabsContent>
+        )}
+        {isManager && (
+          <TabsContent value="invites">
+            <SettingsInvites />
           </TabsContent>
         )}
       </Tabs>

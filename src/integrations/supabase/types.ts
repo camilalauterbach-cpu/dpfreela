@@ -1874,6 +1874,17 @@ export type Database = {
         }
         Returns: Json
       }
+      create_invite_record: {
+        Args: {
+          _acting_user_id: string
+          _email: string
+          _expires_at: string
+          _linked_worker_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+          _token_hash: string
+        }
+        Returns: Json
+      }
       ensure_current_user_access: {
         Args: never
         Returns: {
@@ -1918,12 +1929,25 @@ export type Database = {
         Args: { _error_code: string; _invite_id: string; _nonce: string }
         Returns: Json
       }
+      resend_invite: {
+        Args: {
+          _acting_user_id: string
+          _expires_at: string
+          _invite_id: string
+          _new_token_hash: string
+        }
+        Returns: Json
+      }
       resolve_worker_merge_chain: {
         Args: { _worker_id: string }
         Returns: string
       }
       restore_worker: { Args: { _worker_id: string }; Returns: Json }
       restore_worker_preview: { Args: { _worker_id: string }; Returns: Json }
+      revoke_invite: {
+        Args: { _acting_user_id: string; _invite_id: string }
+        Returns: Json
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
