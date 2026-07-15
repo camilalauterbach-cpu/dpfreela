@@ -46,12 +46,12 @@ export function DuplicateWorkerDialog({ state, onClose, onForceCreate, forcePend
     if (state?.kind !== "inactive") { setPreview(null); return; }
     if (!canRestore) return;
     setLoadingPreview(true);
-    supabase.rpc("restore_worker_preview" as any, { _worker_id: state.workerId })
-      .then(({ data, error }) => {
-        if (error) toast.error("Não foi possível carregar o preview.");
-        else setPreview(data);
-      })
-      .finally(() => setLoadingPreview(false));
+    (async () => {
+      const { data, error } = await supabase.rpc("restore_worker_preview" as any, { _worker_id: state.workerId });
+      if (error) toast.error("Não foi possível carregar o preview.");
+      else setPreview(data);
+      setLoadingPreview(false);
+    })();
   }, [state, canRestore]);
 
   const handleRestore = async () => {
