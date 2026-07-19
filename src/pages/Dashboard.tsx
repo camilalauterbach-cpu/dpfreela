@@ -8,6 +8,7 @@ import { InstallAppBanner } from "@/components/InstallAppBanner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useSstAlertCounts } from "@/hooks/useSstQualifications";
+import { DocumentComplianceSection } from "@/components/dashboard/DocumentComplianceSection";
 
 export default function Dashboard() {
   const { hasAnyRole } = useAuth();
@@ -143,6 +144,8 @@ export default function Dashboard() {
           )}
         </CardContent>
       </Card>
+
+      <DocumentComplianceSection />
     </div>
   );
 }
