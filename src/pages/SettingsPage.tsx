@@ -1,5 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, UserCircle, Building2, Palette, FileText, ShieldCheck, Users2, Mail } from "lucide-react";
+import { Users, UserCircle, Building2, Palette, FileText, ShieldCheck, Users2, Mail, Briefcase } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { SettingsUsers } from "@/components/settings/SettingsUsers";
@@ -10,6 +10,7 @@ import { SettingsLinksAdmission } from "@/components/settings/SettingsLinksAdmis
 import { SettingsAudit } from "@/components/settings/SettingsAudit";
 import { SettingsDuplicates } from "@/components/settings/SettingsDuplicates";
 import { SettingsInvites } from "@/components/settings/SettingsInvites";
+import { SettingsJobRoles } from "@/components/settings/SettingsJobRoles";
 
 export default function SettingsPage() {
   const { hasAnyRole, hasRole } = useAuth();
@@ -19,7 +20,7 @@ export default function SettingsPage() {
   const canEditGlobal = hasAnyRole(["admin", "manager"]);
   const isManager = hasAnyRole(["admin", "manager"]);
   const adminOnlyTabs = ["users", "audit", "duplicates"];
-  const managerTabs = ["invites"];
+  const managerTabs = ["invites", "job-roles"];
   const defaultTab =
     tab && (
       (isAdmin || !adminOnlyTabs.includes(tab)) &&
@@ -54,6 +55,12 @@ export default function SettingsPage() {
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Vínculos</span>
           </TabsTrigger>
+          {isManager && (
+            <TabsTrigger value="job-roles" className="gap-1.5 text-xs sm:text-sm">
+              <Briefcase className="h-4 w-4" />
+              <span className="hidden sm:inline">Cargos</span>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="preferences" className="gap-1.5 text-xs sm:text-sm">
             <Palette className="h-4 w-4" />
             <span className="hidden sm:inline">Preferências</span>
@@ -114,6 +121,11 @@ export default function SettingsPage() {
         {isManager && (
           <TabsContent value="invites">
             <SettingsInvites />
+          </TabsContent>
+        )}
+        {isManager && (
+          <TabsContent value="job-roles">
+            <SettingsJobRoles readOnly={!canEditGlobal} />
           </TabsContent>
         )}
       </Tabs>
