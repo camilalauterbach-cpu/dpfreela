@@ -131,6 +131,54 @@ export type Database = {
         }
         Relationships: []
       }
+      document_types: {
+        Row: {
+          category: string
+          code: string
+          created_at: string
+          created_by: string | null
+          default_validity_days: number | null
+          has_expiration: boolean
+          id: string
+          is_active: boolean
+          name: string
+          needs_review: boolean
+          notes: string | null
+          requires_file: boolean
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          code: string
+          created_at?: string
+          created_by?: string | null
+          default_validity_days?: number | null
+          has_expiration?: boolean
+          id?: string
+          is_active?: boolean
+          name: string
+          needs_review?: boolean
+          notes?: string | null
+          requires_file?: boolean
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          default_validity_days?: number | null
+          has_expiration?: boolean
+          id?: string
+          is_active?: boolean
+          name?: string
+          needs_review?: boolean
+          notes?: string | null
+          requires_file?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       employment_link_documents: {
         Row: {
           category: string | null
@@ -229,6 +277,7 @@ export type Database = {
           id: string
           job_function: string | null
           job_role: string | null
+          job_role_id: string | null
           link_name: string | null
           locker_number: string | null
           meal_allowance: number | null
@@ -281,6 +330,7 @@ export type Database = {
           id?: string
           job_function?: string | null
           job_role?: string | null
+          job_role_id?: string | null
           link_name?: string | null
           locker_number?: string | null
           meal_allowance?: number | null
@@ -333,6 +383,7 @@ export type Database = {
           id?: string
           job_function?: string | null
           job_role?: string | null
+          job_role_id?: string | null
           link_name?: string | null
           locker_number?: string | null
           meal_allowance?: number | null
@@ -376,6 +427,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employment_links_job_role_id_fkey"
+            columns: ["job_role_id"]
+            isOneToOne: false
+            referencedRelation: "job_roles"
             referencedColumns: ["id"]
           },
           {
@@ -546,6 +604,93 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      job_role_document_requirements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          display_order: number
+          document_type_id: string
+          id: string
+          is_mandatory: boolean
+          job_role_id: string
+          notes: string | null
+          updated_at: string
+          validity_days_override: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          document_type_id: string
+          id?: string
+          is_mandatory?: boolean
+          job_role_id: string
+          notes?: string | null
+          updated_at?: string
+          validity_days_override?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          document_type_id?: string
+          id?: string
+          is_mandatory?: boolean
+          job_role_id?: string
+          notes?: string | null
+          updated_at?: string
+          validity_days_override?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_role_document_requirements_document_type_id_fkey"
+            columns: ["document_type_id"]
+            isOneToOne: false
+            referencedRelation: "document_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_role_document_requirements_job_role_id_fkey"
+            columns: ["job_role_id"]
+            isOneToOne: false
+            referencedRelation: "job_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_roles: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       link_group_workers: {
         Row: {
@@ -1111,6 +1256,7 @@ export type Database = {
           deleted_at: string | null
           document_number: string | null
           document_type: string
+          document_type_id: string | null
           expiry_date: string | null
           file_name: string | null
           file_path: string | null
@@ -1130,6 +1276,7 @@ export type Database = {
           deleted_at?: string | null
           document_number?: string | null
           document_type: string
+          document_type_id?: string | null
           expiry_date?: string | null
           file_name?: string | null
           file_path?: string | null
@@ -1149,6 +1296,7 @@ export type Database = {
           deleted_at?: string | null
           document_number?: string | null
           document_type?: string
+          document_type_id?: string | null
           expiry_date?: string | null
           file_name?: string | null
           file_path?: string | null
@@ -1163,6 +1311,13 @@ export type Database = {
           worker_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "worker_documents_document_type_id_fkey"
+            columns: ["document_type_id"]
+            isOneToOne: false
+            referencedRelation: "document_types"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "worker_documents_worker_id_fkey"
             columns: ["worker_id"]
