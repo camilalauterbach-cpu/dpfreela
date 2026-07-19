@@ -2,6 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useMemo, useState } from "react";
 import {
   History,
   AlertCircle,
@@ -77,6 +79,40 @@ function groupByDay(items: ComplianceTimelineItem[]) {
 
 export function ComplianceTimeline({ linkId, className }: Props) {
   const { data, isLoading, isError } = useComplianceTimeline(linkId);
+  const [fSource, setFSource] = useState<string>("all");
+  const [fStatus, setFStatus] = useState<string>("all");
+  const [fDoc, setFDoc] = useState<string>("all");
+
+  const allItems = data?.items ?? [];
+  const documentOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const it of allItems) {
+      if (it.document_type_id && it.document_name) {
+        map.set(it.document_type_id, `${it.document_code ? `[${it.document_code}] ` : ""}${it.document_name}`);
+      }
+    }
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [allItems]);
+  const sourceOptions = useMemo(() => {
+    const set = new Set(allItems.map((i) => i.event_source));
+    return Array.from(set);
+  }, [allItems]);
+  const statusOptions = useMemo(() => {
+    const set = new Set(allItems.map((i) => i.current_status));
+    return Array.from(set);
+  }, [allItems]);
+
+  const items = useMemo(
+    () =>
+      allItems.filter(
+        (i) =>
+          (fSource === "all" || i.event_source === fSource) &&
+          (fStatus === "all" || i.current_status === fStatus) &&
+          (fDoc === "all" ||
+            (fDoc === "__overall__" ? i.entity_type === "overall" : i.document_type_id === fDoc)),
+      ),
+    [allItems, fSource, fStatus, fDoc],
+  );
 
   if (!linkId) {
     return (
@@ -114,7 +150,6 @@ export function ComplianceTimeline({ linkId, className }: Props) {
     );
   }
 
-  const items = data.items ?? [];
   const groups = groupByDay(items);
 
   return (
@@ -124,12 +159,46 @@ export function ComplianceTimeline({ linkId, className }: Props) {
           <History className="h-4 w-4 text-primary" />
           Histórico de conformidade
         </CardTitle>
+        {allItems.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Select value={fDoc} onValueChange={setFDoc}>
+              <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue placeholder="Documento" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os documentos</SelectItem>
+                <SelectItem value="__overall__">Somente geral</SelectItem>
+                {documentOptions.map(([id, label]) => (
+                  <SelectItem key={id} value={id}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={fSource} onValueChange={setFSource}>
+              <SelectTrigger className="h-8 w-[160px] text-xs"><SelectValue placeholder="Fonte" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as fontes</SelectItem>
+                {sourceOptions.map((s) => (
+                  <SelectItem key={s} value={s}>{SOURCE_LABEL[s] ?? s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={fStatus} onValueChange={setFStatus}>
+              <SelectTrigger className="h-8 w-[140px] text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os status</SelectItem>
+                {statusOptions.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {DOC_STATUS[s]?.label ?? OVERALL_STATUS[s]?.label ?? s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </CardHeader>
       <Separator />
       <CardContent className="p-0">
         {items.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-            Nenhuma transição registrada ainda.
+            {allItems.length === 0 ? "Nenhuma transição registrada ainda." : "Nenhum evento para os filtros selecionados."}
           </div>
         ) : (
           <ul className="divide-y">
