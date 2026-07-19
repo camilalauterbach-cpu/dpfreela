@@ -211,9 +211,7 @@ export default function Compliance() {
                     {it.job_role_name ?? "—"}
                   </TableCell>
                   <TableCell className="text-center">
-                    <ComplianceBadge tone={it.overall === "apto" ? "success" : it.overall === "atencao" ? "warning" : "danger"}>
-                      {OVERALL_LABEL[it.overall]}
-                    </ComplianceBadge>
+                    <ComplianceBadge overall={it.overall} />
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-center text-xs tabular-nums">
                     {it.score.valid}/{it.score.required}
