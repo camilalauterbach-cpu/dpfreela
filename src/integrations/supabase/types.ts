@@ -131,6 +131,80 @@ export type Database = {
         }
         Relationships: []
       }
+      document_compliance_history: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          current_status: string
+          document_type_id: string | null
+          employment_link_id: string
+          entity_type: string
+          event_source: string
+          id: string
+          previous_status: string | null
+          reason: string | null
+          worker_document_id: string | null
+          worker_id: string
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          current_status: string
+          document_type_id?: string | null
+          employment_link_id: string
+          entity_type: string
+          event_source: string
+          id?: string
+          previous_status?: string | null
+          reason?: string | null
+          worker_document_id?: string | null
+          worker_id: string
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          current_status?: string
+          document_type_id?: string | null
+          employment_link_id?: string
+          entity_type?: string
+          event_source?: string
+          id?: string
+          previous_status?: string | null
+          reason?: string | null
+          worker_document_id?: string | null
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_compliance_history_document_type_id_fkey"
+            columns: ["document_type_id"]
+            isOneToOne: false
+            referencedRelation: "document_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_compliance_history_employment_link_id_fkey"
+            columns: ["employment_link_id"]
+            isOneToOne: false
+            referencedRelation: "employment_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_compliance_history_worker_document_id_fkey"
+            columns: ["worker_document_id"]
+            isOneToOne: false
+            referencedRelation: "worker_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_compliance_history_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_types: {
         Row: {
           category: string
@@ -2062,6 +2136,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_link_compliance_timeline: {
+        Args: { p_limit?: number; p_link_id: string }
+        Returns: Json
+      }
       get_user_id_by_email: { Args: { _email: string }; Returns: string }
       has_any_role: {
         Args: {
@@ -2105,6 +2183,18 @@ export type Database = {
       }
       merge_workers_preview: {
         Args: { _primary: string; _secondary: string }
+        Returns: Json
+      }
+      record_compliance_transitions: {
+        Args: { p_event_source?: string; p_link_id: string }
+        Returns: Json
+      }
+      reevaluate_job_role_links: {
+        Args: { p_event_source?: string; p_job_role_id: string }
+        Returns: Json
+      }
+      reevaluate_worker_links: {
+        Args: { p_event_source?: string; p_worker_id: string }
         Returns: Json
       }
       register_sst_revision: { Args: { payload: Json }; Returns: Json }
