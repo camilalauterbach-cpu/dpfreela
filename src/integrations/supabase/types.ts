@@ -615,6 +615,7 @@ export type Database = {
           is_mandatory: boolean
           job_role_id: string
           notes: string | null
+          required_by: string
           updated_at: string
           validity_days_override: number | null
         }
@@ -627,6 +628,7 @@ export type Database = {
           is_mandatory?: boolean
           job_role_id: string
           notes?: string | null
+          required_by?: string
           updated_at?: string
           validity_days_override?: number | null
         }
@@ -639,6 +641,7 @@ export type Database = {
           is_mandatory?: boolean
           job_role_id?: string
           notes?: string | null
+          required_by?: string
           updated_at?: string
           validity_days_override?: number | null
         }
@@ -2040,6 +2043,10 @@ export type Database = {
         }
         Returns: Json
       }
+      document_compliance_summary: {
+        Args: { p_warning_days?: number }
+        Returns: Json
+      }
       ensure_current_user_access: {
         Args: never
         Returns: {
@@ -2047,6 +2054,7 @@ export type Database = {
         }[]
       }
       ensure_worker: { Args: { mode?: string; payload: Json }; Returns: Json }
+      evaluate_link_compliance: { Args: { p_link_id: string }; Returns: Json }
       get_audit_user_emails: {
         Args: { _user_ids: string[] }
         Returns: {
