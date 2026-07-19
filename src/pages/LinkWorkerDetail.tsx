@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useLinkGroup, useLinkGroupWorker } from "@/hooks/useLinkGroups";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +11,28 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2, Pencil } from "lucide-react";
 import { LinkDocumentsTab } from "@/components/links/LinkDocumentsTab";
 import { AllocationEditForm } from "@/components/links/AllocationEditForm";
+import { LinkComplianceCard } from "@/components/compliance/LinkComplianceCard";
+
+function useEmploymentLinkId(workerId?: string, eventId?: string | null) {
+  return useQuery({
+    queryKey: ["employment-link-for", workerId, eventId],
+    enabled: !!workerId && !!eventId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employment_links")
+        .select("id")
+        .eq("worker_id", workerId!)
+        .eq("event_id", eventId!)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.id ?? null;
+    },
+  });
+}
 
 const statusLabels: Record<string, string> = {
   draft: "Rascunho", active: "Ativo", suspended: "Suspenso",
@@ -78,6 +101,7 @@ export default function LinkWorkerDetail() {
 
   const g = group as any;
   const a = allocation as any;
+  const { data: employmentLinkId } = useEmploymentLinkId(workerId, g.event_id);
   const worker = a.workers;
   const eventName = g.events?.name || "—";
 
@@ -119,6 +143,7 @@ export default function LinkWorkerDetail() {
       <Tabs defaultValue="dados" className="w-full">
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="dados" className="text-xs sm:text-sm">Dados da alocação</TabsTrigger>
+          <TabsTrigger value="conformidade" className="text-xs sm:text-sm">Conformidade</TabsTrigger>
           <TabsTrigger value="documentos" className="text-xs sm:text-sm">Documentos</TabsTrigger>
         </TabsList>
 
@@ -215,6 +240,10 @@ export default function LinkWorkerDetail() {
               )}
             </>
           )}
+        </TabsContent>
+
+        <TabsContent value="conformidade" className="mt-4">
+          <LinkComplianceCard linkId={employmentLinkId} />
         </TabsContent>
 
         <TabsContent value="documentos" className="mt-4">
