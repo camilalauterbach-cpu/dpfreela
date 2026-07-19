@@ -34,8 +34,8 @@ export function DocumentComplianceSection() {
             </p>
           )}
         </div>
-        <Button size="sm" variant="ghost" onClick={() => navigate("/links")}>
-          Ver vínculos <ChevronRight className="ml-1 h-3 w-3" />
+        <Button size="sm" variant="ghost" onClick={() => navigate("/compliance")}>
+          Ver todos <ChevronRight className="ml-1 h-3 w-3" />
         </Button>
       </CardHeader>
 
@@ -69,21 +69,21 @@ export function DocumentComplianceSection() {
                 label="Aptos"
                 value={data.totals.aptos}
                 tone="ok"
-                onClick={() => navigate("/links?compliance=apto")}
+                onClick={() => navigate("/compliance?compliance=apto")}
               />
               <StatCard
                 icon={AlertTriangle}
                 label="Atenção"
                 value={data.totals.atencao}
                 tone="warn"
-                onClick={() => navigate("/links?compliance=atencao")}
+                onClick={() => navigate("/compliance?compliance=atencao")}
               />
               <StatCard
                 icon={ShieldAlert}
                 label="Bloqueados"
                 value={data.totals.bloqueados}
                 tone="danger"
-                onClick={() => navigate("/links?compliance=bloqueado")}
+                onClick={() => navigate("/compliance?compliance=bloqueado")}
               />
             </div>
 
@@ -109,7 +109,7 @@ export function DocumentComplianceSection() {
                       <button
                         className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-accent transition-colors"
                         onClick={() =>
-                          navigate(`/links?compliance=bloqueado&doc=${d.code}`)
+                          navigate(`/compliance?compliance=bloqueado&doc=${d.code}`)
                         }
                       >
                         <div className="min-w-0">
@@ -140,7 +140,7 @@ export function DocumentComplianceSection() {
                       <button
                         className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-accent transition-colors"
                         onClick={() =>
-                          navigate(`/links?job_role_id=${r.job_role_id}`)
+                          navigate(`/compliance?job_role_id=${r.job_role_id}`)
                         }
                       >
                         <div className="min-w-0 flex-1">

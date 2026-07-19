@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { BankDataForm } from "./BankDataForm";
 import { validateUpload, ALLOWED_FILE_EXTENSIONS, getSafeContentType } from "@/lib/upload-validation";
+import { invalidateComplianceCaches } from "@/lib/compliance-cache";
 
 interface Props {
   workerId: string;
@@ -137,6 +138,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["worker-documents", workerId] });
+      invalidateComplianceCaches(queryClient, { workerId });
       setUploadingCategory(null);
       toast({ title: "Documento enviado" });
     },
@@ -155,6 +157,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["worker-documents", workerId] });
+      invalidateComplianceCaches(queryClient, { workerId });
       toast({ title: "Status atualizado" });
     },
   });
@@ -175,6 +178,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["worker-documents", workerId] });
+      invalidateComplianceCaches(queryClient, { workerId });
     },
   });
 

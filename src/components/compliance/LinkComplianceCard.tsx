@@ -19,6 +19,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useEffect, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   useLinkCompliance,
   type ComplianceDocument,
@@ -92,6 +94,21 @@ interface Props {
  */
 export function LinkComplianceCard({ linkId, actions, className, compact = false }: Props) {
   const { data, isLoading, isError, refetch, isFetching } = useLinkCompliance(linkId);
+
+  // Audit: log first evaluation and subsequent status changes.
+  const previousOverallRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!linkId || !data?.overall) return;
+    const prev = previousOverallRef.current;
+    if (prev === data.overall) return;
+    (supabase.rpc as any)("log_compliance_evaluation", {
+      p_link_id: linkId,
+      p_current_overall: data.overall,
+      p_previous_overall: prev,
+      p_event_source: prev == null ? "view" : "reevaluate",
+    }).then(() => {});
+    previousOverallRef.current = data.overall;
+  }, [linkId, data?.overall]);
 
   if (!linkId) {
     return (

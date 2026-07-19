@@ -27,6 +27,7 @@ const Companies = lazy(() => import("./pages/Companies"));
 const CompanyForm = lazy(() => import("./pages/CompanyForm"));
 const CompanyDetail = lazy(() => import("./pages/CompanyDetail"));
 const Links = lazy(() => import("./pages/Links"));
+const Compliance = lazy(() => import("./pages/Compliance"));
 const LinkDetail = lazy(() => import("./pages/LinkDetail"));
 const LinkForm = lazy(() => import("./pages/LinkForm"));
 const LinkWorkerDetail = lazy(() => import("./pages/LinkWorkerDetail"));
@@ -93,6 +94,7 @@ const App = () => (
                 <Route path="/companies/:id" element={<CompanyDetail />} />
                 <Route path="/companies/:id/edit" element={<CompanyForm />} />
                 <Route path="/links" element={<Links />} />
+                <Route path="/compliance" element={<Compliance />} />
                 <Route path="/links/new" element={<LinkForm key="new" />} />
                 <Route path="/links/:id" element={<LinkDetail />} />
                 <Route path="/links/:groupId/workers/:workerId" element={<LinkWorkerDetail />} />
