@@ -3,7 +3,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   History,
   AlertCircle,
@@ -79,9 +80,19 @@ function groupByDay(items: ComplianceTimelineItem[]) {
 
 export function ComplianceTimeline({ linkId, className }: Props) {
   const { data, isLoading, isError } = useComplianceTimeline(linkId);
-  const [fSource, setFSource] = useState<string>("all");
-  const [fStatus, setFStatus] = useState<string>("all");
-  const [fDoc, setFDoc] = useState<string>("all");
+  const [params, setParams] = useSearchParams();
+  const fSource = params.get("tl_source") || "all";
+  const fStatus = params.get("tl_status") || "all";
+  const fDoc = params.get("tl_doc") || "all";
+  const setParam = (k: string, v: string) => {
+    const next = new URLSearchParams(params);
+    if (!v || v === "all") next.delete(k);
+    else next.set(k, v);
+    setParams(next, { replace: true });
+  };
+  const setFSource = (v: string) => setParam("tl_source", v);
+  const setFStatus = (v: string) => setParam("tl_status", v);
+  const setFDoc = (v: string) => setParam("tl_doc", v);
 
   const allItems = data?.items ?? [];
   const documentOptions = useMemo(() => {
