@@ -2078,7 +2078,27 @@ export type Database = {
         Returns: boolean
       }
       is_valid_cpf: { Args: { _cpf: string }; Returns: boolean }
+      list_link_compliance: {
+        Args: {
+          p_compliance?: string
+          p_doc_code?: string
+          p_job_role_id?: string
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+        }
+        Returns: Json
+      }
       list_worker_duplicate_candidates: { Args: never; Returns: Json }
+      log_compliance_evaluation: {
+        Args: {
+          p_current_overall: string
+          p_event_source?: string
+          p_link_id: string
+          p_previous_overall?: string
+        }
+        Returns: undefined
+      }
       merge_workers: {
         Args: { _confirmation: string; _primary: string; _secondary: string }
         Returns: Json
