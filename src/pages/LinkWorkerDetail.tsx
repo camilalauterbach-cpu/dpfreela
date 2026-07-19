@@ -12,6 +12,7 @@ import { ArrowLeft, Loader2, Pencil } from "lucide-react";
 import { LinkDocumentsTab } from "@/components/links/LinkDocumentsTab";
 import { AllocationEditForm } from "@/components/links/AllocationEditForm";
 import { LinkComplianceCard } from "@/components/compliance/LinkComplianceCard";
+import { ComplianceTimeline } from "@/components/compliance/ComplianceTimeline";
 
 function useEmploymentLinkId(workerId?: string, eventId?: string | null) {
   return useQuery({
@@ -243,7 +244,10 @@ export default function LinkWorkerDetail() {
         </TabsContent>
 
         <TabsContent value="conformidade" className="mt-4">
-          <LinkComplianceCard linkId={employmentLinkId} />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <LinkComplianceCard linkId={employmentLinkId} />
+            <ComplianceTimeline linkId={employmentLinkId} />
+          </div>
         </TabsContent>
 
         <TabsContent value="documentos" className="mt-4">
