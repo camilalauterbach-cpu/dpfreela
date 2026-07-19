@@ -138,7 +138,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["worker-documents", workerId] });
-      invalidateComplianceCaches(queryClient, { workerId });
+      invalidateComplianceCaches(queryClient, { workerId, eventSource: "upload" });
       setUploadingCategory(null);
       toast({ title: "Documento enviado" });
     },
@@ -157,7 +157,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["worker-documents", workerId] });
-      invalidateComplianceCaches(queryClient, { workerId });
+      invalidateComplianceCaches(queryClient, { workerId, eventSource: "admin_update" });
       toast({ title: "Status atualizado" });
     },
   });
@@ -178,7 +178,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["worker-documents", workerId] });
-      invalidateComplianceCaches(queryClient, { workerId });
+      invalidateComplianceCaches(queryClient, { workerId, eventSource: "admin_update" });
     },
   });
 
