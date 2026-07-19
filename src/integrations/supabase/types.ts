@@ -143,6 +143,7 @@ export type Database = {
           id: string
           previous_status: string | null
           reason: string | null
+          state_hash: string | null
           worker_document_id: string | null
           worker_id: string
         }
@@ -157,6 +158,7 @@ export type Database = {
           id?: string
           previous_status?: string | null
           reason?: string | null
+          state_hash?: string | null
           worker_document_id?: string | null
           worker_id: string
         }
@@ -171,6 +173,7 @@ export type Database = {
           id?: string
           previous_status?: string | null
           reason?: string | null
+          state_hash?: string | null
           worker_document_id?: string | null
           worker_id?: string
         }
@@ -352,6 +355,7 @@ export type Database = {
           job_function: string | null
           job_role: string | null
           job_role_id: string | null
+          last_compliance_check_at: string | null
           link_name: string | null
           locker_number: string | null
           meal_allowance: number | null
@@ -405,6 +409,7 @@ export type Database = {
           job_function?: string | null
           job_role?: string | null
           job_role_id?: string | null
+          last_compliance_check_at?: string | null
           link_name?: string | null
           locker_number?: string | null
           meal_allowance?: number | null
@@ -458,6 +463,7 @@ export type Database = {
           job_function?: string | null
           job_role?: string | null
           job_role_id?: string | null
+          last_compliance_check_at?: string | null
           link_name?: string | null
           locker_number?: string | null
           meal_allowance?: number | null
@@ -2106,6 +2112,7 @@ export type Database = {
         }
         Returns: Json
       }
+      compute_compliance_state_hash: { Args: { p_eval: Json }; Returns: string }
       create_invite_record: {
         Args: {
           _acting_user_id: string
@@ -2221,8 +2228,20 @@ export type Database = {
         Args: { _acting_user_id: string; _invite_id: string }
         Returns: Json
       }
+      run_compliance_expiration_job: {
+        Args: { p_force?: boolean; p_warning_days?: number }
+        Returns: Json
+      }
+      save_job_role_requirements: {
+        Args: { p_job_role_id: string; p_requirements: Json }
+        Returns: Json
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      simulate_link_compliance: {
+        Args: { p_link_id: string; p_overrides?: Json }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "operator" | "viewer"
