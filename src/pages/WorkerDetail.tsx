@@ -217,7 +217,7 @@ export default function WorkerDetail() {
         </TabsContent>
 
         <TabsContent value="sst" className="mt-4">
-          <SstQualificationsPanel workerId={worker.id} />
+          <SstQualificationsPanel workerId={worker.id} workerName={worker.full_name} />
         </TabsContent>
 
         <TabsContent value="pagamento" className="mt-4">

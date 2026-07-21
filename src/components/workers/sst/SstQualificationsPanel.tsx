@@ -13,7 +13,6 @@ import {
   Upload, RefreshCw, Replace, History, Users, MoreHorizontal,
   FileText, ExternalLink, ShieldCheck,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   useWorkerSstQualifications, useWorkerSstSummary,
@@ -24,6 +23,7 @@ import {
 } from "./SstStatusBadge";
 import { SstHistorySheet } from "./SstHistorySheet";
 import { SstLinksUsingSheet } from "./SstLinksUsingSheet";
+import { SstCertificateDrawer, type SstDrawerMode } from "./SstCertificateDrawer";
 
 function fmtDate(iso: string | null) {
   if (!iso) return "—";
@@ -43,10 +43,10 @@ function KpiCard({ label, value, tone }: { label: string; value: number; tone: s
 
 interface Props {
   workerId: string;
+  workerName: string;
 }
 
-export function SstQualificationsPanel({ workerId }: Props) {
-  const { toast } = useToast();
+export function SstQualificationsPanel({ workerId, workerName }: Props) {
   const { hasAnyRole } = useAuth();
   const canEdit = hasAnyRole(["admin", "manager", "operator"]);
   const { data: quals, isLoading } = useWorkerSstQualifications(workerId);
@@ -54,6 +54,9 @@ export function SstQualificationsPanel({ workerId }: Props) {
 
   const [historyOpen, setHistoryOpen] = useState<{ nr: string } | null>(null);
   const [linksOpen, setLinksOpen] = useState<{ nr: string; docTypeId: string | null } | null>(null);
+  const [drawer, setDrawer] = useState<
+    { mode: SstDrawerMode; current: SstCurrentRow | null; presetNrCode: string | null } | null
+  >(null);
 
   const rows = useMemo(() => {
     if (!quals) return [];
@@ -68,13 +71,6 @@ export function SstQualificationsPanel({ workerId }: Props) {
       return a.nr_code.localeCompare(b.nr_code, "pt-BR");
     });
   }, [quals]);
-
-  // Placeholder até a E-SST.2.C (drawer de envio de certificado).
-  const notYet = (label: string) =>
-    toast({
-      title: label,
-      description: "Disponível na E-SST.2.C — Drawer de envio de certificado.",
-    });
 
   return (
     <div className="space-y-4">
@@ -113,7 +109,7 @@ export function SstQualificationsPanel({ workerId }: Props) {
                 Nenhuma NR registrada para este trabalhador.
               </p>
               {canEdit && (
-                <Button size="sm" onClick={() => notYet("Anexar certificado")}>
+                <Button size="sm" onClick={() => setDrawer({ mode: "create", current: null, presetNrCode: null })}>
                   <Upload className="mr-1 h-3 w-3" /> Anexar primeiro certificado
                 </Button>
               )}
@@ -135,9 +131,9 @@ export function SstQualificationsPanel({ workerId }: Props) {
                     key={q.id}
                     q={q}
                     canEdit={canEdit}
-                    onUpload={() => notYet("Anexar certificado")}
-                    onRenew={() => notYet("Renovar NR")}
-                    onReplace={() => notYet("Substituir NR")}
+                    onUpload={() => setDrawer({ mode: "replace", current: q, presetNrCode: q.nr_code })}
+                    onRenew={() => setDrawer({ mode: "renew", current: q, presetNrCode: q.nr_code })}
+                    onReplace={() => setDrawer({ mode: "replace", current: q, presetNrCode: q.nr_code })}
                     onHistory={() => setHistoryOpen({ nr: q.nr_code })}
                     onLinks={() => setLinksOpen({ nr: q.nr_code, docTypeId: q.document_type_id })}
                   />
@@ -163,6 +159,17 @@ export function SstQualificationsPanel({ workerId }: Props) {
           workerId={workerId}
           documentTypeId={linksOpen.docTypeId}
           nrCode={linksOpen.nr}
+        />
+      )}
+      {drawer && (
+        <SstCertificateDrawer
+          open={!!drawer}
+          onOpenChange={(v) => !v && setDrawer(null)}
+          mode={drawer.mode}
+          workerId={workerId}
+          workerName={workerName}
+          current={drawer.current}
+          presetNrCode={drawer.presetNrCode}
         />
       )}
     </div>
