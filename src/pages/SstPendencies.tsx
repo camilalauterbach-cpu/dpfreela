@@ -355,8 +355,10 @@ export default function SstPendencies() {
                         )}
                       </div>
                       <div className="mt-1 text-[11px] text-muted-foreground">
-                        {worker.cpf || "sem CPF"} • Venc.: {fmtBR(q.expires_at)}
-                        {daysLeft != null && ` • ${daysLeft}d${q.expires_at ? ` (${fmtBR(q.expires_at)})` : ""}`}
+                        {worker.cpf || "sem CPF"}
+                        {daysLeft != null
+                          ? ` • ${daysLeft} dia${Math.abs(daysLeft) === 1 ? "" : "s"}${q.expires_at ? ` (${fmtBR(q.expires_at)})` : ""}`
+                          : q.expires_at ? ` • Venc.: ${fmtBR(q.expires_at)}` : ""}
                         {" • "}{DOC_LABEL_PT[q.document_status]}
                         {" • "}{EXP_LABEL_PT[q.expiration_status]}
                       </div>
