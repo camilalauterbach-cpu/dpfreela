@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, ShieldCheck, AlertTriangle, Clock, FileWarning, Loader2, Download, FileText } from "lucide-react";
+import { Link } from "react-router-dom";
 import { AddSstDialog } from "@/components/sst/AddSstDialog";
 import { SstPendenciesPanel } from "@/components/sst/SstPendenciesPanel";
 import { flattenWorkers, exportCsv, exportXlsx, exportPdfSummary } from "@/lib/sst/export";
@@ -158,6 +159,11 @@ export default function Sst() {
           <p className="text-sm text-muted-foreground">Acompanhamento de NRs e documentos de SST.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" className="gap-2">
+            <Link to="/sst/pendencias">
+              <AlertTriangle className="h-4 w-4" /> Ver pendências
+            </Link>
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2">

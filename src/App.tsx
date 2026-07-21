@@ -37,6 +37,7 @@ const PayrollDetail = lazy(() => import("./pages/PayrollDetail"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const Sst = lazy(() => import("./pages/Sst"));
 const SstImport = lazy(() => import("./pages/SstImport"));
+const SstPendencies = lazy(() => import("./pages/SstPendencies"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
 
@@ -104,6 +105,7 @@ const App = () => (
                 <Route path="/payroll/:id" element={<PayrollDetail />} />
                 <Route path="/payroll/:id/edit" element={<PayrollForm />} />
                 <Route path="/sst" element={<Sst />} />
+                <Route path="/sst/pendencias" element={<SstPendencies />} />
                 <Route path="/sst/import" element={<ProtectedRoute requiredRoles={["admin", "manager"]}><SstImport /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute requiredRoles={["admin", "manager"]}><SettingsPage /></ProtectedRoute>} />
                 <Route path="/settings/:tab" element={<ProtectedRoute requiredRoles={["admin", "manager"]}><SettingsPage /></ProtectedRoute>} />
