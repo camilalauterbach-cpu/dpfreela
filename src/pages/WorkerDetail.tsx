@@ -16,6 +16,7 @@ import { PaymentMethodsList } from "@/components/workers/PaymentMethodsList";
 import { DocumentChecklist } from "@/components/workers/DocumentChecklist";
 import { DpReadinessBadge } from "@/components/workers/DpReadinessBadge";
 import { WorkerLinksList } from "@/components/links/WorkerLinksList";
+import { SstQualificationsPanel } from "@/components/workers/sst/SstQualificationsPanel";
 
 export default function WorkerDetail() {
   const { id } = useParams();
@@ -107,6 +108,7 @@ export default function WorkerDetail() {
         <TabsList className="w-full justify-start">
           <TabsTrigger value="dados">Dados</TabsTrigger>
           <TabsTrigger value="documentos">Documentos</TabsTrigger>
+          <TabsTrigger value="sst">NRs e Certificações</TabsTrigger>
           <TabsTrigger value="pagamento">Pagamento</TabsTrigger>
           <TabsTrigger value="vinculos">Vínculos</TabsTrigger>
         </TabsList>
@@ -212,6 +214,10 @@ export default function WorkerDetail() {
 
         <TabsContent value="documentos" className="mt-4">
           <DocumentChecklist workerId={worker.id} workerName={worker.full_name} workerCpf={worker.cpf} />
+        </TabsContent>
+
+        <TabsContent value="sst" className="mt-4">
+          <SstQualificationsPanel workerId={worker.id} />
         </TabsContent>
 
         <TabsContent value="pagamento" className="mt-4">
