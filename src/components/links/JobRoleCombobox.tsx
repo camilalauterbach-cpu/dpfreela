@@ -13,6 +13,11 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useJobRoles } from "@/hooks/useJobRoles";
+import { Badge } from "@/components/ui/badge";
+
+// Normaliza string removendo acentos + lowercase para busca robusta.
+const norm = (s: string) =>
+  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 interface Props {
   value: string | null | undefined;
@@ -22,6 +27,8 @@ interface Props {
   className?: string;
   /** Se true, exibe indicador de erro (borda vermelha). */
   invalid?: boolean;
+  /** Se true, oculta a opção "Limpar seleção". */
+  required?: boolean;
 }
 
 /**
@@ -36,6 +43,7 @@ export function JobRoleCombobox({
   disabled,
   className,
   invalid,
+  required,
 }: Props) {
   const [open, setOpen] = useState(false);
   const { data: roles, isLoading } = useJobRoles();
@@ -80,15 +88,23 @@ export function JobRoleCombobox({
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command
           filter={(itemValue, search) => {
-            // itemValue = `${name} ${code}` lowercased below
-            return itemValue.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
+            // Busca apenas por nome, ignorando acentos e caixa.
+            return norm(itemValue).includes(norm(search)) ? 1 : 0;
           }}
         >
           <CommandInput placeholder="Buscar cargo…" className="h-9" />
           <CommandList>
+            {isLoading ? (
+              <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+              </div>
+            ) : (
+              <>
             <CommandEmpty>
               <div className="flex flex-col items-center gap-2 py-4 text-center">
-                <p className="text-sm text-muted-foreground">Nenhum cargo encontrado.</p>
+                <p className="text-sm text-muted-foreground">
+                  O cargo desejado não está cadastrado.
+                </p>
                 <Button
                   asChild
                   size="sm"
@@ -102,8 +118,24 @@ export function JobRoleCombobox({
               </div>
             </CommandEmpty>
             <CommandGroup>
+              {!required && selected && (
+                <CommandItem
+                  value="__clear__"
+                  onSelect={() => {
+                    onChange(null);
+                    setOpen(false);
+                  }}
+                  className="text-muted-foreground"
+                >
+                  <span className="flex items-center gap-2">
+                    <Check className="h-3.5 w-3.5 opacity-0" />
+                    Limpar seleção
+                  </span>
+                </CommandItem>
+              )}
               {(roles ?? []).map((role) => {
-                const label = `${role.name} ${role.code}`;
+                // Busca apenas por nome; code é interno.
+                const label = role.name;
                 const isSelected = role.id === value;
                 return (
                   <CommandItem
@@ -130,7 +162,9 @@ export function JobRoleCombobox({
                       <span className="truncate">{role.name}</span>
                     </span>
                     {!role.is_active && (
-                      <span className="text-xs text-muted-foreground">(Inativo)</span>
+                      <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
+                        Inativo
+                      </Badge>
                     )}
                   </CommandItem>
                 );
@@ -149,6 +183,8 @@ export function JobRoleCombobox({
                 </RouterLink>
               </Button>
             </div>
+              </>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
