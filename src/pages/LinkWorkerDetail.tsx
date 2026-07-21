@@ -181,7 +181,7 @@ export default function LinkWorkerDetail() {
                 <CardHeader><CardTitle className="text-base">Contrato</CardTitle></CardHeader>
                 <CardContent className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                   {info("Tipo de contrato", contractTypeLabels[a.contract_type] || a.contract_type)}
-                  {info("Função/Cargo", a.job_role)}
+                  {info("Função/Cargo", a.job_roles?.name || a.job_role)}
                   {info("Atividade", a.job_function)}
                   {info("Departamento", a.department)}
                   {info("Data início", formatDateBR(a.hire_date))}

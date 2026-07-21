@@ -58,7 +58,8 @@ export function WorkerLinksList({ workerId }: Props) {
                 <div className="space-y-2">
                   {(links as any[]).map((link) => {
                     const eventName = (link.events as any)?.name || "Sem evento";
-                    const displayName = link.link_name || `${link.job_role || "—"} — ${eventName}`;
+                    const roleName = (link as any).job_roles?.name || link.job_role || "—";
+                    const displayName = link.link_name || `${roleName} — ${eventName}`;
                     return (
                       <div
                         key={link.id}
@@ -102,7 +103,7 @@ export function WorkerLinksList({ workerId }: Props) {
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">{groupName}</p>
                           <p className="text-xs text-muted-foreground truncate">
-                            {allocation.job_role || "Sem função definida"} · {eventName}
+                            {(allocation as any).job_roles?.name || allocation.job_role || "Sem função definida"} · {eventName}
                             {allocation.hire_date && ` · ${new Date(allocation.hire_date + "T12:00:00").toLocaleDateString("pt-BR")}`}
                           </p>
                         </div>

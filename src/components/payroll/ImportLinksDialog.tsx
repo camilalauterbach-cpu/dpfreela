@@ -28,7 +28,7 @@ export function ImportLinksDialog({ batchId, eventId, existingWorkerIds, onClose
     queryFn: async () => {
       let query = supabase
         .from("employment_links")
-        .select("id, link_name, worker_id, job_role, daily_rate, fixed_salary, hire_date, end_date, status, workers(full_name, nickname, cpf)")
+        .select("id, link_name, worker_id, job_role, job_role_id, daily_rate, fixed_salary, hire_date, end_date, status, workers(full_name, nickname, cpf), job_roles:job_role_id(name)")
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
 
@@ -124,7 +124,7 @@ export function ImportLinksDialog({ batchId, eventId, existingWorkerIds, onClose
                       <span className="font-medium">{(l.workers as any)?.full_name}</span>
                       {(l.workers as any)?.nickname && <span className="text-xs text-muted-foreground ml-1">({(l.workers as any).nickname})</span>}
                     </TableCell>
-                    <TableCell className="text-sm">{l.job_role || "—"}</TableCell>
+                    <TableCell className="text-sm">{l.job_roles?.name || l.job_role || "—"}</TableCell>
                     <TableCell className="text-right text-sm">
                       {(Number(l.daily_rate) || Number(l.fixed_salary) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                     </TableCell>

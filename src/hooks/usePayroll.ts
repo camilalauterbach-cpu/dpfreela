@@ -58,7 +58,7 @@ export function usePayrollBatchItems(batchId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("payroll_batch_items")
-        .select("*, workers(full_name, nickname, cpf), employment_links(link_name, job_role, daily_rate, fixed_salary)")
+        .select("*, workers(full_name, nickname, cpf), employment_links(link_name, job_role, job_role_id, daily_rate, fixed_salary, job_roles:job_role_id(id, name, is_active))")
         .eq("batch_id", batchId!)
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
