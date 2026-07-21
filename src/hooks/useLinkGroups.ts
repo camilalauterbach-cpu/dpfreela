@@ -80,7 +80,7 @@ export function useLinkGroupWorkers(groupId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("link_group_workers")
-        .select("*, workers(full_name, nickname, cpf, phone_main), job_roles:job_role_id(id, name, is_active)")
+        .select("*, workers(full_name, nickname, cpf, phone_main)")
         .eq("link_group_id", groupId!)
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
@@ -104,7 +104,7 @@ export function useWorkerGroupAllocations(workerId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("link_group_workers")
-        .select("id, worker_id, link_group_id, job_role, job_role_id, status, hire_date, link_groups(group_name, events(name)), job_roles:job_role_id(id, name, is_active)")
+        .select("id, worker_id, link_group_id, job_role, status, hire_date, link_groups(group_name, events(name))")
         .eq("worker_id", workerId!)
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
@@ -238,7 +238,7 @@ export function useLinkGroupWorker(groupId: string | undefined, workerId: string
     queryFn: async () => {
       const { data, error } = await supabase
         .from("link_group_workers")
-        .select("*, workers(full_name, nickname, cpf, phone_main), job_roles:job_role_id(id, name, is_active)")
+        .select("*, workers(full_name, nickname, cpf, phone_main)")
         .eq("link_group_id", groupId!)
         .eq("worker_id", workerId!)
         .is("deleted_at", null)
