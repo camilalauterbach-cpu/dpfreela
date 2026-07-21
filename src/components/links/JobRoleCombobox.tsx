@@ -16,8 +16,9 @@ import { useJobRoles } from "@/hooks/useJobRoles";
 import { Badge } from "@/components/ui/badge";
 
 // Normaliza string removendo acentos + lowercase para busca robusta.
-const norm = (s: string) =>
-  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const norm = (s?: string) =>
+  (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
 
 interface Props {
   value: string | null | undefined;
