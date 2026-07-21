@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertTriangle, Loader2, Lock, CheckCircle2, User, Link2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
 
 type Scope = "worker" | "employment_link";
 
@@ -23,6 +24,26 @@ interface DocType {
   category: string;
   is_active: boolean;
   storage_scope: Scope | null;
+}
+
+interface GateRow {
+  document_type_id: string;
+  suggested_scope: Scope | null;
+  suggestion_reason: string | null;
+  notes: string | null;
+}
+
+interface UsageRow {
+  document_type_id: string;
+  worker_count: number;
+  link_count: number;
+}
+
+interface GateStatus {
+  total: number;
+  resolved: number;
+  pending: number;
+  ready_for_step_2: boolean;
 }
 
 interface Props { readOnly?: boolean }
@@ -48,6 +69,7 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
   const [chosenScope, setChosenScope] = useState<Scope | null>(null);
   const [force, setForce] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [notes, setNotes] = useState("");
 
   const q = useQuery({
     queryKey: ["settings-doc-types-scope"],
@@ -61,8 +83,50 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
     },
   });
 
+  const gateQ = useQuery({
+    queryKey: ["settings-doc-types-gate-rows"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("document_type_scope_backfill_unmatched")
+        .select("document_type_id, suggested_scope, suggestion_reason, notes");
+      if (error) throw error;
+      return (data ?? []) as GateRow[];
+    },
+  });
+
+  const usageQ = useQuery({
+    queryKey: ["settings-doc-types-usage"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("document_type_usage_counts" as any);
+      if (error) throw error;
+      return (data ?? []) as UsageRow[];
+    },
+  });
+
+  const statusQ = useQuery({
+    queryKey: ["settings-doc-types-gate-status"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("document_type_scope_gate_status" as any);
+      if (error) throw error;
+      return data as unknown as GateStatus;
+    },
+  });
+
+  const gateByType = useMemo(() => {
+    const m = new Map<string, GateRow>();
+    (gateQ.data ?? []).forEach((r) => m.set(r.document_type_id, r));
+    return m;
+  }, [gateQ.data]);
+
+  const usageByType = useMemo(() => {
+    const m = new Map<string, UsageRow>();
+    (usageQ.data ?? []).forEach((r) => m.set(r.document_type_id, r));
+    return m;
+  }, [usageQ.data]);
+
   const all = q.data ?? [];
-  const pendingCount = all.filter((d) => d.storage_scope == null).length;
+  const pendingCount = statusQ.data?.pending ?? all.filter((d) => d.storage_scope == null).length;
+  const readyForStep2 = statusQ.data?.ready_for_step_2 ?? pendingCount === 0;
 
   const filtered = useMemo(() => {
     const norm = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
@@ -85,18 +149,26 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
     setEditing(d);
     setChosenScope(d.storage_scope ?? null);
     setForce(false);
+    setNotes(gateByType.get(d.id)?.notes ?? "");
   };
 
   const closeEdit = () => {
     setEditing(null);
     setChosenScope(null);
     setForce(false);
+    setNotes("");
   };
 
   const save = async () => {
     if (!editing || !chosenScope) return;
-    const isChange = editing.storage_scope != null && editing.storage_scope !== chosenScope;
-    if (isChange && !force) {
+    const scopeChanged = editing.storage_scope !== chosenScope;
+    const notesChanged = (gateByType.get(editing.id)?.notes ?? "") !== notes;
+    if (!scopeChanged && !notesChanged) {
+      closeEdit();
+      return;
+    }
+    const isForcedChange = editing.storage_scope != null && scopeChanged;
+    if (isForcedChange && !force) {
       toast({
         title: "Alteração bloqueada",
         description: "O escopo já foi definido. Marque 'forçar alteração' para prosseguir.",
@@ -109,11 +181,16 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
       const { error } = await supabase.rpc("resolve_document_type_scope", {
         p_document_type_id: editing.id,
         p_scope: chosenScope,
-        p_force: isChange,
+        p_notes: notes.trim() ? notes.trim() : null,
+        p_force: isForcedChange,
       } as any);
       if (error) throw error;
       toast({ title: "Escopo definido", description: `${editing.name} → ${chosenScope === "worker" ? "Trabalhador" : "Vínculo"}` });
-      await qc.invalidateQueries({ queryKey: ["settings-doc-types-scope"] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["settings-doc-types-scope"] }),
+        qc.invalidateQueries({ queryKey: ["settings-doc-types-gate-rows"] }),
+        qc.invalidateQueries({ queryKey: ["settings-doc-types-gate-status"] }),
+      ]);
       closeEdit();
     } catch (err: any) {
       toast({ title: "Erro", description: err?.message ?? "Falha ao salvar", variant: "destructive" });
@@ -163,6 +240,15 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
           </Alert>
         )}
 
+        {pendingCount === 0 && readyForStep2 && (
+          <Alert>
+            <CheckCircle2 className="h-4 w-4" />
+            <AlertDescription>
+              Todos os tipos possuem escopo definido. O sistema está pronto para o Passo 2 da E-DOC.2.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="flex flex-wrap gap-2">
           <FilterChip value="pending" label="Pendentes" count={pendingCount} />
           <FilterChip value="all" label="Todos" count={all.length} />
@@ -196,6 +282,7 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
                   <TableHead>Nome</TableHead>
                   <TableHead className="hidden sm:table-cell">Categoria</TableHead>
                   <TableHead>Escopo</TableHead>
+                  <TableHead className="hidden md:table-cell">Utilizado por</TableHead>
                   <TableHead className="hidden sm:table-cell">Status</TableHead>
                   <TableHead className="w-[110px] text-right">Ação</TableHead>
                 </TableRow>
@@ -203,13 +290,14 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
               <TableBody>
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                       Nenhum tipo encontrado para este filtro.
                     </TableCell>
                   </TableRow>
                 )}
                 {filtered.map((d) => {
                   const pending = d.storage_scope == null;
+                  const usage = usageByType.get(d.id);
                   return (
                     <TableRow key={d.id} className={pending ? "bg-yellow-50 dark:bg-yellow-950/20" : undefined}>
                       <TableCell className="font-mono text-xs">{d.code}</TableCell>
@@ -227,9 +315,22 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
                             <Link2 className="h-3 w-3" /> Vínculo
                           </Badge>
                         ) : (
-                          <Badge variant="destructive" className="gap-1">
+                          <Badge
+                            variant="outline"
+                            className="gap-1 border-yellow-500 bg-yellow-50 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-200"
+                          >
                             <AlertTriangle className="h-3 w-3" /> Pendente
                           </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+                        {usage ? (
+                          <div className="space-y-0.5 leading-tight">
+                            <div><span className="font-medium text-foreground">{usage.worker_count}</span> trabalhadores</div>
+                            <div><span className="font-medium text-foreground">{usage.link_count}</span> vínculos</div>
+                          </div>
+                        ) : (
+                          <span className="opacity-60">—</span>
                         )}
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
@@ -268,6 +369,30 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
               Escolha onde este tipo de documento é armazenado. A decisão é praticamente imutável.
             </DialogDescription>
           </DialogHeader>
+
+          {editing && gateByType.get(editing.id)?.suggestion_reason && (
+            <Alert>
+              <AlertDescription className="text-sm">
+                <span className="font-medium">Sugestão do sistema: </span>
+                {gateByType.get(editing.id)?.suggested_scope === "worker" ? "Trabalhador" : gateByType.get(editing.id)?.suggested_scope === "employment_link" ? "Vínculo" : "—"}
+                {" — "}
+                <span className="text-muted-foreground">{gateByType.get(editing.id)?.suggestion_reason}</span>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {editing && (() => {
+            const u = usageByType.get(editing.id);
+            if (!u || (u.worker_count === 0 && u.link_count === 0)) return null;
+            return (
+              <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                <div className="font-medium mb-1">Impacto atual</div>
+                <div className="text-muted-foreground">
+                  {u.worker_count} trabalhador(es) e {u.link_count} vínculo(s) já possuem documentos deste tipo.
+                </div>
+              </div>
+            );
+          })()}
 
           <RadioGroup
             value={chosenScope ?? undefined}
@@ -309,6 +434,17 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
             </label>
           </RadioGroup>
 
+          <div className="space-y-1.5">
+            <Label htmlFor="scope-notes" className="text-sm">Notas (opcional)</Label>
+            <Textarea
+              id="scope-notes"
+              placeholder="Justificativa ou observações sobre esta decisão..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+            />
+          </div>
+
           {editing?.storage_scope != null && chosenScope && editing.storage_scope !== chosenScope && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
@@ -336,7 +472,7 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
             <Button variant="outline" onClick={closeEdit} disabled={saving}>Cancelar</Button>
             <Button onClick={save} disabled={saving || !chosenScope}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Salvar
+              {editing?.storage_scope == null ? "Definir escopo" : (editing.storage_scope !== chosenScope ? "Alterar escopo" : "Salvar")}
             </Button>
           </DialogFooter>
         </DialogContent>
