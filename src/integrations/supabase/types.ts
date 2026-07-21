@@ -748,6 +748,42 @@ export type Database = {
           },
         ]
       }
+      job_role_backfill_unmatched: {
+        Row: {
+          created_at: string
+          id: string
+          normalized_text: string
+          occurrences: number
+          original_text: string
+          source_row_id: string
+          source_table: string
+          suggested_name: string
+          suggested_slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          normalized_text: string
+          occurrences?: number
+          original_text: string
+          source_row_id: string
+          source_table: string
+          suggested_name: string
+          suggested_slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          normalized_text?: string
+          occurrences?: number
+          original_text?: string
+          source_row_id?: string
+          source_table?: string
+          suggested_name?: string
+          suggested_slug?: string
+        }
+        Relationships: []
+      }
       job_role_document_requirements: {
         Row: {
           created_at: string
@@ -2367,6 +2403,7 @@ export type Database = {
         Args: { p_warning_days?: number }
         Returns: Json
       }
+      dry_run_job_role_backfill: { Args: never; Returns: Json }
       ensure_current_user_access: {
         Args: never
         Returns: {
@@ -2375,7 +2412,9 @@ export type Database = {
       }
       ensure_worker: { Args: { mode?: string; payload: Json }; Returns: Json }
       evaluate_link_compliance: { Args: { p_link_id: string }; Returns: Json }
+      f_normalize_job_role: { Args: { p_text: string }; Returns: string }
       f_normalize_nr_code: { Args: { _raw: string }; Returns: string }
+      f_slugify_job_role: { Args: { p_text: string }; Returns: string }
       get_audit_user_emails: {
         Args: { _user_ids: string[] }
         Returns: {
@@ -2493,6 +2532,7 @@ export type Database = {
         Args: { p_link_id: string; p_overrides?: Json }
         Returns: Json
       }
+      unaccent: { Args: { "": string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "manager" | "operator" | "viewer"
