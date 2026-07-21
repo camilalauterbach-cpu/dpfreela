@@ -1,130 +1,192 @@
-## E-ADMIN.2 — Remoção definitiva de Cargo/Função livre + Consolidação da fonte única (APROVADA)
 
-Fecha o ciclo de `job_roles` como entidade mestre. Ao final: todo vínculo/alocação exige `job_role_id`; nenhuma tela aceita cargo digitado; toda leitura vem de `job_roles` + `evaluate_link_compliance`. Backfill **nunca autocria cargos**.
+# E-QUALIF.1 — Painel de Qualificações (substitui Conformidade)
 
-### 1. Backend — reconciliação sem autocriação
+## Mudança de conceito
 
-**Passo 1 · Migration de reconciliação (dry-run + gate)** — cria `job_role_backfill_unmatched`, popula com toda linha sem match normalizado, e se houver linhas `RAISE EXCEPTION` com contagem + 10 amostras. Nada muda no banco.
+- Removemos a tela `Conformidade` como superfície principal.
+- Criamos **Painel de Qualificações**: matriz `trabalhador × documento` com bolinhas coloridas por status.
+- O motor de conformidade continua existindo, mas rebaixado para uso interno em telas de vínculo/credenciamento (badge contextual, nunca lista agregada).
+- O rótulo `Apto` deixa de ser exibido ao usuário. Passa a ser um cálculo derivado, consumido apenas por regras de credenciamento.
 
-**Passo 2 · Migration estrutural (só passa com gate vazio)** — adiciona `link_group_workers.job_role_id UUID FK`, backfill exato normalizado, reexecuta gate, `SET NOT NULL` em ambas as tabelas, índice.
+## Menu e rota
 
-**Passo 3 · Trigger `f_enforce_link_job_role()`** compartilhada com mensagens PT distintas: nulo, inexistente/soft-deleted, inativo.
+- Sidebar: item **Conformidade** vira **Qualificações** (ícone `ShieldCheck` → `Grid3x3` ou similar).
+- Rota `/compliance` → redireciona para `/qualifications`.
+- Página antiga `src/pages/Compliance.tsx` removida; hook `useLinkComplianceList` fica só onde o motor ainda é usado internamente (badge de vínculo).
 
-**Passo 4 · `job_role` texto** vira read-only (rollback/export). Sem sync.
+## Estrutura do painel
 
-### 2. Frontend — Combobox único
+### Linhas
+Uma linha por trabalhador ativo (não por vínculo). O painel é sobre a **pessoa**, não sobre o contrato. Isso é o que muda tudo — hoje o módulo pergunta "este vínculo está ok?", o painel pergunta "esta pessoa tem as qualificações?".
 
-`JobRoleCombobox.tsx` (Command+Popover), fonte `job_roles` staleTime 2min, ativos selecionáveis, inativos cinza `(Inativo)` desabilitados. Empty state com CTA para `/settings?tab=job-roles`. Sem criação inline.
+### Colunas
+Configuráveis pelo usuário. Fonte de tipos:
+- `document_types` com `category IN ('sst_nr','sst_aso','training')` e `is_active = true`, ordenados por `display_order`.
+- O usuário escolhe quais colunas quer ver (persistido em `saved_filters` por usuário).
+- Preset padrão: ASO + todas as NRs ativas na empresa.
 
-Substituir em `LinkDetail.tsx` (Alocar) e `AllocationEditForm.tsx`. Adicionar join `job_roles:job_role_id(name, is_active)` em: `useEmploymentLinks`, `useLinkGroups`, `usePayroll`, `WorkerLinksList`, `LinkWorkerDetail`, `PayrollDetail`, `PayrollItemForm`, `ImportLinksDialog`, e exports.
+### Célula (status por trabalhador × tipo)
+Cinco estados visuais:
 
-### 3. Consolidação da fonte única
+| Símbolo | Estado | Regra |
+|---|---|---|
+| 🟢 verde | válido | doc/NR existe, `is_current`, sem vencimento ou `expiry > today + warning_days` |
+| 🟡 amarelo | vence em breve | dentro de `warning_days` (default 30) |
+| 🔴 vermelho | vencido | `expiry < today` |
+| ⚪ cinza | ausente | tipo é considerado relevante para o trabalhador (ver escopo abaixo) mas não há registro |
+| — | não aplicável | tipo não é relevante para nenhum vínculo/cargo do trabalhador |
 
-**Cadeia canônica:** `job_roles → employment_links.job_role_id → link_group_workers.job_role_id → evaluate_link_compliance → list_link_compliance → UI`.
+### Definição de "relevante para o trabalhador"
+Um tipo de documento é `⚪ ausente` (e não `— n/a`) quando:
+- É exigido por **algum cargo** de vínculo ativo do trabalhador, OU
+- É um override `add` em algum vínculo ativo, OU
+- O usuário forçou como "sempre mostrar" no filtro.
 
-**`nao_configurado` — decidido por CONFIGURAÇÃO DO CARGO, não por matriz efetiva** (short-circuit em `evaluate_link_compliance`, ANTES do motor):
+Caso contrário, exibe `—`.
 
-```text
-v_role_configured := EXISTS (
-  SELECT 1 FROM job_role_document_requirements
-  WHERE job_role_id = link.job_role_id AND is_active
-);
-v_effective_required := resolveRequiredDocuments(link);
+Isso resolve o problema atual: o painel só considera um documento como "faltando" quando existe uma exigência real, calculada pelas mesmas fontes que o motor de conformidade usa. Nunca há falso positivo silencioso, porque não há agregador binário.
 
-IF NOT v_role_configured AND cardinality(v_effective_required) = 0 THEN
-  overall := 'nao_configurado';
-ELSE
-  overall := calculate_compliance_overall(v_effective_required);
-END IF;
+## Interação
+
+### Clique na célula
+Abre `QualificationCell` em Popover/Sheet com:
+- Nome do documento + status
+- Data de emissão, validade, emitente, carga horária (para NRs)
+- Botões contextuais:
+  - 🟢/🟡 → "Ver arquivo" (signed URL), "Ver histórico", "Enviar revisão"
+  - 🔴/⚪ → "Enviar certificado" (abre `SstCertificateDrawer` para SST, ou upload padrão para o resto)
+- Link "Abrir ficha do trabalhador" para o caso complexo
+
+### Clique no nome do trabalhador
+Vai para `/workers/:id` (comportamento atual).
+
+### Filtros no topo
+- Busca por nome/CPF
+- Seletor de colunas visíveis (multi-select com preset "SST essencial")
+- Filtro por estado: "com vermelhos", "com amarelos", "com ausentes", "sem pendências"
+- Filtro por evento/vínculo ativo (opcional)
+- Filtro por cargo
+
+### Contadores no topo
+Substituem o resumo atual "aptos/atenção/bloqueados". Passam a ser:
+- N trabalhadores no painel
+- N com pelo menos 1 documento vencido
+- N com pelo menos 1 documento vencendo em 30 dias
+- N com pelo menos 1 documento ausente
+
+Todos clicáveis (filtro rápido).
+
+### Exportação
+CSV e XLSX da matriz visível (linhas × colunas selecionadas), status por célula em texto.
+
+## Onde a conformidade sobrevive
+
+Em duas superfícies apenas, com escopo estritamente contextual:
+
+1. **`LinkWorkerDetail`** — dentro do vínculo, mantém `LinkComplianceCard` porque ali a pergunta legítima é "este trabalhador atende os requisitos deste cargo neste vínculo?". **Correção obrigatória antes do painel:** o motor precisa emitir `nao_configurado` (e não `apto`) quando `required = 0` ou quando `job_role_id IS NULL`. Sem essa correção, o card continua mentindo dentro do vínculo.
+2. **`PayrollForm` / futuro credenciamento** — usa `evaluate_link_compliance` internamente para bloquear inclusão de vínculo com pendências, exibindo os documentos faltantes por nome (não um selo genérico).
+
+Nenhuma outra tela renderiza `overall`.
+
+## Backend
+
+### RPC nova: `list_worker_qualifications`
+
+Assinatura:
+```
+list_worker_qualifications(
+  p_document_type_ids uuid[] DEFAULT NULL,   -- NULL = todos ativos SST/training
+  p_search text DEFAULT NULL,
+  p_state text DEFAULT NULL,                  -- 'expired' | 'warning' | 'missing' | 'ok' | NULL
+  p_event_id uuid DEFAULT NULL,
+  p_job_role_id uuid DEFAULT NULL,
+  p_limit int DEFAULT 100,
+  p_offset int DEFAULT 0
+) RETURNS jsonb
 ```
 
-`calculate_compliance_overall` permanece **pura e IMMUTABLE**. Vínculo com cargo configurado mas totalmente dispensado por override/waiver segue `apto`. Estrutura extensível: futuras origens (evento/empresa/template) apenas enriquecem `v_role_configured` sem tocar o motor.
+Retorna:
+```json
+{
+  "schema_version": 1,
+  "generated_at": "...",
+  "columns": [{ "document_type_id", "code", "name", "category" }],
+  "total": N,
+  "items": [{
+    "worker_id", "worker_name", "cpf_masked",
+    "cells": [{
+      "document_type_id",
+      "status": "ok|warning|expired|missing|not_applicable",
+      "expiry_date", "issue_date", "issuer",
+      "worker_document_id", "sst_qualification_id",
+      "is_required_by": ["job_role:<uuid>", "link_override:<uuid>"] | []
+    }]
+  }]
+}
+```
 
-Contrato `ComplianceOverall` ganha `'nao_configurado'` (label "Cargo sem requisitos", tom `warning`). `ComplianceBadge` e agregados renderizam o estado.
+Fontes: `worker_sst_qualifications_current` (NRs) + `worker_documents` (`is_current = true`) unidos por `document_type_id`. "Relevância" calculada por CTE que agrega requisitos dos vínculos ativos do trabalhador.
 
-**`list_link_compliance`** apenas agrega — loop chamando `evaluate_link_compliance`, zero cálculo próprio.
+### RPC nova: `get_qualification_cell(p_worker_id, p_document_type_id)`
+Detalhe expandido de uma célula para o popover: histórico de revisões, signed URL, próxima renovação sugerida.
 
-**Status Shakira ("Rascunho")** — corrigir toda leitura para `employment_links.status`, nunca `link_groups.status`.
+### Sem migração destrutiva
+Nenhuma tabela é alterada. `document_compliance_history` e `evaluate_link_compliance` permanecem — o painel apenas não os consulta.
 
-### 4. Critérios de aceite
+## Frontend
 
-- Nenhum input de Cargo/Função editável em telas operacionais.
-- `link_group_workers.job_role_id` e `employment_links.job_role_id` `NOT NULL`.
-- Trigger com mensagens PT distintas.
-- Combobox único; inativos visíveis não selecionáveis; CTA no empty.
-- `bun run build` limpo.
-- **Auditoria backend (leituras):** `rg "\.job_role[^_]"` em `src/` = 0 em código de negócio (fora de blocos legado/export marcados).
-- **Auditoria frontend (escritas):** `rg "job_role_id"` — confirmar que toda gravação usa UUID.
-- Nenhum "Apto" sem `evaluate_link_compliance` retornar `apto`.
-- Cargos não configurados → `nao_configurado`; cargos configurados com override total → `apto`.
-- `list_link_compliance` só agrega (verificado no corpo da RPC).
-- Cargos vêm exclusivamente de `job_roles.name`.
-- Status de vínculo vem de `employment_links.status` (caso Shakira).
-- **Checks pós-deploy (obrigatórios, mesmo com NOT NULL):**
-  ```sql
-  SELECT COUNT(*) FROM link_group_workers WHERE job_role_id IS NULL;  -- = 0
-  SELECT COUNT(*) FROM employment_links   WHERE job_role_id IS NULL;  -- = 0
-  SELECT DISTINCT job_role FROM employment_links
-  UNION
-  SELECT DISTINCT job_role FROM link_group_workers;  -- só legado
-  ```
+### Arquivos novos
+- `src/pages/Qualifications.tsx` — página principal.
+- `src/components/qualifications/QualificationMatrix.tsx` — grid virtualizada (react-virtual) para escalar até ~1000 trabalhadores.
+- `src/components/qualifications/QualificationCell.tsx` — bolinha + popover.
+- `src/components/qualifications/QualificationColumnPicker.tsx` — seletor de colunas com persistência.
+- `src/components/qualifications/QualificationFilters.tsx`.
+- `src/hooks/useWorkerQualifications.ts`.
+- `src/lib/qualifications-export.ts`.
 
-### 5. Detalhes técnicos
+### Arquivos alterados
+- `src/App.tsx` — rota `/qualifications`, redirect `/compliance`.
+- `src/components/AppSidebar.tsx` — renomeia item, novo ícone.
+- `src/pages/Dashboard.tsx` — se houver card "Conformidade", vira "Qualificações" e aponta para o painel.
 
-- Normalização: `regexp_replace(lower(unaccent(trim(coalesce(x,'')))), '\s+', ' ', 'g')`.
-- Slug: `regexp_replace(lower(unaccent(name)), '[^a-z0-9]+', '_', 'g')`.
-- Trigger única `f_enforce_link_job_role()` via `TG_TABLE_NAME`.
-- `useLinkCompliance` mantém `staleTime: 30s`.
+### Arquivos removidos
+- `src/pages/Compliance.tsx`
+- `src/hooks/useLinkComplianceList.ts` (usado só pela tela agregada — o painel não usa)
+- `src/lib/compliance-export.ts` (substituído por `qualifications-export.ts`)
 
-### Fora de escopo
+### Arquivos mantidos
+- `src/components/compliance/LinkComplianceCard.tsx` — segue em uso dentro do vínculo, com a correção do estado `nao_configurado`.
+- `src/hooks/useLinkCompliance.ts` — idem.
+- `src/components/compliance/ComplianceBadge.tsx` — segue, ganha variante `nao_configurado` (cinza).
 
-- Remoção física da coluna `job_role` texto (release futura).
-- **E-ADMIN.3** — ferramenta de merge assistido de cargos duplicados.
+## Correção mínima do motor (pré-requisito, não opcional)
 
-## E-DOC.2 · TODOs registrados (pós-aprovação da UI do gate)
+Antes de qualquer trabalho no painel, uma migration curta:
+- `calculate_compliance_overall`: quando `required = 0`, retorna `nao_configurado` (não mais `apto`).
+- `evaluate_link_compliance`: quando `job_role_id IS NULL`, retorna `nao_configurado` com `status_reason` claro.
+- `ComplianceBadge`: aceita `nao_configurado` (cinza neutro, sem ícone de sucesso).
 
-- **Passo 2 (obrigatório):** substituir o JOIN por código em `document_type_usage_counts()`
-  (`dt.code = eld.document_type`) por FK direta `eld.document_type_id = dt.id`
-  após adicionar `employment_link_documents.document_type_id` na migração estrutural.
-- **Passo 2 (revisões imutáveis):** ao introduzir `is_current` / `supersedes_id` /
-  `superseded_at`, atualizar `document_type_usage_counts()` para filtrar
-  `AND is_current = true` em `worker_documents` e (quando existir) em
-  `employment_link_documents`. Contagem `DISTINCT worker_id` / `DISTINCT employment_link_id`
-  permanece — mede impacto de classificação, não volume de arquivos.
-- **Escopo mantido enxuto:** não incluir `document_count` agora. Métricas de
-  auditoria documental (vigentes/revisões/históricos) ficam para RPC dedicada
-  quando a tela de auditoria existir.
-- **Futuro `storage_scope = 'company'`:** registrado como evolução, fora do escopo atual.
+Sem isso, o `LinkComplianceCard` continua exibindo verde falso dentro do vínculo, mesmo depois de removermos a lista agregada.
 
-## E-DOC.2 · Invariantes arquiteturais (autorização condicional do Passo 2)
+## Ordem de execução
 
-Autorização: **Passo 2 liberado** assim que `document_type_scope_gate_status().ready_for_step_2 = true`.
+1. **Fix mínimo do motor** — migration única alterando `calculate_compliance_overall` e `evaluate_link_compliance` para emitir `nao_configurado`.
+2. **RPCs do painel** — `list_worker_qualifications` e `get_qualification_cell`.
+3. **Frontend do painel** — matriz + filtros + popover + exportação.
+4. **Sidebar/rotas** — renomeia menu, adiciona redirect.
+5. **Remoção** — apaga `Compliance.tsx`, `useLinkComplianceList`, `compliance-export`.
+6. **Homologação** — você valida contra os mesmos 27 vínculos que hoje mostram "Apto" falso.
 
-Invariantes obrigatórias — protegidas por trigger/RPC no Passo 2:
+## Fora do escopo
 
-1. **Conformidade nunca lê documentos diretamente.** UI e módulos consomem
-   exclusivamente `evaluate_link_compliance()` → `list_link_compliance()`.
-   Leitura direta de `worker_documents` / `employment_link_documents` para
-   fins de compliance é proibida.
-2. **RPCs de revisão são o único ponto de escrita.** Após o Passo 2,
-   `INSERT`/`UPDATE` direto em `worker_documents` e `employment_link_documents`
-   é bloqueado por trigger. Todo caminho de escrita (UI, import, edge functions)
-   passa por `register_worker_document_revision()` / `register_link_document_revision()`.
-3. **Histórico imutável.** Trigger `BEFORE UPDATE` bloqueia qualquer alteração
-   quando `is_current = false`. Revisões antigas são somente leitura/download.
-4. **`storage_scope` faz parte da identidade do tipo documental.** Alteração
-   permanece condicionada a `p_force = true` e é tratada como praticamente
-   equivalente a criar um novo tipo (owner, revision strategy e compliance derivam dele).
+- Redesenho do `LinkComplianceCard` (só adiciona estado `nao_configurado`).
+- Job automático de credenciamento (bloqueio no `PayrollForm` fica para entrega própria).
+- Dashboard executivo com gráficos — o painel matricial é a resposta principal; gráficos são complemento futuro.
+- Notificações de vencimento por email/push.
 
-Sequência de execução do Passo 2 (fixada):
+## Ganho concreto
 
-1. Concluir a classificação dos 32 `document_types` pela UI do gate.
-2. Confirmar `ready_for_step_2 = true`.
-3. Modelo de revisões imutáveis: `supersedes_id`, `superseded_at`, `is_current`
-   + CHECK `(superseded_at IS NULL OR supersedes_id IS NOT NULL)`.
-4. RPCs `register_worker_document_revision` / `register_link_document_revision`
-   como ponto único de escrita.
-5. Triggers de enforcement de `storage_scope` (bloqueio de upload no nível errado)
-   e de imutabilidade do histórico.
-6. Atualizar `document_type_usage_counts()` para FK `document_type_id` e filtro
-   `is_current = true`.
+- Elimina o falso positivo estrutural (23 de 27 vínculos hoje).
+- Substitui uma resposta binária escondendo problemas por uma matriz que **expõe** cada pendência individualmente.
+- Reduz cliques: coordenador enxerga 100 trabalhadores em uma tela sem abrir fichas.
+- Filtros por documento respondem diretamente às perguntas reais do RH ("quem está sem NR35?", "quem vence NR10 em 30 dias?").
