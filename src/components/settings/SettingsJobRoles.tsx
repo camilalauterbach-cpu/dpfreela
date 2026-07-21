@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
 import { invalidateComplianceCaches } from "@/lib/compliance-cache";
+import { SettingsJobRolesHygiene } from "./SettingsJobRolesHygiene";
 
 interface JobRole { id: string; code: string; name: string; is_active: boolean }
 interface DocType { id: string; code: string; name: string; category: string | null; default_validity_days: number | null; is_active: boolean }
@@ -260,6 +261,8 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
           <AlertDescription>Somente administradores e gerentes podem editar requisitos de cargo.</AlertDescription>
         </Alert>
       )}
+
+      <SettingsJobRolesHygiene />
 
       <div className="grid gap-4 md:grid-cols-[260px_1fr]">
         <Card>
