@@ -2572,6 +2572,7 @@ export type Database = {
       resolve_document_type_scope: {
         Args: {
           p_document_type_id: string
+          p_force?: boolean
           p_notes?: string
           p_scope: Database["public"]["Enums"]["document_storage_scope"]
         }
