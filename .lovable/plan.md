@@ -95,3 +95,36 @@ Contrato `ComplianceOverall` ganha `'nao_configurado'` (label "Cargo sem requisi
   auditoria documental (vigentes/revisões/históricos) ficam para RPC dedicada
   quando a tela de auditoria existir.
 - **Futuro `storage_scope = 'company'`:** registrado como evolução, fora do escopo atual.
+
+## E-DOC.2 · Invariantes arquiteturais (autorização condicional do Passo 2)
+
+Autorização: **Passo 2 liberado** assim que `document_type_scope_gate_status().ready_for_step_2 = true`.
+
+Invariantes obrigatórias — protegidas por trigger/RPC no Passo 2:
+
+1. **Conformidade nunca lê documentos diretamente.** UI e módulos consomem
+   exclusivamente `evaluate_link_compliance()` → `list_link_compliance()`.
+   Leitura direta de `worker_documents` / `employment_link_documents` para
+   fins de compliance é proibida.
+2. **RPCs de revisão são o único ponto de escrita.** Após o Passo 2,
+   `INSERT`/`UPDATE` direto em `worker_documents` e `employment_link_documents`
+   é bloqueado por trigger. Todo caminho de escrita (UI, import, edge functions)
+   passa por `register_worker_document_revision()` / `register_link_document_revision()`.
+3. **Histórico imutável.** Trigger `BEFORE UPDATE` bloqueia qualquer alteração
+   quando `is_current = false`. Revisões antigas são somente leitura/download.
+4. **`storage_scope` faz parte da identidade do tipo documental.** Alteração
+   permanece condicionada a `p_force = true` e é tratada como praticamente
+   equivalente a criar um novo tipo (owner, revision strategy e compliance derivam dele).
+
+Sequência de execução do Passo 2 (fixada):
+
+1. Concluir a classificação dos 32 `document_types` pela UI do gate.
+2. Confirmar `ready_for_step_2 = true`.
+3. Modelo de revisões imutáveis: `supersedes_id`, `superseded_at`, `is_current`
+   + CHECK `(superseded_at IS NULL OR supersedes_id IS NOT NULL)`.
+4. RPCs `register_worker_document_revision` / `register_link_document_revision`
+   como ponto único de escrita.
+5. Triggers de enforcement de `storage_scope` (bloqueio de upload no nível errado)
+   e de imutabilidade do histórico.
+6. Atualizar `document_type_usage_counts()` para FK `document_type_id` e filtro
+   `is_current = true`.
