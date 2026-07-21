@@ -26,7 +26,7 @@ export async function exportPayrollBatchXlsx(batch: any, items: any[]) {
       nickname: (item.workers as any)?.nickname || "",
       cpf: (item.workers as any)?.cpf || "",
       link: (item.employment_links as any)?.link_name || "",
-      role: (item.employment_links as any)?.job_role || "",
+      role: (item.employment_links as any)?.job_roles?.name || (item.employment_links as any)?.job_role || "",
       base: Number(item.base_amount) || 0,
       overtime: Number(item.overtime_amount) || 0,
       bonuses: Number(item.bonuses) || 0,

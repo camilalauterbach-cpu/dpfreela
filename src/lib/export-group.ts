@@ -29,7 +29,7 @@ const sanitizeFileName = (s: string) =>
 async function fetchGroupWorkersFull(groupId: string) {
   const { data, error } = await supabase
     .from("link_group_workers")
-    .select("*, workers(*)")
+    .select("*, workers(*), job_roles:job_role_id(name)")
     .eq("link_group_id", groupId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
@@ -119,7 +119,7 @@ export async function exportGroupXlsx({ groupId, groupName, eventName, companyNa
       boolLabel(w.is_pcd), w.pcd_type || "", w.pcd_notes || "", boolLabel(w.is_rehabilitated), w.notes || "",
       // Alocação
       groupName, eventName, companyName,
-      a.job_role || "", a.job_function || "", a.department || "",
+      (a.job_roles?.name || a.job_role || ""), a.job_function || "", a.department || "",
       a.contract_type || "", statusLabels[a.status] || a.status,
       formatDateBR(a.hire_date), formatDateBR(a.end_date),
       a.remuneration_type ? remunerationLabels[a.remuneration_type] || a.remuneration_type : "",
@@ -199,7 +199,7 @@ export async function exportGroupPdf({ groupId, groupName, eventName, companyNam
     return [
       w.full_name || "—",
       w.cpf || "—",
-      a.job_role || "—",
+      (a.job_roles?.name || a.job_role || "—"),
       a.contract_type || "—",
       a.remuneration_type ? remunerationLabels[a.remuneration_type] || a.remuneration_type : "—",
       fmtVal,

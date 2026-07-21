@@ -78,7 +78,7 @@ export async function exportAdmissionXlsx({ links, companyNameMap, eventCompanyM
       w.shirt_size || "", w.shoe_size || "", w.blood_type || "", w.allergies || "", w.medical_conditions || "",
       boolLabel(w.is_pcd), w.pcd_type || "", w.pcd_notes || "", boolLabel(w.is_rehabilitated), w.notes || "",
       link.link_name || "", eventName, companyName,
-      link.job_role || "", link.job_function || "", link.department || "",
+      ((link as any).job_roles?.name || link.job_role || ""), link.job_function || "", link.department || "",
       link.contract_type || "", statusLabels[link.status] || link.status,
       formatDateBR(link.hire_date), formatDateBR(link.end_date),
       link.work_days_mode === "specific_dates" ? "Datas específicas" : "Contínuo",

@@ -22,6 +22,7 @@ import { exportGroupDocsZip } from "@/lib/export-docs-zip";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useDeleteRecord } from "@/hooks/useDeleteRecord";
 import { toast } from "sonner";
+import { JobRoleCombobox } from "@/components/links/JobRoleCombobox";
 
 const statusLabels: Record<string, string> = {
   draft: "Rascunho", active: "Ativo", suspended: "Suspenso",
@@ -104,7 +105,7 @@ function getEffectiveValueField(remunerationType: string) {
 
 const INITIAL_ALLOC = {
   worker_id: "",
-  job_role: "",
+  job_role_id: "",
   job_function: "",
   department: "",
   contract_type: "",
@@ -178,6 +179,10 @@ export default function LinkDetail() {
       toast.error("Selecione um trabalhador");
       return;
     }
+    if (!alloc.job_role_id) {
+      toast.error("Selecione um cargo");
+      return;
+    }
 
     const effectiveField = getEffectiveValueField(alloc.remuneration_type);
     const effectiveValue = alloc.effective_value ? Number(alloc.effective_value) : null;
@@ -185,7 +190,7 @@ export default function LinkDetail() {
     const payload: Record<string, any> = {
       link_group_id: id!,
       worker_id: alloc.worker_id,
-      job_role: alloc.job_role || null,
+      job_role_id: alloc.job_role_id,
       job_function: alloc.job_function || null,
       department: alloc.department || null,
       contract_type: alloc.contract_type || null,
@@ -418,9 +423,9 @@ export default function LinkDetail() {
                       <TableRow key={w.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/links/${id}/workers/${w.worker_id}`)}>
                         <TableCell>
                           <p className="text-sm font-medium">{wName}{wNick ? ` (${wNick})` : ""}</p>
-                          <p className="text-xs text-muted-foreground sm:hidden">{w.job_role || ""}</p>
+                          <p className="text-xs text-muted-foreground sm:hidden">{w.job_roles?.name || w.job_role || ""}</p>
                         </TableCell>
-                        <TableCell className="hidden sm:table-cell">{w.job_role || "—"}</TableCell>
+                        <TableCell className="hidden sm:table-cell">{w.job_roles?.name || w.job_role || "—"}</TableCell>
                         <TableCell className="hidden md:table-cell">{formatCurrency(effectiveVal)}</TableCell>
                         <TableCell>
                           <Badge variant={statusVariant(w.status)}>{statusLabels[w.status] || w.status}</Badge>
@@ -481,8 +486,11 @@ export default function LinkDetail() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <Label>Função/Cargo</Label>
-                  <Input value={alloc.job_role} onChange={(e) => setA("job_role", e.target.value)} />
+                  <Label>Função/Cargo *</Label>
+                  <JobRoleCombobox
+                    value={alloc.job_role_id}
+                    onChange={(id) => setA("job_role_id", id ?? "")}
+                  />
                 </div>
                 <div>
                   <Label>Atividade</Label>

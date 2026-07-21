@@ -57,7 +57,7 @@ export function PayrollItemForm({ batchId, eventId, existing, onClose }: Props) 
     queryFn: async () => {
       let q = supabase
         .from("employment_links")
-        .select("id, link_name, job_role, daily_rate, fixed_salary")
+        .select("id, link_name, job_role, job_role_id, daily_rate, fixed_salary, job_roles:job_role_id(name)")
         .is("deleted_at", null)
         .eq("worker_id", workerId);
       if (eventId) q = q.eq("event_id", eventId);
@@ -141,7 +141,7 @@ export function PayrollItemForm({ batchId, eventId, existing, onClose }: Props) 
                   <SelectItem value="__none__">Sem vínculo</SelectItem>
                   {(eventLinks ?? []).map((l: any) => (
                     <SelectItem key={l.id} value={l.id}>
-                      {l.link_name || l.job_role || "Vínculo"}
+                      {l.link_name || l.job_roles?.name || l.job_role || "Vínculo"}
                     </SelectItem>
                   ))}
                 </SelectContent>

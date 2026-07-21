@@ -234,10 +234,10 @@ export default function PayrollDetail() {
                             {(item.workers as any)?.nickname && (
                               <span className="text-muted-foreground text-xs ml-1">({(item.workers as any).nickname})</span>
                             )}
-                            <p className="md:hidden text-xs text-muted-foreground">{(item.employment_links as any)?.job_role || ""}</p>
+                            <p className="md:hidden text-xs text-muted-foreground">{(item.employment_links as any)?.job_roles?.name || (item.employment_links as any)?.job_role || ""}</p>
                           </div>
                         </TableCell>
-                        <TableCell className="hidden md:table-cell text-sm">{(item.employment_links as any)?.job_role || "—"}</TableCell>
+                        <TableCell className="hidden md:table-cell text-sm">{(item.employment_links as any)?.job_roles?.name || (item.employment_links as any)?.job_role || "—"}</TableCell>
                         <TableCell className="hidden sm:table-cell text-right">{fmt(item.base_amount)}</TableCell>
                         <TableCell className="hidden lg:table-cell text-right">{fmt(item.overtime_amount)}</TableCell>
                         <TableCell className="hidden lg:table-cell text-right">{fmt(item.bonuses)}</TableCell>
