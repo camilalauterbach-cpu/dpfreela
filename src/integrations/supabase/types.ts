@@ -2475,6 +2475,14 @@ export type Database = {
         Returns: Json
       }
       document_type_scope_gate_status: { Args: never; Returns: Json }
+      document_type_usage_counts: {
+        Args: never
+        Returns: {
+          document_type_id: string
+          link_count: number
+          worker_count: number
+        }[]
+      }
       dry_run_job_role_backfill: { Args: never; Returns: Json }
       ensure_current_user_access: {
         Args: never
