@@ -1646,7 +1646,7 @@ export type Database = {
           created_by: string | null
           deleted_at: string | null
           document_status: string
-          document_type_id: string | null
+          document_type_id: string
           document_url: string | null
           employment_link_document_id: string | null
           event_id: string | null
@@ -1686,7 +1686,7 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           document_status?: string
-          document_type_id?: string | null
+          document_type_id: string
           document_url?: string | null
           employment_link_document_id?: string | null
           event_id?: string | null
@@ -1726,7 +1726,7 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           document_status?: string
-          document_type_id?: string | null
+          document_type_id?: string
           document_url?: string | null
           employment_link_document_id?: string | null
           event_id?: string | null
