@@ -10,14 +10,6 @@ export interface ComplianceSummaryTotals {
   bloqueados: number;
 }
 
-export interface ComplianceSummaryDocuments {
-  ok: number;
-  warning: number;
-  expired: number;
-  missing: number;
-  pending: number;
-}
-
 export interface ComplianceSummaryByRole {
   job_role_id: string;
   job_role_name: string;
@@ -40,9 +32,8 @@ export interface DocumentComplianceSummary {
   generated_at: string;
   warning_days: number;
   totals: ComplianceSummaryTotals;
-  documents: ComplianceSummaryDocuments;
   by_role: ComplianceSummaryByRole[];
-  top_pending_documents: ComplianceSummaryTopPending[];
+  top_pending: ComplianceSummaryTopPending[];
 }
 
 /**
