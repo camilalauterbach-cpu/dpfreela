@@ -2534,6 +2534,17 @@ export type Database = {
         Returns: Json
       }
       list_worker_duplicate_candidates: { Args: never; Returns: Json }
+      list_worker_qualifications: {
+        Args: {
+          p_document_type_ids?: string[]
+          p_limit?: number
+          p_offset?: number
+          p_only_relevant?: boolean
+          p_search?: string
+          p_state?: string
+        }
+        Returns: Json
+      }
       log_compliance_evaluation: {
         Args: {
           p_current_overall: string

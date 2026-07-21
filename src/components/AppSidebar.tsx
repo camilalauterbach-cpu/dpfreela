@@ -1,4 +1,4 @@
-import { Users, Calendar, Building2, Link2, DollarSign, LayoutDashboard, LogOut, Settings, ShieldCheck, ClipboardCheck } from "lucide-react";
+import { Users, Calendar, Building2, Link2, DollarSign, LayoutDashboard, LogOut, Settings, ShieldCheck, GraduationCap } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,7 +25,7 @@ const mainItems = [
   { title: "Eventos", url: "/events", icon: Calendar },
   { title: "Empresas", url: "/companies", icon: Building2 },
   { title: "Vínculos", url: "/links", icon: Link2 },
-  { title: "Conformidade", url: "/compliance", icon: ClipboardCheck },
+  { title: "Qualificações", url: "/qualifications", icon: GraduationCap },
   { title: "Pagamentos", url: "/payroll", icon: DollarSign },
   { title: "Controle SST", url: "/sst", icon: ShieldCheck },
 ];
