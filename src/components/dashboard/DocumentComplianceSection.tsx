@@ -87,24 +87,15 @@ export function DocumentComplianceSection() {
               />
             </div>
 
-            {/* Documentos */}
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-              <DocPill label="Válidos" value={data.documents.ok} tone="ok" />
-              <DocPill label="Vencendo" value={data.documents.warning} tone="warn" />
-              <DocPill label="Vencidos" value={data.documents.expired} tone="danger" />
-              <DocPill label="Faltantes" value={data.documents.missing} tone="danger" />
-              <DocPill label="Pendentes" value={data.documents.pending} tone="warn" />
-            </div>
-
             {/* Top pendências */}
-            {data.top_pending_documents.length > 0 && (
+            {data.top_pending.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                   <FileClock className="h-3.5 w-3.5" />
                   Top documentos com pendências
                 </div>
                 <ul className="divide-y rounded-md border">
-                  {data.top_pending_documents.slice(0, 5).map((d) => (
+                  {data.top_pending.slice(0, 5).map((d) => (
                     <li key={d.document_type_id}>
                       <button
                         className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-accent transition-colors"
