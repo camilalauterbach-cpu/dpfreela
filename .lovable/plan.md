@@ -80,3 +80,18 @@ Contrato `ComplianceOverall` ganha `'nao_configurado'` (label "Cargo sem requisi
 
 - Remoção física da coluna `job_role` texto (release futura).
 - **E-ADMIN.3** — ferramenta de merge assistido de cargos duplicados.
+
+## E-DOC.2 · TODOs registrados (pós-aprovação da UI do gate)
+
+- **Passo 2 (obrigatório):** substituir o JOIN por código em `document_type_usage_counts()`
+  (`dt.code = eld.document_type`) por FK direta `eld.document_type_id = dt.id`
+  após adicionar `employment_link_documents.document_type_id` na migração estrutural.
+- **Passo 2 (revisões imutáveis):** ao introduzir `is_current` / `supersedes_id` /
+  `superseded_at`, atualizar `document_type_usage_counts()` para filtrar
+  `AND is_current = true` em `worker_documents` e (quando existir) em
+  `employment_link_documents`. Contagem `DISTINCT worker_id` / `DISTINCT employment_link_id`
+  permanece — mede impacto de classificação, não volume de arquivos.
+- **Escopo mantido enxuto:** não incluir `document_count` agora. Métricas de
+  auditoria documental (vigentes/revisões/históricos) ficam para RPC dedicada
+  quando a tela de auditoria existir.
+- **Futuro `storage_scope = 'company'`:** registrado como evolução, fora do escopo atual.
