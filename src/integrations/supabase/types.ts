@@ -2271,6 +2271,10 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_compliance_overall: {
+        Args: { p_documents: Json }
+        Returns: Json
+      }
       claim_public_invite: {
         Args: { _ip_hash: string; _token_hash: string }
         Returns: Json
