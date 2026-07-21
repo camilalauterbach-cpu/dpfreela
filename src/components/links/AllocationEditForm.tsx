@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Save } from "lucide-react";
+import { JobRoleCombobox } from "@/components/links/JobRoleCombobox";
 
 interface Props {
   allocation: any;
@@ -22,7 +23,7 @@ export function AllocationEditForm({ allocation, groupId, onSaved }: Props) {
   const updateMutation = useUpdateGroupWorker();
 
   const [form, setForm] = useState({
-    job_role: allocation.job_role || "",
+    job_role_id: allocation.job_role_id || "",
     job_function: allocation.job_function || "",
     department: allocation.department || "",
     contract_type: allocation.contract_type || "",
@@ -51,10 +52,14 @@ export function AllocationEditForm({ allocation, groupId, onSaved }: Props) {
   const set = (key: string, value: any) => setForm((prev) => ({ ...prev, [key]: value }));
 
   const handleSave = () => {
+    if (!form.job_role_id) {
+      toast({ title: "Selecione um cargo", variant: "destructive" });
+      return;
+    }
     const payload: Record<string, any> = {
       id: allocation.id,
       link_group_id: groupId,
-      job_role: form.job_role || null,
+      job_role_id: form.job_role_id,
       job_function: form.job_function || null,
       department: form.department || null,
       contract_type: form.contract_type || null,
@@ -140,7 +145,13 @@ export function AllocationEditForm({ allocation, groupId, onSaved }: Props) {
               </SelectContent>
             </Select>
           </div>
-          {field("Função/Cargo", "job_role")}
+          <div className="space-y-1">
+            <Label className="text-xs">Função/Cargo *</Label>
+            <JobRoleCombobox
+              value={form.job_role_id}
+              onChange={(id) => set("job_role_id", id ?? "")}
+            />
+          </div>
           {field("Atividade", "job_function")}
           {field("Departamento", "department")}
           {field("Data início", "hire_date", "date")}
