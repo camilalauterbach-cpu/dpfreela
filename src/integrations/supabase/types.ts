@@ -2308,6 +2308,7 @@ export type Database = {
       }
       ensure_worker: { Args: { mode?: string; payload: Json }; Returns: Json }
       evaluate_link_compliance: { Args: { p_link_id: string }; Returns: Json }
+      f_normalize_nr_code: { Args: { _raw: string }; Returns: string }
       get_audit_user_emails: {
         Args: { _user_ids: string[] }
         Returns: {
