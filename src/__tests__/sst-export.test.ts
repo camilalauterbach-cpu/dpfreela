@@ -11,6 +11,7 @@ function q(over: Partial<SstCurrentRow>): SstCurrentRow {
     workload_hours: null, provider_name: null, instructor_name: null,
     document_url: null, document_status: "ok", validity_status: "no_expiry",
     source_type: "manual", revision_type: "initial",
+    revision_reason: null, document_type_id: null,
     employment_link_document_id: null, link_group_worker_id: null,
     link_group_id: null, event_id: null, company_id: null, notes: null,
     expiration_status: "no_expiry", ...over,
