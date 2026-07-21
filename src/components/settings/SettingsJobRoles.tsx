@@ -10,7 +10,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Lock, Plus, Trash2, Save, ArrowUp, ArrowDown } from "lucide-react";
+import { Loader2, Lock, Plus, Trash2, Save, ArrowUp, ArrowDown, MoreVertical, Pencil, Power, PowerOff } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
 import { invalidateComplianceCaches } from "@/lib/compliance-cache";
 
@@ -26,6 +28,16 @@ interface Requirement {
 
 interface Props { readOnly?: boolean }
 
+// Categorias de documentos que fazem sentido como REQUISITO DE CARGO/FUNÇÃO.
+// Documentos pessoais (RG, CPF, CNH, título eleitor, carteira profissional, CREA, etc.)
+// pertencem ao trabalhador e não devem entrar aqui.
+const ROLE_DOC_CATEGORIES = ["sst_nr", "sst_aso", "training"] as const;
+const ROLE_DOC_CATEGORY_LABELS: Record<string, string> = {
+  sst_nr: "NR",
+  sst_aso: "ASO / Saúde",
+  training: "Treinamento",
+};
+
 export function SettingsJobRoles({ readOnly = false }: Props) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -33,6 +45,13 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
   const [reqs, setReqs] = useState<Requirement[]>([]);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [busyRoleId, setBusyRoleId] = useState<string | null>(null);
+  const [deleteRole, setDeleteRole] = useState<JobRole | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const rolesQ = useQuery({
     queryKey: ["settings-job-roles"],
@@ -46,7 +65,12 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
   const docsQ = useQuery({
     queryKey: ["settings-document-types"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("document_types").select("id, code, name, category, default_validity_days, is_active").eq("is_active", true).order("name");
+      const { data, error } = await supabase
+        .from("document_types")
+        .select("id, code, name, category, default_validity_days, is_active")
+        .eq("is_active", true)
+        .in("category", ROLE_DOC_CATEGORIES as unknown as string[])
+        .order("name");
       if (error) throw error;
       return (data ?? []) as DocType[];
     },
@@ -83,6 +107,86 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
     const used = new Set(reqs.map((r) => r.document_type_id));
     return (docsQ.data ?? []).filter((d) => !used.has(d.id));
   }, [docsQ.data, reqs]);
+
+  const slugifyCode = (name: string) =>
+    name
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 60) || `cargo_${Date.now()}`;
+
+  const handleCreateRole = async () => {
+    const name = newRoleName.trim();
+    if (!name) return;
+    setCreating(true);
+    const { data, error } = await supabase
+      .from("job_roles")
+      .insert({ name, code: slugifyCode(name), is_active: true })
+      .select("id")
+      .single();
+    setCreating(false);
+    if (error) {
+      toast({ title: "Erro ao criar cargo", description: error.message, variant: "destructive" });
+      return;
+    }
+    setNewRoleName("");
+    toast({ title: "Cargo criado" });
+    await qc.invalidateQueries({ queryKey: ["settings-job-roles"] });
+    if (data?.id) setSelectedRoleId(data.id);
+  };
+
+  const handleRename = async (role: JobRole) => {
+    const name = renameValue.trim();
+    if (!name || name === role.name) {
+      setRenamingId(null);
+      return;
+    }
+    setBusyRoleId(role.id);
+    const { error } = await supabase.from("job_roles").update({ name }).eq("id", role.id);
+    setBusyRoleId(null);
+    setRenamingId(null);
+    if (error) {
+      toast({ title: "Erro ao renomear", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Cargo renomeado" });
+    qc.invalidateQueries({ queryKey: ["settings-job-roles"] });
+  };
+
+  const handleToggleActive = async (role: JobRole) => {
+    setBusyRoleId(role.id);
+    const { error } = await supabase.from("job_roles").update({ is_active: !role.is_active }).eq("id", role.id);
+    setBusyRoleId(null);
+    if (error) {
+      toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: role.is_active ? "Cargo inativado" : "Cargo ativado" });
+    qc.invalidateQueries({ queryKey: ["settings-job-roles"] });
+  };
+
+  const handleDelete = async () => {
+    if (!deleteRole) return;
+    setDeleting(true);
+    const { error } = await supabase.from("job_roles").delete().eq("id", deleteRole.id);
+    setDeleting(false);
+    if (error) {
+      toast({
+        title: "Não foi possível excluir",
+        description: /foreign key|violat/i.test(error.message)
+          ? "Este cargo está vinculado a trabalhadores ou requisitos. Inative-o em vez de excluir."
+          : error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    if (selectedRoleId === deleteRole.id) setSelectedRoleId(null);
+    setDeleteRole(null);
+    toast({ title: "Cargo excluído" });
+    qc.invalidateQueries({ queryKey: ["settings-job-roles"] });
+  };
 
   const addRequirement = (docId: string) => {
     setReqs((prev) => [
@@ -153,23 +257,75 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Cargos</CardTitle>
-            <CardDescription>Selecione um cargo</CardDescription>
+            <CardDescription>Selecione, renomeie, inative ou exclua</CardDescription>
           </CardHeader>
+          {!readOnly && (
+            <div className="px-3 pb-2 flex gap-1">
+              <Input
+                value={newRoleName}
+                onChange={(e) => setNewRoleName(e.target.value)}
+                placeholder="Novo cargo"
+                className="h-8 text-sm"
+                onKeyDown={(e) => e.key === "Enter" && handleCreateRole()}
+              />
+              <Button size="sm" onClick={handleCreateRole} disabled={creating || !newRoleName.trim()} className="h-8">
+                {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              </Button>
+            </div>
+          )}
           <CardContent className="p-0">
             <ul className="divide-y max-h-[520px] overflow-auto">
               {roles.map((r) => (
                 <li key={r.id}>
-                  <button
-                    type="button"
-                    onClick={() => selectedRoleId !== r.id && (dirty ? confirm("Descartar alterações não salvas?") && setSelectedRoleId(r.id) : setSelectedRoleId(r.id))}
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-muted/50 ${selectedRoleId === r.id ? "bg-muted font-medium" : ""}`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate">{r.name}</span>
-                      {!r.is_active && <Badge variant="secondary" className="text-[10px]">Inativo</Badge>}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{r.code}</p>
-                  </button>
+                  <div className={`flex items-center gap-1 px-2 py-1.5 hover:bg-muted/50 ${selectedRoleId === r.id ? "bg-muted" : ""}`}>
+                    {renamingId === r.id ? (
+                      <Input
+                        autoFocus
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onBlur={() => handleRename(r)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleRename(r);
+                          if (e.key === "Escape") setRenamingId(null);
+                        }}
+                        className="h-7 text-sm"
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => selectedRoleId !== r.id && (dirty ? confirm("Descartar alterações não salvas?") && setSelectedRoleId(r.id) : setSelectedRoleId(r.id))}
+                        className="flex-1 min-w-0 text-left"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`truncate text-sm ${selectedRoleId === r.id ? "font-medium" : ""} ${!r.is_active ? "text-muted-foreground line-through" : ""}`}>{r.name}</span>
+                          {!r.is_active && <Badge variant="secondary" className="text-[10px]">Inativo</Badge>}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">{r.code}</p>
+                      </button>
+                    )}
+                    {!readOnly && renamingId !== r.id && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" disabled={busyRoleId === r.id}>
+                            {busyRoleId === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MoreVertical className="h-3.5 w-3.5" />}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => { setRenamingId(r.id); setRenameValue(r.name); }}>
+                            <Pencil className="h-3.5 w-3.5 mr-2" /> Renomear
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleToggleActive(r)}>
+                            {r.is_active ? <PowerOff className="h-3.5 w-3.5 mr-2" /> : <Power className="h-3.5 w-3.5 mr-2" />}
+                            {r.is_active ? "Inativar" : "Ativar"}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-destructive" onClick={() => setDeleteRole(r)}>
+                            <Trash2 className="h-3.5 w-3.5 mr-2" /> Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
                 </li>
               ))}
               {!roles.length && <li className="px-3 py-6 text-center text-sm text-muted-foreground">Nenhum cargo cadastrado.</li>}
@@ -181,7 +337,7 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
           <CardHeader>
             <CardTitle className="text-base">Requisitos documentais do cargo</CardTitle>
             <CardDescription>
-              A única forma de alterar requisitos. Salvar reavalia todos os vínculos do cargo em uma única transação.
+              Somente NRs, ASO/saúde e treinamentos. Documentos pessoais (RG, CPF, CNH, título eleitor, CREA, carteira profissional) pertencem ao trabalhador e não entram aqui.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -260,7 +416,10 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
                         disabled={readOnly}
                       >
                         <Plus className="h-3 w-3 mr-1" />
-                        [{d.code}] {d.name}
+                        <span className="mr-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                          {ROLE_DOC_CATEGORY_LABELS[d.category ?? ""] ?? d.category}
+                        </span>
+                        {d.name}
                       </Button>
                     ))}
                     {!availableToAdd.length && (
@@ -282,6 +441,15 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
           </CardContent>
         </Card>
       </div>
+
+      <DeleteConfirmDialog
+        open={!!deleteRole}
+        onOpenChange={(o) => !o && setDeleteRole(null)}
+        title={`Excluir "${deleteRole?.name ?? ""}"?`}
+        description="A exclusão é permanente e só é permitida se o cargo não estiver vinculado a nenhum trabalhador. Se estiver em uso, inative-o."
+        onConfirm={handleDelete}
+        isDeleting={deleting}
+      />
     </div>
   );
 }
