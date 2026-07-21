@@ -76,7 +76,9 @@ export function JobRoleCombobox({
               <>
                 {selected.name}
                 {!selected.is_active && (
-                  <span className="ml-1 text-xs text-muted-foreground">(Inativo)</span>
+                  <Badge variant="secondary" className="ml-2 text-[10px] py-0 px-1.5">
+                    Inativo
+                  </Badge>
                 )}
               </>
             ) : (
