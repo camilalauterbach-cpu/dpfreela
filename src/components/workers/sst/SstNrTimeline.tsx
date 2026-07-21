@@ -10,6 +10,7 @@ import {
   Plus, RefreshCw, Replace, PenLine, Ban, Clock, Package, CircleDot,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { openCertificate } from "@/lib/sst/certificate-url";
 
 interface Props {
   open: boolean;
@@ -114,11 +115,12 @@ export function SstNrTimeline({ open, onOpenChange, workerId, nrCode, onOpenLink
                   )}
                   {r.notes && <p className="text-xs italic text-muted-foreground">"{r.notes}"</p>}
                   {r.document_url && (
-                    <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                      <a href={r.document_url} target="_blank" rel="noreferrer">
-                        <FileText className="mr-1 h-3 w-3" /> Baixar certificado desta revisão
-                        <ExternalLink className="ml-1 h-3 w-3" />
-                      </a>
+                    <Button
+                      size="sm" variant="ghost" className="h-7 px-2 text-xs"
+                      onClick={() => openCertificate(r.document_url)}
+                    >
+                      <FileText className="mr-1 h-3 w-3" /> Baixar certificado desta revisão
+                      <ExternalLink className="ml-1 h-3 w-3" />
                     </Button>
                   )}
                 </div>
