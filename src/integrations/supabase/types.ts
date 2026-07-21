@@ -994,6 +994,42 @@ export type Database = {
           },
         ]
       }
+      migration_execution_log: {
+        Row: {
+          environment: string | null
+          executed_at: string
+          executed_by: string | null
+          git_revision: string | null
+          id: string
+          migration_name: string
+          notes: string | null
+          phase: string
+          success: boolean
+        }
+        Insert: {
+          environment?: string | null
+          executed_at?: string
+          executed_by?: string | null
+          git_revision?: string | null
+          id?: string
+          migration_name: string
+          notes?: string | null
+          phase: string
+          success: boolean
+        }
+        Update: {
+          environment?: string | null
+          executed_at?: string
+          executed_by?: string | null
+          git_revision?: string | null
+          id?: string
+          migration_name?: string
+          notes?: string | null
+          phase?: string
+          success?: boolean
+        }
+        Relationships: []
+      }
       payment_receipts: {
         Row: {
           batch_id: string | null
@@ -1234,6 +1270,75 @@ export type Database = {
           table_name?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      sst_migration_audit: {
+        Row: {
+          duration_ms: number | null
+          employment_link_documents_migrated: number
+          finished_at: string | null
+          history_updated: number
+          id: string
+          migration_name: string
+          started_at: string
+          success: boolean | null
+          unmatched: number
+          worker_documents_migrated: number
+        }
+        Insert: {
+          duration_ms?: number | null
+          employment_link_documents_migrated?: number
+          finished_at?: string | null
+          history_updated?: number
+          id?: string
+          migration_name: string
+          started_at: string
+          success?: boolean | null
+          unmatched?: number
+          worker_documents_migrated?: number
+        }
+        Update: {
+          duration_ms?: number | null
+          employment_link_documents_migrated?: number
+          finished_at?: string | null
+          history_updated?: number
+          id?: string
+          migration_name?: string
+          started_at?: string
+          success?: boolean | null
+          unmatched?: number
+          worker_documents_migrated?: number
+        }
+        Relationships: []
+      }
+      sst_migration_unmatched: {
+        Row: {
+          created_at: string
+          id: string
+          nr_code: string | null
+          reason: string
+          source_id: string | null
+          source_table: string
+          worker_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nr_code?: string | null
+          reason: string
+          source_id?: string | null
+          source_table: string
+          worker_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nr_code?: string | null
+          reason?: string
+          source_id?: string | null
+          source_table?: string
+          worker_id?: string | null
         }
         Relationships: []
       }
@@ -1531,12 +1636,17 @@ export type Database = {
       }
       worker_sst_qualifications: {
         Row: {
+          certificate_file_name: string | null
+          certificate_file_path: string | null
+          certificate_mime_type: string | null
+          certificate_uploaded_at: string | null
           chain_key: string | null
           company_id: string | null
           created_at: string
           created_by: string | null
           deleted_at: string | null
           document_status: string
+          document_type_id: string | null
           document_url: string | null
           employment_link_document_id: string | null
           event_id: string | null
@@ -1544,12 +1654,17 @@ export type Database = {
           id: string
           instructor_name: string | null
           issued_at: string
+          legacy_employment_link_document_id: string | null
+          legacy_worker_document_id: string | null
           link_group_id: string | null
           link_group_worker_id: string | null
           notes: string | null
           nr_code: string
           provider_document: string | null
           provider_name: string | null
+          revision_reason:
+            | Database["public"]["Enums"]["sst_revision_reason"]
+            | null
           revision_type: string
           source_type: string
           superseded_at: string | null
@@ -1561,12 +1676,17 @@ export type Database = {
           workload_hours: number | null
         }
         Insert: {
+          certificate_file_name?: string | null
+          certificate_file_path?: string | null
+          certificate_mime_type?: string | null
+          certificate_uploaded_at?: string | null
           chain_key?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           document_status?: string
+          document_type_id?: string | null
           document_url?: string | null
           employment_link_document_id?: string | null
           event_id?: string | null
@@ -1574,12 +1694,17 @@ export type Database = {
           id?: string
           instructor_name?: string | null
           issued_at: string
+          legacy_employment_link_document_id?: string | null
+          legacy_worker_document_id?: string | null
           link_group_id?: string | null
           link_group_worker_id?: string | null
           notes?: string | null
           nr_code: string
           provider_document?: string | null
           provider_name?: string | null
+          revision_reason?:
+            | Database["public"]["Enums"]["sst_revision_reason"]
+            | null
           revision_type?: string
           source_type?: string
           superseded_at?: string | null
@@ -1591,12 +1716,17 @@ export type Database = {
           workload_hours?: number | null
         }
         Update: {
+          certificate_file_name?: string | null
+          certificate_file_path?: string | null
+          certificate_mime_type?: string | null
+          certificate_uploaded_at?: string | null
           chain_key?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           document_status?: string
+          document_type_id?: string | null
           document_url?: string | null
           employment_link_document_id?: string | null
           event_id?: string | null
@@ -1604,12 +1734,17 @@ export type Database = {
           id?: string
           instructor_name?: string | null
           issued_at?: string
+          legacy_employment_link_document_id?: string | null
+          legacy_worker_document_id?: string | null
           link_group_id?: string | null
           link_group_worker_id?: string | null
           notes?: string | null
           nr_code?: string
           provider_document?: string | null
           provider_name?: string | null
+          revision_reason?:
+            | Database["public"]["Enums"]["sst_revision_reason"]
+            | null
           revision_type?: string
           source_type?: string
           superseded_at?: string | null
@@ -1626,6 +1761,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_sst_qualifications_document_type_id_fkey"
+            columns: ["document_type_id"]
+            isOneToOne: false
+            referencedRelation: "document_types"
             referencedColumns: ["id"]
           },
           {
@@ -1877,6 +2019,7 @@ export type Database = {
           company_id: string | null
           created_at: string | null
           document_status: string | null
+          document_type_id: string | null
           document_url: string | null
           employment_link_document_id: string | null
           event_id: string | null
@@ -1890,6 +2033,9 @@ export type Database = {
           notes: string | null
           nr_code: string | null
           provider_name: string | null
+          revision_reason:
+            | Database["public"]["Enums"]["sst_revision_reason"]
+            | null
           revision_type: string | null
           source_type: string | null
           training_type: string | null
@@ -1904,6 +2050,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_sst_qualifications_document_type_id_fkey"
+            columns: ["document_type_id"]
+            isOneToOne: false
+            referencedRelation: "document_types"
             referencedColumns: ["id"]
           },
           {
@@ -1950,6 +2103,7 @@ export type Database = {
           created_at: string | null
           deleted_at: string | null
           document_status: string | null
+          document_type_id: string | null
           document_url: string | null
           employment_link_document_id: string | null
           event_id: string | null
@@ -1963,6 +2117,9 @@ export type Database = {
           notes: string | null
           nr_code: string | null
           provider_name: string | null
+          revision_reason:
+            | Database["public"]["Enums"]["sst_revision_reason"]
+            | null
           revision_type: string | null
           source_type: string | null
           superseded_at: string | null
@@ -1979,6 +2136,7 @@ export type Database = {
           created_at?: string | null
           deleted_at?: string | null
           document_status?: string | null
+          document_type_id?: string | null
           document_url?: string | null
           employment_link_document_id?: string | null
           event_id?: string | null
@@ -1992,6 +2150,9 @@ export type Database = {
           notes?: string | null
           nr_code?: string | null
           provider_name?: string | null
+          revision_reason?:
+            | Database["public"]["Enums"]["sst_revision_reason"]
+            | null
           revision_type?: string | null
           source_type?: string | null
           superseded_at?: string | null
@@ -2008,6 +2169,7 @@ export type Database = {
           created_at?: string | null
           deleted_at?: string | null
           document_status?: string | null
+          document_type_id?: string | null
           document_url?: string | null
           employment_link_document_id?: string | null
           event_id?: string | null
@@ -2021,6 +2183,9 @@ export type Database = {
           notes?: string | null
           nr_code?: string | null
           provider_name?: string | null
+          revision_reason?:
+            | Database["public"]["Enums"]["sst_revision_reason"]
+            | null
           revision_type?: string | null
           source_type?: string | null
           superseded_at?: string | null
@@ -2037,6 +2202,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_sst_qualifications_document_type_id_fkey"
+            columns: ["document_type_id"]
+            isOneToOne: false
+            referencedRelation: "document_types"
             referencedColumns: ["id"]
           },
           {
@@ -2245,6 +2417,14 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "manager" | "operator" | "viewer"
+      sst_revision_reason:
+        | "created"
+        | "renewed"
+        | "replaced"
+        | "revoked"
+        | "corrected"
+        | "expired"
+        | "migrated"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2373,6 +2553,15 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "manager", "operator", "viewer"],
+      sst_revision_reason: [
+        "created",
+        "renewed",
+        "replaced",
+        "revoked",
+        "corrected",
+        "expired",
+        "migrated",
+      ],
     },
   },
 } as const
