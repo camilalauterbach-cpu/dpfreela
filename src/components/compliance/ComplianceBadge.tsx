@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, AlertTriangle, ShieldAlert } from "lucide-react";
+import { CheckCircle2, AlertTriangle, ShieldAlert, CircleDashed } from "lucide-react";
 import type { ComplianceOverall } from "@/hooks/useLinkCompliance";
 import { OVERALL_LABEL } from "@/hooks/useLinkCompliance";
 import { cn } from "@/lib/utils";
@@ -11,12 +11,15 @@ const TONE_CLASSES: Record<ComplianceOverall, string> = {
     "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300",
   bloqueado:
     "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300",
+  nao_configurado:
+    "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300",
 };
 
 const ICONS: Record<ComplianceOverall, typeof CheckCircle2> = {
   apto: CheckCircle2,
   atencao: AlertTriangle,
   bloqueado: ShieldAlert,
+  nao_configurado: CircleDashed,
 };
 
 interface Props {
