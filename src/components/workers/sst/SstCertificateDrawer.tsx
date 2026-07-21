@@ -67,6 +67,7 @@ export function SstCertificateDrawer({
   const [instructor, setInstructor] = useState("");
   const [notes, setNotes] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
 
   const nrLocked = mode !== "create" || !!presetNrCode;
 
@@ -75,6 +76,7 @@ export function SstCertificateDrawer({
     // Pré-carregamento por modo
     setFile(null);
     setNotes("");
+    setLastError(null);
     if (mode === "create") {
       setNrCode(presetNrCode || "");
       setTrainingType("");
@@ -109,6 +111,8 @@ export function SstCertificateDrawer({
       if (!expiresAt) errs.push("Informe a data de validade.");
       else if (issuedAt && expiresAt <= issuedAt)
         errs.push("Validade deve ser posterior à emissão.");
+      else if (expiresAt <= today)
+        errs.push("Validade deve ser posterior a hoje.");
     }
     return errs;
   }, [file, nrCode, issuedAt, expiresAt, hasExpiry, today]);
@@ -124,8 +128,14 @@ export function SstCertificateDrawer({
 
       // 1) Upload
       setUploading(true);
+      setLastError(null);
       const ext = (file.name.split(".").pop() || "bin").toLowerCase();
-      const path = `sst/${workerId}/${normalized}/${Date.now()}.${ext}`;
+      // Timestamp ISO compacto (YYYYMMDDTHHMMSSZ) — legível durante inspeções.
+      const stamp = new Date().toISOString().replace(/[-:.]/g, "").replace(/\..+$/, "").slice(0, 15) + "Z";
+      const opTag =
+        mode === "renew" ? "renewal" :
+        mode === "replace" ? "replacement" : "initial";
+      const path = `sst/${workerId}/${normalized}/${stamp}_${opTag}.${ext}`;
       const { error: upErr } = await supabase.storage
         .from("worker-documents")
         .upload(path, file, {
@@ -198,7 +208,14 @@ export function SstCertificateDrawer({
     },
     onError: (e: any) => {
       setUploading(false);
-      toast.error(String(e?.message || "Falha ao registrar certificado."));
+      const msg = String(e?.message || "Falha ao registrar certificado.");
+      setLastError(msg);
+      toast.error(msg, {
+        action: {
+          label: "Tentar novamente",
+          onClick: () => submit.mutate(),
+        },
+      });
     },
   });
 
@@ -206,7 +223,13 @@ export function SstCertificateDrawer({
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!pending) onOpenChange(v); }}>
-      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-md overflow-y-auto"
+        onEscapeKeyDown={(e) => { if (pending) e.preventDefault(); }}
+        onPointerDownOutside={(e) => { if (pending) e.preventDefault(); }}
+        onInteractOutside={(e) => { if (pending) e.preventDefault(); }}
+      >
         <SheetHeader>
           <SheetTitle>{TITLES[mode]}{nrCode ? ` — ${nrCode}` : ""}</SheetTitle>
           <SheetDescription>
@@ -262,8 +285,11 @@ export function SstCertificateDrawer({
             ) : (
               <div className="mt-1 flex items-center justify-between gap-2 border rounded-md px-3 py-2 text-sm">
                 <div className="flex items-center gap-2 min-w-0">
-                  <FileText className="h-4 w-4 shrink-0 text-primary" />
-                  <span className="truncate">{file.name}</span>
+                  <FileText className="h-4 w-4 shrink-0 text-emerald-600" />
+                  <span className="truncate">
+                    <span className="text-emerald-700 dark:text-emerald-400 font-medium">✔ Pronto para envio:</span>{" "}
+                    {file.name}
+                  </span>
                   <span className="text-xs text-muted-foreground shrink-0">
                     ({(file.size / 1024).toFixed(0)} KB)
                   </span>
@@ -328,8 +354,9 @@ export function SstCertificateDrawer({
               <Label>Carga horária</Label>
               <Input
                 value={workload}
-                onChange={(e) => setWorkload(e.target.value.replace(/[^\d.]/g, ""))}
-                placeholder="Horas"
+                inputMode="numeric"
+                onChange={(e) => setWorkload(e.target.value.replace(/\D/g, ""))}
+                placeholder="Horas (inteiro)"
               />
             </div>
             <div>
@@ -350,6 +377,20 @@ export function SstCertificateDrawer({
             <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5">
               {errors.map((e) => <li key={e}>{e}</li>)}
             </ul>
+          )}
+
+          {lastError && !pending && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive flex items-start justify-between gap-2">
+              <span className="min-w-0">{lastError}</span>
+              <Button
+                size="sm" variant="outline"
+                className="h-7 text-xs shrink-0"
+                onClick={() => submit.mutate()}
+                disabled={errors.length > 0}
+              >
+                Tentar novamente
+              </Button>
+            </div>
           )}
         </div>
 
