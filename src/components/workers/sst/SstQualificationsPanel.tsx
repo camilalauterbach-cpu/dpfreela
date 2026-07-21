@@ -25,6 +25,7 @@ import { SstHistorySheet } from "./SstHistorySheet";
 import { SstLinksUsingSheet } from "./SstLinksUsingSheet";
 import { SstNrTimeline } from "./SstNrTimeline";
 import { SstCertificateDrawer, type SstDrawerMode } from "./SstCertificateDrawer";
+import { openCertificate } from "@/lib/sst/certificate-url";
 
 function fmtDate(iso: string | null) {
   if (!iso) return "—";
@@ -228,15 +229,14 @@ function QualRow({ q, canEdit, onUpload, onRenew, onReplace, onHistory, onLinks,
       </TableCell>
       <TableCell className="hidden md:table-cell">
         {hasCert ? (
-          <a
-            href={q.document_url!}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            type="button"
+            onClick={() => openCertificate(q.document_url)}
             className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
           >
             <FileText className="h-3.5 w-3.5" /> Ver
             <ExternalLink className="h-3 w-3" />
-          </a>
+          </button>
         ) : (
           <span className="text-xs text-muted-foreground">—</span>
         )}
