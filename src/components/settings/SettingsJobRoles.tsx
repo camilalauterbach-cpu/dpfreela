@@ -223,7 +223,15 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
     });
     setSaving(false);
     if (error) {
-      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+      const msg = error.message || "";
+      const isCategoryBlock = /requisito de cargo|documentos pessoais|NRs, ASO/i.test(msg);
+      toast({
+        title: isCategoryBlock ? "Documento não permitido como requisito de cargo" : "Erro ao salvar",
+        description: isCategoryBlock
+          ? `${msg}\n\nRemova o item destacado e selecione apenas documentos de NR, ASO ou treinamento.`
+          : msg,
+        variant: "destructive",
+      });
       return;
     }
     const reev = (data as any)?.reevaluation;
