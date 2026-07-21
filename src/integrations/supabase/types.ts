@@ -211,6 +211,68 @@ export type Database = {
           },
         ]
       }
+      document_type_scope_backfill_unmatched: {
+        Row: {
+          category: string
+          code: string
+          created_at: string
+          document_type_id: string
+          id: string
+          name: string
+          notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          resolved_scope:
+            | Database["public"]["Enums"]["document_storage_scope"]
+            | null
+          suggested_scope: Database["public"]["Enums"]["document_storage_scope"]
+          suggestion_reason: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          code: string
+          created_at?: string
+          document_type_id: string
+          id?: string
+          name: string
+          notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          resolved_scope?:
+            | Database["public"]["Enums"]["document_storage_scope"]
+            | null
+          suggested_scope: Database["public"]["Enums"]["document_storage_scope"]
+          suggestion_reason: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          code?: string
+          created_at?: string
+          document_type_id?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          resolved_scope?:
+            | Database["public"]["Enums"]["document_storage_scope"]
+            | null
+          suggested_scope?: Database["public"]["Enums"]["document_storage_scope"]
+          suggestion_reason?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_type_scope_backfill_unmatched_document_type_id_fkey"
+            columns: ["document_type_id"]
+            isOneToOne: true
+            referencedRelation: "document_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_types: {
         Row: {
           category: string
@@ -225,6 +287,9 @@ export type Database = {
           needs_review: boolean
           notes: string | null
           requires_file: boolean
+          storage_scope:
+            | Database["public"]["Enums"]["document_storage_scope"]
+            | null
           updated_at: string
         }
         Insert: {
@@ -240,6 +305,9 @@ export type Database = {
           needs_review?: boolean
           notes?: string | null
           requires_file?: boolean
+          storage_scope?:
+            | Database["public"]["Enums"]["document_storage_scope"]
+            | null
           updated_at?: string
         }
         Update: {
@@ -255,6 +323,9 @@ export type Database = {
           needs_review?: boolean
           notes?: string | null
           requires_file?: boolean
+          storage_scope?:
+            | Database["public"]["Enums"]["document_storage_scope"]
+            | null
           updated_at?: string
         }
         Relationships: []
@@ -2403,6 +2474,7 @@ export type Database = {
         Args: { p_warning_days?: number }
         Returns: Json
       }
+      document_type_scope_gate_status: { Args: never; Returns: Json }
       dry_run_job_role_backfill: { Args: never; Returns: Json }
       ensure_current_user_access: {
         Args: never
@@ -2497,6 +2569,14 @@ export type Database = {
         }
         Returns: Json
       }
+      resolve_document_type_scope: {
+        Args: {
+          p_document_type_id: string
+          p_notes?: string
+          p_scope: Database["public"]["Enums"]["document_storage_scope"]
+        }
+        Returns: Json
+      }
       resolve_worker_merge_chain: {
         Args: { _worker_id: string }
         Returns: string
@@ -2536,6 +2616,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "manager" | "operator" | "viewer"
+      document_storage_scope: "worker" | "employment_link"
       link_document_override_action: "add" | "waive"
       sst_revision_reason:
         | "created"
@@ -2673,6 +2754,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "manager", "operator", "viewer"],
+      document_storage_scope: ["worker", "employment_link"],
       link_document_override_action: ["add", "waive"],
       sst_revision_reason: [
         "created",
