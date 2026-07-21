@@ -141,6 +141,7 @@ export type Database = {
           entity_type: string
           event_source: string
           id: string
+          override_action: string | null
           previous_status: string | null
           reason: string | null
           state_hash: string | null
@@ -156,6 +157,7 @@ export type Database = {
           entity_type: string
           event_source: string
           id?: string
+          override_action?: string | null
           previous_status?: string | null
           reason?: string | null
           state_hash?: string | null
@@ -171,6 +173,7 @@ export type Database = {
           entity_type?: string
           event_source?: string
           id?: string
+          override_action?: string | null
           previous_status?: string | null
           reason?: string | null
           state_hash?: string | null
@@ -255,6 +258,66 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      employment_link_document_overrides: {
+        Row: {
+          action: Database["public"]["Enums"]["link_document_override_action"]
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          document_type_id: string
+          employment_link_id: string
+          id: string
+          reason: string | null
+          required_until: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["link_document_override_action"]
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          document_type_id: string
+          employment_link_id: string
+          id?: string
+          reason?: string | null
+          required_until?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["link_document_override_action"]
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          document_type_id?: string
+          employment_link_id?: string
+          id?: string
+          reason?: string | null
+          required_until?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employment_link_document_overrides_document_type_id_fkey"
+            columns: ["document_type_id"]
+            isOneToOne: false
+            referencedRelation: "document_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employment_link_document_overrides_employment_link_id_fkey"
+            columns: ["employment_link_id"]
+            isOneToOne: false
+            referencedRelation: "employment_links"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       employment_link_documents: {
         Row: {
@@ -2413,6 +2476,17 @@ export type Database = {
         Args: { p_job_role_id: string; p_requirements: Json }
         Returns: Json
       }
+      save_link_document_override: {
+        Args: {
+          p_action: string
+          p_document_type_id: string
+          p_employment_link_id: string
+          p_override_id?: string
+          p_reason?: string
+          p_required_until?: string
+        }
+        Returns: Json
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       simulate_link_compliance: {
@@ -2422,6 +2496,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "manager" | "operator" | "viewer"
+      link_document_override_action: "add" | "waive"
       sst_revision_reason:
         | "created"
         | "renewed"
@@ -2558,6 +2633,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "manager", "operator", "viewer"],
+      link_document_override_action: ["add", "waive"],
       sst_revision_reason: [
         "created",
         "renewed",
