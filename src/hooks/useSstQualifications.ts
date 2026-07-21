@@ -28,6 +28,8 @@ export interface SstCurrentRow {
   validity_status: ValidityStatus;
   source_type: SourceType;
   revision_type: RevisionType;
+  revision_reason: string | null;
+  document_type_id: string | null;
   employment_link_document_id: string | null;
   link_group_worker_id: string | null;
   link_group_id: string | null;
