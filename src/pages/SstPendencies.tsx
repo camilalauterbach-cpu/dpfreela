@@ -3,6 +3,8 @@
 // Filtros: categoria de pendência, NR, busca por trabalhador; paginação client-side.
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   useSstOverview,
@@ -20,6 +22,9 @@ import {
 import { Search, Loader2, ExternalLink, ArrowLeft, Upload } from "lucide-react";
 import { TablePagination } from "@/components/TablePagination";
 import { SstCertificateDrawer, type SstDrawerMode } from "@/components/workers/sst/SstCertificateDrawer";
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type Category = "" | "expired" | "rejected" | "d7" | "d15" | "d30" | "pending" | "no_document" | "unknown";
 
@@ -66,6 +71,39 @@ function fmtBR(iso: string | null) {
 
 const PAGE_SIZE = 20;
 
+interface AllocationInfo { event_name: string | null; job_role_name: string | null }
+
+function useActiveAllocationsForWorkers(workerIds: string[]) {
+  const key = useMemo(() => [...workerIds].sort(), [workerIds]);
+  return useQuery({
+    queryKey: ["sst-pendencies-allocations", key],
+    enabled: key.length > 0,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("link_group_workers")
+        .select("worker_id, link_groups!inner(group_name, events(name), job_roles(name))")
+        .in("worker_id", key)
+        .is("deleted_at", null);
+      if (error) throw error;
+      const byWorker = new Map<string, AllocationInfo[]>();
+      for (const row of (data || []) as any[]) {
+        const info: AllocationInfo = {
+          event_name: row.link_groups?.events?.name ?? row.link_groups?.group_name ?? null,
+          job_role_name: row.link_groups?.job_roles?.name ?? null,
+        };
+        const arr = byWorker.get(row.worker_id) || [];
+        // dedupe by event+role
+        if (!arr.some((a) => a.event_name === info.event_name && a.job_role_name === info.job_role_name)) {
+          arr.push(info);
+        }
+        byWorker.set(row.worker_id, arr);
+      }
+      return byWorker;
+    },
+  });
+}
+
 export default function SstPendencies() {
   const { hasAnyRole } = useAuth();
   const canWrite = hasAnyRole(["admin", "manager", "operator"]);
@@ -91,7 +129,7 @@ export default function SstPendencies() {
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     const digits = term.replace(/\D/g, "");
-    return allPendencies.filter(({ worker, q, rank }) => {
+    const arr = allPendencies.filter(({ worker, q, rank }) => {
       if (!matchesCategory(category, rank)) return false;
       if (nr && q.nr_code !== nr) return false;
       if (term) {
@@ -102,9 +140,30 @@ export default function SstPendencies() {
       }
       return true;
     });
+    // Ordenação determinística: prioridade → menor daysLeft → nome → NR.
+    arr.sort((a, b) => {
+      if (a.rank !== b.rank) return a.rank - b.rank;
+      const ad = a.daysLeft ?? Number.MAX_SAFE_INTEGER;
+      const bd = b.daysLeft ?? Number.MAX_SAFE_INTEGER;
+      if (ad !== bd) return ad - bd;
+      const n = a.worker.full_name.localeCompare(b.worker.full_name, "pt-BR");
+      if (n !== 0) return n;
+      return a.q.nr_code.localeCompare(b.q.nr_code);
+    });
+    return arr;
   }, [allPendencies, category, nr, search]);
 
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const uniqueWorkerIds = useMemo(
+    () => Array.from(new Set(filtered.map((p) => p.worker.worker_id))),
+    [filtered],
+  );
+  const pageWorkerIds = useMemo(
+    () => Array.from(new Set(paged.map((p) => p.worker.worker_id))),
+    [paged],
+  );
+  const allocations = useActiveAllocationsForWorkers(pageWorkerIds);
 
   // Reset page + sync URL on filter change
   useEffect(() => {
@@ -139,6 +198,7 @@ export default function SstPendencies() {
   const clear = () => { setSearch(""); setCategory(""); setNr(""); };
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -152,7 +212,14 @@ export default function SstPendencies() {
             </p>
           </div>
         </div>
-        <Badge variant="outline">{filtered.length} pendência{filtered.length !== 1 ? "s" : ""}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline">
+            {uniqueWorkerIds.length} trabalhador{uniqueWorkerIds.length !== 1 ? "es" : ""}
+          </Badge>
+          <Badge variant="outline">
+            {filtered.length} pendência{filtered.length !== 1 ? "s" : ""}
+          </Badge>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -199,7 +266,9 @@ export default function SstPendencies() {
 
       {!overview.isLoading && filtered.length === 0 && (
         <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
-          Nenhuma pendência com os filtros atuais.
+          {(search || category || nr)
+            ? "Nenhuma pendência com os filtros atuais."
+            : "Nenhuma pendência. Todos os certificados obrigatórios estão regularizados."}
         </CardContent></Card>
       )}
 
@@ -212,6 +281,12 @@ export default function SstPendencies() {
                 const isRenewable = rank <= 5; // vencidas/rejeitadas/vencendo → renew
                 const mode: SstDrawerMode = q.document_status === "no_document" ? "create"
                   : isRenewable ? "renew" : "create";
+                const allocs = allocations.data?.get(worker.worker_id) || [];
+                const allocLabel = allocs.length === 0
+                  ? "Sem vínculo ativo"
+                  : allocs.slice(0, 2).map((a) =>
+                      `${a.event_name ?? "—"} · ${a.job_role_name ?? "sem cargo"}`
+                    ).join("  |  ") + (allocs.length > 2 ? ` +${allocs.length - 2}` : "");
                 return (
                   <div key={q.id} className="p-3 flex flex-wrap items-center gap-3">
                     <div className="min-w-[220px] flex-1">
@@ -231,6 +306,10 @@ export default function SstPendencies() {
                         {" • "}{DOC_LABEL_PT[q.document_status]}
                         {" • "}{EXP_LABEL_PT[q.expiration_status]}
                       </div>
+                      <div className="mt-1 text-[11px] text-muted-foreground truncate">
+                        <span className="font-medium text-foreground/70">Vínculos: </span>
+                        {allocations.isLoading ? "carregando…" : allocLabel}
+                      </div>
                     </div>
                     <div className="flex items-center gap-1">
                       {canWrite && (
@@ -240,11 +319,17 @@ export default function SstPendencies() {
                           {mode === "create" ? "Anexar" : "Renovar"}
                         </Button>
                       )}
-                      <Button asChild size="sm" variant="ghost" className="h-8 text-xs gap-1">
-                        <Link to={`/workers/${worker.worker_id}?tab=sst`}>
-                          Abrir <ExternalLink className="h-3.5 w-3.5" />
-                        </Link>
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button asChild size="icon" variant="ghost" className="h-8 w-8">
+                            <Link to={`/workers/${worker.worker_id}?tab=sst`}
+                              aria-label="Abrir trabalhador">
+                              <ExternalLink className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Abrir trabalhador</TooltipContent>
+                      </Tooltip>
                     </div>
                   </div>
                 );
@@ -272,5 +357,6 @@ export default function SstPendencies() {
         />
       )}
     </div>
+    </TooltipProvider>
   );
 }
