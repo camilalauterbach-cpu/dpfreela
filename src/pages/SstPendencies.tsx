@@ -78,7 +78,7 @@ function useActiveAllocationsForWorkers(workerIds: string[]) {
   return useQuery({
     queryKey: ["sst-pendencies-allocations", key],
     enabled: key.length > 0,
-    staleTime: 60_000,
+    staleTime: 300_000, // 5 min — cache das alocações (E-SST.2.F)
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("link_group_workers")
@@ -100,6 +100,46 @@ function useActiveAllocationsForWorkers(workerIds: string[]) {
         byWorker.set(row.worker_id, arr);
       }
       return byWorker;
+    },
+  });
+}
+
+// Overrides ativos por worker × document_type (para badge [Override] na lista).
+function useActiveOverridesForWorkers(
+  entries: Array<{ workerId: string; docTypeId: string | null }>,
+) {
+  const key = useMemo(() => {
+    const uniq = new Set<string>();
+    for (const e of entries) if (e.docTypeId) uniq.add(`${e.workerId}:${e.docTypeId}`);
+    return Array.from(uniq).sort();
+  }, [entries]);
+  const workerIds = useMemo(
+    () => Array.from(new Set(key.map((k) => k.split(":")[0]))),
+    [key],
+  );
+  const docTypeIds = useMemo(
+    () => Array.from(new Set(key.map((k) => k.split(":")[1]))),
+    [key],
+  );
+  return useQuery({
+    queryKey: ["sst-pendencies-overrides", key],
+    enabled: key.length > 0,
+    staleTime: 300_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("employment_link_document_overrides")
+        .select("employment_link_id, document_type_id, action, employment_links!inner(worker_id)")
+        .in("document_type_id", docTypeIds)
+        .is("deleted_at", null);
+      if (error) throw error;
+      const set = new Set<string>();
+      for (const row of (data || []) as any[]) {
+        const wid = row.employment_links?.worker_id;
+        if (wid && workerIds.includes(wid)) {
+          set.add(`${wid}:${row.document_type_id}`);
+        }
+      }
+      return set;
     },
   });
 }
@@ -164,6 +204,12 @@ export default function SstPendencies() {
     [paged],
   );
   const allocations = useActiveAllocationsForWorkers(pageWorkerIds);
+  const overrides = useActiveOverridesForWorkers(
+    useMemo(
+      () => paged.map((p) => ({ workerId: p.worker.worker_id, docTypeId: p.q.document_type_id })),
+      [paged],
+    ),
+  );
 
   // Reset page + sync URL on filter change
   useEffect(() => {
@@ -287,6 +333,9 @@ export default function SstPendencies() {
                   : allocs.slice(0, 2).map((a) =>
                       `${a.event_name ?? "—"} · ${a.job_role_name ?? "sem cargo"}`
                     ).join("  |  ") + (allocs.length > 2 ? ` +${allocs.length - 2}` : "");
+                const hasOverride = q.document_type_id
+                  ? overrides.data?.has(`${worker.worker_id}:${q.document_type_id}`) ?? false
+                  : false;
                 return (
                   <div key={q.id} className="p-3 flex flex-wrap items-center gap-3">
                     <div className="min-w-[220px] flex-1">
@@ -299,10 +348,17 @@ export default function SstPendencies() {
                         <span className={`text-[10px] px-1.5 py-0.5 rounded border ${meta.className}`}>
                           {meta.label}
                         </span>
+                        {hasOverride && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded border bg-purple-50 text-purple-800 border-purple-200">
+                            Override
+                          </span>
+                        )}
                       </div>
                       <div className="mt-1 text-[11px] text-muted-foreground">
-                        {worker.cpf || "sem CPF"} • Venc.: {fmtBR(q.expires_at)}
-                        {daysLeft != null && ` • ${daysLeft}d`}
+                        {worker.cpf || "sem CPF"}
+                        {daysLeft != null
+                          ? ` • ${daysLeft} dia${Math.abs(daysLeft) === 1 ? "" : "s"}${q.expires_at ? ` (${fmtBR(q.expires_at)})` : ""}`
+                          : q.expires_at ? ` • Venc.: ${fmtBR(q.expires_at)}` : ""}
                         {" • "}{DOC_LABEL_PT[q.document_status]}
                         {" • "}{EXP_LABEL_PT[q.expiration_status]}
                       </div>
