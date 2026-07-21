@@ -70,14 +70,21 @@ export function useSstQualificationHistory(
       const { data, error } = await (supabase as any)
         .from("worker_sst_qualifications")
         .select(
-          "id, nr_code, chain_key, revision_type, revision_reason, issued_at, expires_at, workload_hours, provider_name, instructor_name, document_url, document_status, validity_status, source_type, notes, is_current, superseded_at, superseded_by, created_at, created_by",
+          "id, nr_code, chain_key, revision_type, revision_reason, issued_at, expires_at, workload_hours, provider_name, instructor_name, document_url, document_status, validity_status, source_type, notes, supersedes_id, superseded_at, created_at, created_by",
         )
         .eq("worker_id", workerId)
         .eq("nr_code", nrCode)
         .order("issued_at", { ascending: false })
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data || []) as SstHistoryRow[];
+      // A tabela não possui colunas `is_current` nem `superseded_by`; derivamos
+      // `is_current` a partir de `superseded_at IS NULL` e expomos
+      // `superseded_by` como alias de `supersedes_id` para manter o contrato.
+      return ((data || []) as any[]).map((r) => ({
+        ...r,
+        is_current: r.superseded_at == null,
+        superseded_by: r.supersedes_id ?? null,
+      })) as SstHistoryRow[];
     },
   });
 }

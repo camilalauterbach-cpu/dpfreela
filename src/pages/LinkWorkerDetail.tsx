@@ -91,6 +91,9 @@ export default function LinkWorkerDetail() {
   const { data: group, isLoading: loadingGroup } = useLinkGroup(groupId);
   const { data: allocation, isLoading: loadingAlloc } = useLinkGroupWorker(groupId, workerId);
   const [editing, setEditing] = useState(false);
+  // IMPORTANT: hooks must run before any early return to preserve hook order.
+  const eventId = (group as any)?.event_id ?? null;
+  const { data: employmentLinkId } = useEmploymentLinkId(workerId, eventId);
 
   if (loadingGroup || loadingAlloc) {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -102,7 +105,6 @@ export default function LinkWorkerDetail() {
 
   const g = group as any;
   const a = allocation as any;
-  const { data: employmentLinkId } = useEmploymentLinkId(workerId, g.event_id);
   const worker = a.workers;
   const eventName = g.events?.name || "—";
 
