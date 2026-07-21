@@ -122,19 +122,22 @@ export function JobRoleCombobox({
             </CommandEmpty>
             <CommandGroup>
               {!required && selected && (
-                <CommandItem
-                  value="__clear__"
-                  onSelect={() => {
-                    onChange(null);
-                    setOpen(false);
-                  }}
-                  className="text-muted-foreground"
-                >
-                  <span className="flex items-center gap-2">
-                    <Check className="h-3.5 w-3.5 opacity-0" />
-                    Limpar seleção
-                  </span>
-                </CommandItem>
+                <>
+                  <CommandItem
+                    value="__clear__"
+                    onSelect={() => {
+                      onChange(null);
+                      setOpen(false);
+                    }}
+                    className="text-muted-foreground"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 opacity-0" />
+                      Limpar seleção
+                    </span>
+                  </CommandItem>
+                  <div className="border-t my-1" />
+                </>
               )}
               {(roles ?? []).map((role) => {
                 // Busca apenas por nome; code é interno.
