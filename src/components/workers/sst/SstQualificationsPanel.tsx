@@ -10,7 +10,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Upload, RefreshCw, Replace, History, Users, MoreHorizontal,
+  Upload, RefreshCw, Replace, History, Users, MoreHorizontal, GitBranch,
   FileText, ExternalLink, ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,6 +23,7 @@ import {
 } from "./SstStatusBadge";
 import { SstHistorySheet } from "./SstHistorySheet";
 import { SstLinksUsingSheet } from "./SstLinksUsingSheet";
+import { SstNrTimeline } from "./SstNrTimeline";
 import { SstCertificateDrawer, type SstDrawerMode } from "./SstCertificateDrawer";
 
 function fmtDate(iso: string | null) {
@@ -54,6 +55,7 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
 
   const [historyOpen, setHistoryOpen] = useState<{ nr: string } | null>(null);
   const [linksOpen, setLinksOpen] = useState<{ nr: string; docTypeId: string | null } | null>(null);
+  const [timelineOpen, setTimelineOpen] = useState<{ nr: string; docTypeId: string | null } | null>(null);
   const [drawer, setDrawer] = useState<
     { mode: SstDrawerMode; current: SstCurrentRow | null; presetNrCode: string | null } | null
   >(null);
@@ -136,6 +138,7 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
                     onReplace={() => setDrawer({ mode: "replace", current: q, presetNrCode: q.nr_code })}
                     onHistory={() => setHistoryOpen({ nr: q.nr_code })}
                     onLinks={() => setLinksOpen({ nr: q.nr_code, docTypeId: q.document_type_id })}
+                    onTimeline={() => setTimelineOpen({ nr: q.nr_code, docTypeId: q.document_type_id })}
                   />
                 ))}
               </TableBody>
@@ -161,6 +164,17 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
           nrCode={linksOpen.nr}
         />
       )}
+      {timelineOpen && (
+        <SstNrTimeline
+          open={!!timelineOpen}
+          onOpenChange={(v) => !v && setTimelineOpen(null)}
+          workerId={workerId}
+          nrCode={timelineOpen.nr}
+          onOpenLinks={() =>
+            setLinksOpen({ nr: timelineOpen.nr, docTypeId: timelineOpen.docTypeId })
+          }
+        />
+      )}
       {drawer && (
         <SstCertificateDrawer
           open={!!drawer}
@@ -184,9 +198,10 @@ interface RowProps {
   onReplace: () => void;
   onHistory: () => void;
   onLinks: () => void;
+  onTimeline: () => void;
 }
 
-function QualRow({ q, canEdit, onUpload, onRenew, onReplace, onHistory, onLinks }: RowProps) {
+function QualRow({ q, canEdit, onUpload, onRenew, onReplace, onHistory, onLinks, onTimeline }: RowProps) {
   const status = resolveOverall(q);
   const days = daysUntil(q.expires_at);
   const hasCert = !!q.document_url;
@@ -252,6 +267,9 @@ function QualRow({ q, canEdit, onUpload, onRenew, onReplace, onHistory, onLinks 
             {canEdit && <DropdownMenuSeparator />}
             <DropdownMenuItem onClick={onHistory}>
               <History className="mr-2 h-4 w-4" /> Ver histórico
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onTimeline}>
+              <GitBranch className="mr-2 h-4 w-4" /> Ver linha do tempo
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onLinks}>
               <Users className="mr-2 h-4 w-4" /> Ver vínculos
