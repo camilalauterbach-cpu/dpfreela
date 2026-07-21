@@ -8,7 +8,7 @@ export type ComplianceStatus =
   | "warning"
   | "ok";
 
-export type ComplianceOverall = "apto" | "atencao" | "bloqueado";
+export type ComplianceOverall = "apto" | "atencao" | "bloqueado" | "nao_configurado";
 
 export interface ComplianceDocument {
   document_type_id: string;
@@ -72,6 +72,7 @@ export const OVERALL_LABEL: Record<ComplianceOverall, string> = {
   apto: "Apto",
   atencao: "Atenção",
   bloqueado: "Bloqueado",
+  nao_configurado: "Não configurado",
 };
 
 export const STATUS_TONE: Record<ComplianceStatus, "success" | "warning" | "danger" | "muted"> = {
@@ -82,8 +83,9 @@ export const STATUS_TONE: Record<ComplianceStatus, "success" | "warning" | "dang
   missing: "danger",
 };
 
-export const OVERALL_TONE: Record<ComplianceOverall, "success" | "warning" | "danger"> = {
+export const OVERALL_TONE: Record<ComplianceOverall, "success" | "warning" | "danger" | "muted"> = {
   apto: "success",
   atencao: "warning",
   bloqueado: "danger",
+  nao_configurado: "muted",
 };
