@@ -218,8 +218,8 @@ export default function EventForm() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="planned">Planejado</SelectItem>
-                  <SelectItem value="active">Ativo</SelectItem>
                   <SelectItem value="confirmed">Confirmado</SelectItem>
+                  <SelectItem value="in_progress">Em andamento</SelectItem>
                   <SelectItem value="completed">Concluído</SelectItem>
                   <SelectItem value="cancelled">Cancelado</SelectItem>
                 </SelectContent>
