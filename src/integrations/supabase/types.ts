@@ -280,6 +280,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           default_validity_days: number | null
+          display_order: number
           has_expiration: boolean
           id: string
           is_active: boolean
@@ -298,6 +299,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           default_validity_days?: number | null
+          display_order?: number
           has_expiration?: boolean
           id?: string
           is_active?: boolean
@@ -316,6 +318,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           default_validity_days?: number | null
+          display_order?: number
           has_expiration?: boolean
           id?: string
           is_active?: boolean
@@ -964,6 +967,7 @@ export type Database = {
           id: string
           job_function: string | null
           job_role: string | null
+          job_role_id: string | null
           link_group_id: string
           meal_allowance: number | null
           notes: string | null
@@ -996,6 +1000,7 @@ export type Database = {
           id?: string
           job_function?: string | null
           job_role?: string | null
+          job_role_id?: string | null
           link_group_id: string
           meal_allowance?: number | null
           notes?: string | null
@@ -1028,6 +1033,7 @@ export type Database = {
           id?: string
           job_function?: string | null
           job_role?: string | null
+          job_role_id?: string | null
           link_group_id?: string
           meal_allowance?: number | null
           notes?: string | null
@@ -1043,6 +1049,13 @@ export type Database = {
           worker_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "link_group_workers_job_role_id_fkey"
+            columns: ["job_role_id"]
+            isOneToOne: false
+            referencedRelation: "job_roles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "link_group_workers_link_group_id_fkey"
             columns: ["link_group_id"]
