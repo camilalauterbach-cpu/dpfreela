@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, AlertTriangle, XCircle, Circle, MinusCircle, Loader2, Search, Filter, ExternalLink } from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, Circle, MinusCircle, Loader2, Search, Filter, ExternalLink, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,12 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { useWorkerQualifications, QualStatus, QualCell, QualColumn, QualRow } from "@/hooks/useWorkerQualifications";
+import { useQualificationColumnCatalog, type QualColumnCatalogRow } from "@/hooks/useQualificationColumnCatalog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
+import { fetchAllQualificationRows, exportQualificationsCsv, exportQualificationsXlsx } from "@/lib/qualifications-export";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -25,9 +31,25 @@ const STATUS_META: Record<QualStatus, { label: string; tone: string; icon: any }
   ok: { label: "Válido", tone: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/30", icon: CheckCircle2 },
   warning: { label: "Vence em breve", tone: "bg-amber-500/15 text-amber-700 dark:text-amber-400 ring-1 ring-amber-500/30", icon: AlertTriangle },
   expired: { label: "Vencido", tone: "bg-red-500/15 text-red-700 dark:text-red-400 ring-1 ring-red-500/30", icon: XCircle },
-  missing: { label: "Obrigatório e inexistente", tone: "bg-slate-500/15 text-slate-700 dark:text-slate-300 ring-1 ring-slate-500/30", icon: Circle },
+  missing: { label: "Ausente", tone: "bg-slate-500/15 text-slate-700 dark:text-slate-300 ring-1 ring-slate-500/30", icon: Circle },
   not_applicable: { label: "Não aplicável", tone: "text-muted-foreground/40", icon: MinusCircle },
 };
+
+const STORAGE_KEY = "dpfreela.qualifications.columns.v1";
+
+function loadStoredSelection(): string[] | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr) && arr.every((s) => typeof s === "string")) return arr;
+  } catch { /* ignore */ }
+  return null;
+}
+
+function saveStoredSelection(ids: string[]) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ids)); } catch { /* ignore */ }
+}
 
 function formatDate(iso: string | null) {
   if (!iso) return "—";
@@ -55,26 +77,65 @@ export default function Qualifications() {
   const [search, setSearch] = useState("");
   const [state, setState] = useState<QualStatus | null>(null);
   const [onlyRelevant, setOnlyRelevant] = useState(true);
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [selectedColumnIds, setSelectedColumnIds] = useState<string[]>([]);
+  const [selectionReady, setSelectionReady] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [detail, setDetail] = useState<{ row: QualRow; col: QualColumn; cell: QualCell } | null>(null);
+
+  const catalog = useQualificationColumnCatalog();
+  const availableColumns: QualColumnCatalogRow[] = catalog.data ?? [];
+
+  // Preset inicial: ASO + todas as NRs ativas. Treinamentos entram só se o
+  // usuário marcar explicitamente. Se houver seleção persistida, respeita-a.
+  useEffect(() => {
+    if (selectionReady || catalog.isLoading || !catalog.data) return;
+    const stored = loadStoredSelection();
+    if (stored) {
+      const valid = new Set(catalog.data.map((c) => c.document_type_id));
+      setSelectedColumnIds(stored.filter((id) => valid.has(id)));
+    } else {
+      const preset = catalog.data
+        .filter((c) => c.category === "sst_aso" || c.category === "sst_nr")
+        .map((c) => c.document_type_id);
+      setSelectedColumnIds(preset);
+    }
+    setSelectionReady(true);
+  }, [catalog.isLoading, catalog.data, selectionReady]);
+
+  // Persiste seleção sempre que muda (após preset inicial).
+  useEffect(() => {
+    if (selectionReady) saveStoredSelection(selectedColumnIds);
+  }, [selectedColumnIds, selectionReady]);
 
   const { data, isLoading, error } = useWorkerQualifications({
     search,
     state,
-    documentTypeIds: selectedTypes.length ? selectedTypes : null,
+    // Passa exatamente a seleção do usuário (array vazio desabilita a consulta).
+    documentTypeIds: selectionReady ? selectedColumnIds : null,
     onlyRelevant,
   });
 
   const columns = data?.columns ?? [];
   const items = data?.items ?? [];
 
-  const groupedCols = useMemo(() => {
-    const groups: Record<string, QualColumn[]> = { sst_nr: [], sst_aso: [], training: [] };
-    columns.forEach((c) => {
-      (groups[c.category] ||= []).push(c);
-    });
+  // Agrupa o CATÁLOGO (não os columns filtrados) — assim marcar uma coluna
+  // nunca remove as demais opções do seletor.
+  const groupedCatalog = useMemo(() => {
+    const groups: Record<string, QualColumnCatalogRow[]> = { sst_nr: [], sst_aso: [], training: [] };
+    availableColumns.forEach((c) => { (groups[c.category] ||= []).push(c); });
     return groups;
-  }, [columns]);
+  }, [availableColumns]);
+
+  const totalCatalog = availableColumns.length;
+  const selectedCount = selectedColumnIds.length;
+
+  const toggleColumn = (id: string, checked: boolean) => {
+    setSelectedColumnIds((prev) =>
+      checked ? Array.from(new Set([...prev, id])) : prev.filter((x) => x !== id),
+    );
+  };
+  const selectAll = () => setSelectedColumnIds(availableColumns.map((c) => c.document_type_id));
+  const clearAll = () => setSelectedColumnIds([]);
 
   const stateCounts = useMemo(() => {
     const acc = { expired: 0, warning: 0, missing: 0, ok: 0 };
@@ -87,13 +148,51 @@ export default function Qualifications() {
     return acc;
   }, [items]);
 
+  async function runExport(kind: "csv" | "xlsx") {
+    if (selectedColumnIds.length === 0) {
+      toast.info("Selecione ao menos uma coluna antes de exportar.");
+      return;
+    }
+    setExporting(true);
+    try {
+      const matrix = await fetchAllQualificationRows({
+        search,
+        state,
+        onlyRelevant,
+        documentTypeIds: selectedColumnIds,
+      });
+      if (kind === "csv") await exportQualificationsCsv(matrix);
+      else await exportQualificationsXlsx(matrix);
+      toast.success(`Exportação concluída — ${matrix.items.length} trabalhador${matrix.items.length === 1 ? "" : "es"}.`);
+    } catch (e: any) {
+      toast.error(String(e?.message || "Falha ao exportar."));
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="space-y-4 p-4 sm:p-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Painel de Qualificações</h1>
-        <p className="text-sm text-muted-foreground">
-          Matriz completa de NRs, ASOs e treinamentos por trabalhador. Cada célula reflete o estado atual do documento (válido, vencendo, vencido ou ausente quando obrigatório).
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Painel de Qualificações</h1>
+          <p className="text-sm text-muted-foreground">
+            Matriz de NRs, ASOs e treinamentos por trabalhador. O certificado pertence ao trabalhador;
+            o cargo/vínculo apenas define quando ele é exigido.
+          </p>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2" disabled={exporting || selectedColumnIds.length === 0}>
+              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              Exportar
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem onClick={() => runExport("xlsx")} disabled={exporting}>Planilha (.xlsx)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => runExport("csv")} disabled={exporting}>CSV (.csv)</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </header>
 
       {/* Filters */}
@@ -134,36 +233,37 @@ export default function Qualifications() {
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
                 <Filter className="h-4 w-4 mr-1" />
-                Colunas {selectedTypes.length > 0 && <Badge variant="secondary" className="ml-1">{selectedTypes.length}</Badge>}
+                Colunas <Badge variant="secondary" className="ml-1">{selectedCount} de {totalCatalog}</Badge>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-72 max-h-[70vh] overflow-y-auto">
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-medium">Documentos exibidos</span>
-                  {selectedTypes.length > 0 && (
-                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setSelectedTypes([])}>
-                      Limpar
-                    </Button>
-                  )}
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={selectAll}>Selecionar todas</Button>
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={clearAll}>Limpar seleção</Button>
+                  </div>
                 </div>
-                {(["sst_nr", "sst_aso", "training"] as const).map((cat) =>
-                  groupedCols[cat]?.length ? (
+                {catalog.isLoading ? (
+                  <div className="py-4 flex justify-center text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : (["sst_aso", "sst_nr", "training"] as const).map((cat) =>
+                  groupedCatalog[cat]?.length ? (
                     <div key={cat} className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                         {cat === "sst_nr" ? "NRs" : cat === "sst_aso" ? "ASO" : "Treinamentos"}
                       </p>
-                      {groupedCols[cat].map((c) => (
+                      {groupedCatalog[cat].map((c) => (
                         <label key={c.document_type_id} className="flex items-center gap-2 py-1 cursor-pointer">
                           <Checkbox
-                            checked={selectedTypes.includes(c.document_type_id)}
-                            onCheckedChange={(v) => {
-                              setSelectedTypes((prev) =>
-                                v ? [...prev, c.document_type_id] : prev.filter((id) => id !== c.document_type_id)
-                              );
-                            }}
+                            checked={selectedColumnIds.includes(c.document_type_id)}
+                            onCheckedChange={(v) => toggleColumn(c.document_type_id, !!v)}
+                            onClick={(e) => e.stopPropagation()}
                           />
                           <span className="text-sm">{c.name}</span>
+                          {c.code && <span className="text-[10px] text-muted-foreground ml-auto">{c.code}</span>}
                         </label>
                       ))}
                     </div>
@@ -185,14 +285,18 @@ export default function Qualifications() {
           <span className="inline-flex items-center gap-1"><StatusIcon status="ok" size={14} /> Válido</span>
           <span className="inline-flex items-center gap-1"><StatusIcon status="warning" size={14} /> Vence em ≤ {data?.warning_days ?? 30}d</span>
           <span className="inline-flex items-center gap-1"><StatusIcon status="expired" size={14} /> Vencido</span>
-          <span className="inline-flex items-center gap-1"><StatusIcon status="missing" size={14} /> Obrigatório e ausente</span>
+          <span className="inline-flex items-center gap-1"><StatusIcon status="missing" size={14} /> Ausente (exigido pelo cargo)</span>
           <span className="inline-flex items-center gap-1"><StatusIcon status="not_applicable" size={14} /> Não aplicável</span>
         </div>
       </div>
 
       {/* Matrix */}
       <div className="rounded-lg border bg-card overflow-hidden">
-        {isLoading ? (
+        {selectionReady && selectedColumnIds.length === 0 ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">
+            Selecione pelo menos uma coluna para visualizar as qualificações.
+          </div>
+        ) : isLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
