@@ -593,3 +593,44 @@ function SummaryTile({ label, value, sub, tone }: { label: string; value: number
     </div>
   );
 }
+
+function SampleTable<T>({
+  title, filename, rows, headers, renderRow,
+}: {
+  title: string;
+  filename: string;
+  rows: Array<Record<string, unknown>>;
+  headers: string[];
+  renderRow: (row: T) => React.ReactNode[];
+}) {
+  if (!rows || rows.length === 0) {
+    return (
+      <div className="rounded-md border p-3 text-sm text-muted-foreground">
+        <div className="text-sm font-medium mb-1 text-foreground">{title}</div>
+        Sem registros neste grupo.
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-md border overflow-x-auto">
+      <div className="flex items-center justify-between px-3 py-2 bg-muted/40">
+        <div className="text-xs font-medium">{title}</div>
+        <Button size="sm" variant="outline" onClick={() => downloadCsv(filename, rows)}>
+          <Download className="mr-1 h-4 w-4" /> Exportar CSV
+        </Button>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>{headers.map((h) => <TableHead key={h}>{h}</TableHead>)}</TableRow>
+        </TableHeader>
+        <TableBody>
+          {(rows as unknown as T[]).map((r, i) => (
+            <TableRow key={i}>
+              {renderRow(r).map((cell, j) => <TableCell key={j}>{cell as React.ReactNode}</TableCell>)}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
