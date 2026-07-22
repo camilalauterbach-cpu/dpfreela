@@ -11,7 +11,10 @@ import {
   type SstCurrentRow,
   type SstWorkerRow,
 } from "@/hooks/useSstQualifications";
-import { collectPendencies, DOC_LABEL_PT, EXP_LABEL_PT } from "@/lib/sst/export";
+import {
+  collectPendencies, groupPendenciesByWorker,
+  DOC_LABEL_PT, EXP_LABEL_PT, type PendencyRow,
+} from "@/lib/sst/export";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -166,10 +169,12 @@ export default function SstPendencies() {
     return Array.from(set).sort();
   }, [allPendencies]);
 
-  const filtered = useMemo(() => {
+  // Filtra pendências individuais (chip a chip) — usado tanto para as linhas
+  // agrupadas quanto para o contador global "M pendências".
+  const filteredPendencies = useMemo<PendencyRow[]>(() => {
     const term = search.trim().toLowerCase();
     const digits = term.replace(/\D/g, "");
-    const arr = allPendencies.filter(({ worker, q, rank }) => {
+    return allPendencies.filter(({ worker, q, rank }) => {
       if (!matchesCategory(category, rank)) return false;
       if (nr && q.nr_code !== nr) return false;
       if (term) {
@@ -180,33 +185,29 @@ export default function SstPendencies() {
       }
       return true;
     });
-    // Ordenação determinística: prioridade → menor daysLeft → nome → NR.
-    arr.sort((a, b) => {
-      if (a.rank !== b.rank) return a.rank - b.rank;
-      const ad = a.daysLeft ?? Number.MAX_SAFE_INTEGER;
-      const bd = b.daysLeft ?? Number.MAX_SAFE_INTEGER;
-      if (ad !== bd) return ad - bd;
-      const n = a.worker.full_name.localeCompare(b.worker.full_name, "pt-BR");
-      if (n !== 0) return n;
-      return a.q.nr_code.localeCompare(b.q.nr_code);
-    });
-    return arr;
   }, [allPendencies, category, nr, search]);
 
-  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  // Uma linha por trabalhador — chips agrupados, ordenados pela pior pendência.
+  const groupedRows = useMemo(
+    () => groupPendenciesByWorker(filteredPendencies),
+    [filteredPendencies],
+  );
+  const paged = groupedRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const uniqueWorkerIds = useMemo(
-    () => Array.from(new Set(filtered.map((p) => p.worker.worker_id))),
-    [filtered],
+    () => groupedRows.map((g) => g.worker.worker_id),
+    [groupedRows],
   );
   const pageWorkerIds = useMemo(
-    () => Array.from(new Set(paged.map((p) => p.worker.worker_id))),
+    () => paged.map((g) => g.worker.worker_id),
     [paged],
   );
   const allocations = useActiveAllocationsForWorkers(pageWorkerIds);
   const overrides = useActiveOverridesForWorkers(
     useMemo(
-      () => paged.map((p) => ({ workerId: p.worker.worker_id, docTypeId: p.q.document_type_id })),
+      () => paged.flatMap((g) =>
+        g.pendencies.map((p) => ({ workerId: g.worker.worker_id, docTypeId: p.q.document_type_id })),
+      ),
       [paged],
     ),
   );
@@ -254,7 +255,7 @@ export default function SstPendencies() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Pendências SST</h1>
             <p className="text-sm text-muted-foreground">
-              Lista operacional de pendências por prioridade.
+              Uma linha por trabalhador — cada NR aparece como um chip com ação individual.
             </p>
           </div>
         </div>
@@ -263,7 +264,7 @@ export default function SstPendencies() {
             {uniqueWorkerIds.length} trabalhador{uniqueWorkerIds.length !== 1 ? "es" : ""}
           </Badge>
           <Badge variant="outline">
-            {filtered.length} pendência{filtered.length !== 1 ? "s" : ""}
+            {filteredPendencies.length} pendência{filteredPendencies.length !== 1 ? "s" : ""}
           </Badge>
         </div>
       </div>
@@ -310,7 +311,7 @@ export default function SstPendencies() {
         </div>
       )}
 
-      {!overview.isLoading && filtered.length === 0 && (
+      {!overview.isLoading && groupedRows.length === 0 && (
         <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
           {(search || category || nr)
             ? "Nenhuma pendência com os filtros atuais."
@@ -322,62 +323,30 @@ export default function SstPendencies() {
         <Card>
           <CardContent className="p-0">
             <div className="divide-y">
-              {paged.map(({ worker, q, rank, daysLeft }) => {
-                const meta = RANK_META[rank];
-                const isRenewable = rank <= 5; // vencidas/rejeitadas/vencendo → renew
-                const mode: SstDrawerMode = q.document_status === "no_document" ? "create"
-                  : isRenewable ? "renew" : "create";
+              {paged.map((group) => {
+                const { worker, pendencies } = group;
                 const allocs = allocations.data?.get(worker.worker_id) || [];
                 const allocLabel = allocs.length === 0
                   ? "Sem vínculo ativo"
                   : allocs.slice(0, 2).map((a) =>
                       `${a.event_name ?? "—"} · ${a.job_role_name ?? "sem cargo"}`
                     ).join("  |  ") + (allocs.length > 2 ? ` +${allocs.length - 2}` : "");
-                const hasOverride = q.document_type_id
-                  ? overrides.data?.has(`${worker.worker_id}:${q.document_type_id}`) ?? false
-                  : false;
                 return (
-                  <div key={q.id} className="p-3 flex flex-wrap items-center gap-3">
-                    <div className="min-w-[220px] flex-1">
-                      <div className="flex items-center gap-2">
-                        <Link to={`/workers/${worker.worker_id}`}
-                          className="font-medium hover:underline truncate">
-                          {worker.full_name}
-                        </Link>
-                        <Badge variant="outline" className="text-[10px]">{q.nr_code}</Badge>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${meta.className}`}>
-                          {meta.label}
-                        </span>
-                        {hasOverride && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded border bg-purple-50 text-purple-800 border-purple-200">
-                            Override
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-1 text-[11px] text-muted-foreground">
+                  <div key={worker.worker_id} className="p-3 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link to={`/workers/${worker.worker_id}`}
+                        className="font-medium hover:underline truncate">
+                        {worker.full_name}
+                      </Link>
+                      <span className="text-[11px] text-muted-foreground">
                         {worker.cpf || "sem CPF"}
-                        {daysLeft != null
-                          ? ` • ${daysLeft} dia${Math.abs(daysLeft) === 1 ? "" : "s"}${q.expires_at ? ` (${fmtBR(q.expires_at)})` : ""}`
-                          : q.expires_at ? ` • Venc.: ${fmtBR(q.expires_at)}` : ""}
-                        {" • "}{DOC_LABEL_PT[q.document_status]}
-                        {" • "}{EXP_LABEL_PT[q.expiration_status]}
-                      </div>
-                      <div className="mt-1 text-[11px] text-muted-foreground truncate">
-                        <span className="font-medium text-foreground/70">Vínculos: </span>
-                        {allocations.isLoading ? "carregando…" : allocLabel}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {canWrite && (
-                        <Button size="sm" variant="outline" className="h-8 text-xs gap-1"
-                          onClick={() => setDrawer({ mode, worker, current: q })}>
-                          <Upload className="h-3.5 w-3.5" />
-                          {mode === "create" ? "Anexar" : "Renovar"}
-                        </Button>
-                      )}
+                      </span>
+                      <Badge variant="outline" className="text-[10px]">
+                        {pendencies.length} pendência{pendencies.length !== 1 ? "s" : ""}
+                      </Badge>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button asChild size="icon" variant="ghost" className="h-8 w-8">
+                          <Button asChild size="icon" variant="ghost" className="h-7 w-7 ml-auto">
                             <Link to={`/workers/${worker.worker_id}?tab=sst`}
                               aria-label="Abrir trabalhador">
                               <ExternalLink className="h-4 w-4" />
@@ -387,13 +356,61 @@ export default function SstPendencies() {
                         <TooltipContent>Abrir trabalhador</TooltipContent>
                       </Tooltip>
                     </div>
+                    <div className="text-[11px] text-muted-foreground truncate">
+                      <span className="font-medium text-foreground/70">Vínculos: </span>
+                      {allocations.isLoading ? "carregando…" : allocLabel}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {pendencies.map(({ q, rank, daysLeft }) => {
+                        const meta = RANK_META[rank];
+                        const isRenewable = rank <= 5;
+                        const mode: SstDrawerMode =
+                          q.document_status === "no_document" ? "create"
+                          : isRenewable ? "renew" : "create";
+                        const hasOverride = q.document_type_id
+                          ? overrides.data?.has(`${worker.worker_id}:${q.document_type_id}`) ?? false
+                          : false;
+                        return (
+                          <div key={q.id}
+                            className="rounded-md border bg-card p-2 min-w-[220px] flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <Badge variant="outline" className="text-[10px]">{q.nr_code}</Badge>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded border ${meta.className}`}>
+                                {meta.label}
+                              </span>
+                              {hasOverride && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded border bg-purple-50 text-purple-800 border-purple-200">
+                                  Override
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                              {daysLeft != null
+                                ? `${daysLeft} dia${Math.abs(daysLeft) === 1 ? "" : "s"}${q.expires_at ? ` (${fmtBR(q.expires_at)})` : ""}`
+                                : q.expires_at ? `Venc.: ${fmtBR(q.expires_at)}` : "Sem data"}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {DOC_LABEL_PT[q.document_status]} · {EXP_LABEL_PT[q.expiration_status]}
+                            </div>
+                            {canWrite && (
+                              <Button size="sm" variant="outline"
+                                className="h-7 text-[11px] gap-1 mt-1 self-start"
+                                onClick={() => setDrawer({ mode, worker, current: q })}>
+                                <Upload className="h-3 w-3" />
+                                {mode === "create" ? "Anexar" : "Renovar"}
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               })}
             </div>
             <TablePagination
               page={page}
-              totalCount={filtered.length}
+              totalCount={groupedRows.length}
               pageSize={PAGE_SIZE}
               onPageChange={setPage}
             />
