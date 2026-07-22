@@ -1,6 +1,6 @@
 # Fila oficial de pendências — DPfreela
 
-Última atualização: Fase 1.5 aplicada (validade NR + cargos inativos ocultos).
+Última atualização: Fase 0A aplicada (dry-run SST/vínculos — read-only).
 
 | ID | Pendência | Prioridade | Status | Evidência | Bloqueio |
 |----|-----------|------------|--------|-----------|----------|
@@ -19,6 +19,11 @@
 | Q-013 | Lint e otimização de chunks grandes | P2 | OPEN | Baseline Fase 0: 376 problemas (351 erros), majoritariamente `no-explicit-any` em `supabase/functions/*` — pré-existentes. | — |
 | Q-014 | Cálculo automático da validade da NR por trabalhador | P0 | DONE | Migration Fase 1.5: `register_sst_revision` calcula `expires_at = issued_at + document_types.default_validity_days` quando não vier explícito (retorna `expiry_source`); `evaluate_link_compliance` v3 aplica precedência de cargo (`role_effective_expiry`, `effective_expiry`, `expiry_rule_source`). Frontend: `SstCertificateDrawer` recalcula ao mudar NR/data, marca "Data ajustada manualmente" quando o usuário edita, e alerta quando não há validade padrão. `SettingsJobRoles` renomeou o campo para "Validade específica do cargo — opcional" com hint do padrão do documento e tooltip explicando o uso excepcional. Unit tests em `src/lib/sst/__tests__/validity.test.ts` (9/9 passed). | — |
 | Q-015 | Ocultar cargos inativos dos seletores operacionais | P0 | DONE | `useJobRoles({ includeInactive })` com caches independentes `["job-roles-catalog","active"|"all"]`. `JobRoleCombobox` consome só o catálogo ativo, não lista inativos na busca; quando o `value` aponta para cargo inativo, exibe alerta destrutivo pedindo nova seleção (ou rótulo "Cargo histórico inativo" com `readOnlyHistory`). `SettingsJobRoles` continua com sua query própria (ativos + inativos) e invalida ambos os caches em criar/renomear/ativar/inativar/excluir. | — |
+| Q-014.0 | Fase 0A · dry-run SST/vínculos (read-only) | P0 | DONE | `public.dry_run_sst_link_readiness()` (STABLE, SECURITY DEFINER, admin/manager, zero DML). UI Configurações → SST → "Diagnóstico SST e vínculos" (Rodar/Recolher/Exportar JSON). E2E `e2e/settings-sst-readiness-dry-run.spec.ts` 1/1 passed. Blockers detectados no relatório: `chain_identity_uses_text`, `event_requirement_not_canonical`, `aso_flow_not_covered`, `training_flow_not_covered`, `unresolved_multi_link_status_definition`. Q-014.1 → Q-019 permanecem BLOCKED até autorização humana. | Aguardando autorização |
+| Q-016 | Seletor canônico de NR no drawer SST | P0 | BLOCKED | — | Aguarda Fase 0A |
+| Q-017 | Pendências SST por vínculo agrupadas por trabalhador | P0 | BLOCKED | — | Aguarda Fase 0A |
+| Q-018 | Validade efetiva por vínculo | P0 | BLOCKED | — | Aguarda Fase 0A |
+| Q-019 | E2E multi-vínculo SST | P1 | BLOCKED | — | Aguarda Q-014→Q-018 |
 
 ## Fase 1.5 — Validade NR e cargos inativos (concluída)
 
