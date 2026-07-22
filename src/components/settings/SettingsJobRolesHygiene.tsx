@@ -393,6 +393,53 @@ export function SettingsJobRolesHygiene() {
                 </AccordionItem>
 
                 {/* Fantasmas */}
+                {/* Textual ambíguo por cluster */}
+                <AccordionItem value="ambig_textual">
+                  <AccordionTrigger>Uso textual ambíguo por cluster ({report.ambiguous_textual_clusters.length})</AccordionTrigger>
+                  <AccordionContent>
+                    <div className="flex justify-end mb-2">
+                      <Button size="sm" variant="outline" onClick={() => downloadCsv(
+                        "ambiguous-textual-clusters.csv",
+                        report.ambiguous_textual_clusters.map((c) => ({
+                          normalized_name: c.normalized_name,
+                          total_occurrences: c.total_occurrences,
+                          active_occurrences: c.active_occurrences,
+                          historical_occurrences: c.historical_occurrences,
+                          candidate_job_roles: c.candidate_job_roles.map((r) => `${r.name} (${r.id})`).join(" | "),
+                        }))
+                      )}>
+                        <Download className="mr-1 h-4 w-4" /> Exportar CSV
+                      </Button>
+                    </div>
+                    {report.ambiguous_textual_clusters.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Nenhum cluster textual ambíguo — todo texto que casa com o catálogo aponta para um único cargo.</p>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Normalizado</TableHead>
+                            <TableHead className="text-right">Ocorrências</TableHead>
+                            <TableHead className="text-right">Ativas</TableHead>
+                            <TableHead>Cargos candidatos (não atribuir)</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {report.ambiguous_textual_clusters.map((c) => (
+                            <TableRow key={c.normalized_name}>
+                              <TableCell className="font-medium">{c.normalized_name}</TableCell>
+                              <TableCell className="text-right">{c.total_occurrences}</TableCell>
+                              <TableCell className="text-right">{c.active_occurrences}</TableCell>
+                              <TableCell className="text-xs">
+                                {c.candidate_job_roles.map((r) => r.name).join(" | ")}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+
                 <AccordionItem value="ghosts">
                   <AccordionTrigger>Cargos fantasmas ({report.ghost_texts.length})</AccordionTrigger>
                   <AccordionContent>
@@ -575,12 +622,12 @@ export function SettingsJobRolesHygiene() {
                     </Alert>
 
                     {/* Divergências ativas */}
-                    <SampleTable
+                    <SampleTable<DivergentSample>
                       title={`Divergências ativas (${report.link_allocation_relationship.divergent_role_samples_active.length})`}
                       filename="link-alloc-divergent-active.csv"
-                      rows={report.link_allocation_relationship.divergent_role_samples_active as unknown as Array<Record<string, unknown>>}
-                      headers={["Alocação", "Trabalhador", "Evento", "Grupo", "Cargo (aloc)", "Cargo (vínc)", "Status aloc/vínc"]}
-                      renderRow={(d: DivergentSample) => [
+                      rows={report.link_allocation_relationship.divergent_role_samples_active}
+                      headers={["Alocação", "Trabalhador", "Evento", "Grupo", "Cargo (aloc)", "Cargo (vínc)", "Status aloc/vínc", "Vig. aloc/grp/ev"]}
+                      renderRow={(d) => [
                         <span className="font-mono text-xs">{d.allocation_id.slice(0, 8)}…</span>,
                         d.trabalhador ?? d.worker_id.slice(0, 8) + "…",
                         d.evento ?? "—",
@@ -588,68 +635,99 @@ export function SettingsJobRolesHygiene() {
                         d.alloc_role_text ?? "—",
                         d.link_role_name ?? "—",
                         `${d.allocation_status ?? "—"} / ${d.employment_link_status ?? "—"}`,
+                        <span className="text-xs">{yn(d.alloc_vigent)}/{yn(d.group_vigent)}/{yn(d.event_vigent)}</span>,
                       ]}
+                      csvRow={(d) => ({
+                        allocation_id: d.allocation_id, employment_link_id: d.employment_link_id,
+                        worker_id: d.worker_id, trabalhador: d.trabalhador,
+                        event_id: d.event_id, evento: d.evento,
+                        link_group_id: d.link_group_id, grupo: d.grupo,
+                        alloc_role_text: d.alloc_role_text, link_role_id: d.link_role_id, link_role_name: d.link_role_name,
+                        allocation_status: d.allocation_status, employment_link_status: d.employment_link_status,
+                        alloc_vigent: d.alloc_vigent, group_status: d.group_status, group_vigent: d.group_vigent,
+                        event_status: d.event_status, event_vigent: d.event_vigent,
+                      })}
                     />
 
                     {/* Órfãs ativas */}
-                    <SampleTable
+                    <SampleTable<OrphanSample>
                       title={`Órfãs ativas (${report.link_allocation_relationship.orphan_samples_active.length})`}
                       filename="link-alloc-orphans-active.csv"
-                      rows={report.link_allocation_relationship.orphan_samples_active as unknown as Array<Record<string, unknown>>}
-                      headers={["Alocação", "Trabalhador", "Evento", "Grupo", "Cargo (aloc)"]}
-                      renderRow={(o: OrphanSample) => [
+                      rows={report.link_allocation_relationship.orphan_samples_active}
+                      headers={["Alocação", "Trabalhador", "Evento", "Grupo", "Cargo (aloc)", "Vig. aloc/grp/ev"]}
+                      renderRow={(o) => [
                         <span className="font-mono text-xs">{o.allocation_id.slice(0, 8)}…</span>,
                         o.trabalhador ?? o.worker_id.slice(0, 8) + "…",
                         o.evento ?? "—",
                         o.grupo ?? "—",
                         o.alloc_role_text ?? "—",
+                        <span className="text-xs">{yn(o.alloc_vigent)}/{yn(o.group_vigent)}/{yn(o.event_vigent)}</span>,
                       ]}
+                      csvRow={(o) => ({
+                        allocation_id: o.allocation_id, worker_id: o.worker_id, trabalhador: o.trabalhador,
+                        event_id: o.event_id, evento: o.evento,
+                        link_group_id: o.link_group_id, grupo: o.grupo,
+                        alloc_role_text: o.alloc_role_text,
+                        alloc_vigent: o.alloc_vigent, group_status: o.group_status, group_vigent: o.group_vigent,
+                        event_status: o.event_status, event_vigent: o.event_vigent,
+                      })}
                     />
 
                     {/* Ambíguas */}
-                    <SampleTable
+                    <SampleTable<AmbiguousSample>
                       title={`Correspondências ambíguas (${report.link_allocation_relationship.ambiguous_samples.length})`}
                       filename="link-alloc-ambiguous.csv"
-                      rows={report.link_allocation_relationship.ambiguous_samples.map((a) => ({
-                        allocation_id: a.allocation_id, worker_id: a.worker_id, trabalhador: a.trabalhador,
-                        event_id: a.event_id, evento: a.evento, candidate_count: a.candidate_count,
-                        candidate_employment_link_ids: a.candidates.map((c) => c.employment_link_id).join("|"),
-                        candidate_roles: a.candidates.map((c) => c.role_name ?? "—").join("|"),
-                        candidate_statuses: a.candidates.map((c) => c.status ?? "—").join("|"),
-                        allocation_status: a.allocation_status,
-                      })) as unknown as Array<Record<string, unknown>>}
-                      headers={["Alocação", "Trabalhador", "Evento", "# candidatos", "Vínculos candidatos", "Cargos", "Status"]}
-                      renderRow={(a: AmbiguousSample) => [
+                      rows={report.link_allocation_relationship.ambiguous_samples}
+                      headers={["Alocação", "Trabalhador", "Evento", "Grupo", "# candidatos", "Vínculos candidatos", "Cargos", "Status"]}
+                      renderRow={(a) => [
                         <span className="font-mono text-xs">{a.allocation_id.slice(0, 8)}…</span>,
                         a.trabalhador ?? a.worker_id.slice(0, 8) + "…",
                         a.evento ?? "—",
+                        a.grupo ?? "—",
                         a.candidate_count,
                         <span className="text-xs">{a.candidates.map((c) => c.employment_link_id.slice(0, 8) + "…").join(", ")}</span>,
                         <span className="text-xs">{a.candidates.map((c) => c.role_name ?? "—").join(" | ")}</span>,
                         <span className="text-xs">{a.candidates.map((c) => c.status ?? "—").join(" | ")}</span>,
                       ]}
+                      csvRow={(a) => ({
+                        allocation_id: a.allocation_id, worker_id: a.worker_id, trabalhador: a.trabalhador,
+                        event_id: a.event_id, evento: a.evento,
+                        link_group_id: a.link_group_id, grupo: a.grupo,
+                        candidate_count: a.candidate_count,
+                        candidate_employment_link_ids: a.candidates.map((c) => c.employment_link_id).join("|"),
+                        candidate_roles: a.candidates.map((c) => c.role_name ?? "—").join("|"),
+                        candidate_statuses: a.candidates.map((c) => c.status ?? "—").join("|"),
+                        allocation_status: a.allocation_status,
+                        alloc_vigent: a.alloc_vigent,
+                      })}
                     />
 
                     {/* Vínculos com múltiplas alocações ativas com cargos distintos */}
-                    <SampleTable
+                    <SampleTable<MultiAllocSample>
                       title={`Vínculos com múltiplas alocações ativas e cargos distintos (${report.link_allocation_relationship.links_with_multiple_active_allocations_distinct_roles.length})`}
                       filename="links-multi-active-distinct-roles.csv"
-                      rows={report.link_allocation_relationship.links_with_multiple_active_allocations_distinct_roles.map((m) => ({
+                      rows={report.link_allocation_relationship.links_with_multiple_active_allocations_distinct_roles}
+                      headers={["Vínculo", "Evento", "Cargo (vínc)", "# ativas", "# cargos distintos", "Alocações (grupo · cargo)"]}
+                      renderRow={(m) => [
+                        <span className="font-mono text-xs">{m.employment_link_id.slice(0, 8)}…</span>,
+                        m.evento ?? "—",
+                        m.link_role_name ?? "—",
+                        m.active_alloc_count,
+                        m.distinct_active_roles,
+                        <span className="text-xs">
+                          {m.allocations.map((a) => `${a.group_name ?? "—"} · ${a.alloc_role_text ?? "—"} (${a.allocation_id.slice(0, 6)}…)`).join(", ")}
+                        </span>,
+                      ]}
+                      csvRow={(m) => ({
                         employment_link_id: m.employment_link_id,
-                        worker_id: m.worker_id, event_id: m.event_id, link_role_name: m.link_role_name,
+                        worker_id: m.worker_id, event_id: m.event_id, evento: m.evento,
+                        link_role_name: m.link_role_name,
                         active_alloc_count: m.active_alloc_count, distinct_active_roles: m.distinct_active_roles,
                         allocation_ids: m.allocations.map((a) => a.allocation_id).join("|"),
                         allocation_role_texts: m.allocations.map((a) => a.alloc_role_text ?? "—").join("|"),
                         link_group_ids: m.allocations.map((a) => a.link_group_id ?? "—").join("|"),
-                      })) as unknown as Array<Record<string, unknown>>}
-                      headers={["Vínculo", "Cargo (vínc)", "# ativas", "# cargos distintos", "Alocações"]}
-                      renderRow={(m: MultiAllocSample) => [
-                        <span className="font-mono text-xs">{m.employment_link_id.slice(0, 8)}…</span>,
-                        m.link_role_name ?? "—",
-                        m.active_alloc_count,
-                        m.distinct_active_roles,
-                        <span className="text-xs">{m.allocations.map((a) => `${a.allocation_id.slice(0, 6)}… (${a.alloc_role_text ?? "—"})`).join(", ")}</span>,
-                      ]}
+                        link_group_names: m.allocations.map((a) => a.group_name ?? "—").join("|"),
+                      })}
                     />
                   </AccordionContent>
                 </AccordionItem>
