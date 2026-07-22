@@ -2547,6 +2547,7 @@ export type Database = {
         Args: { p_current_link_criterion?: string }
         Returns: Json
       }
+      dry_run_sst_link_readiness: { Args: never; Returns: Json }
       ensure_current_user_access: {
         Args: never
         Returns: {
