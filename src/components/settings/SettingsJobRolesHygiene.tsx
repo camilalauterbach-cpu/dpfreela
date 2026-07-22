@@ -15,15 +15,19 @@ interface CatalogRow {
   created_at: string | null; created_by: string | null;
   origin: string; origin_evidence: Record<string, unknown> | null;
   employment_links_active: number; employment_links_historical: number;
-  lgw_role_active: number; lgw_role_historical: number;
-  lgw_function_active: number; lgw_function_historical: number;
-  employment_links_function_active: number; employment_links_function_historical: number;
+  employment_links_vigent: number; employment_links_status_active_and_vigent: number;
+  textual_unambiguous_active: number; textual_unambiguous_historical: number;
   active_usage_total: number; historical_usage_total: number;
   requirement_count: number;
 }
 interface DuplicateCluster {
   normalized_name: string; role_count: number;
   roles: Array<{ id: string; name: string; code: string | null; is_active: boolean; active_usage: number; historical_usage: number; requirement_count: number }>;
+}
+interface AmbiguousCluster {
+  normalized_name: string;
+  total_occurrences: number; active_occurrences: number; historical_occurrences: number;
+  candidate_job_roles: Array<{ id: string; name: string }>;
 }
 interface GhostRow {
   source: string; normalized: string; sample_text: string;
@@ -37,27 +41,36 @@ interface GhostRow {
 }
 interface ConflictRow { allocation_id: string; link_group_id: string | null; event_id: string | null; worker_id: string; job_role_text: string; job_function_text: string; is_active: boolean }
 interface NoUseRow { id: string; name: string; code: string | null; is_active: boolean; historical_usage_total: number; requirement_count: number }
-interface OriginRow { id: string; name: string; created_at: string | null; created_by: string | null; origin: string; origin_evidence: Record<string, unknown> | null }
-interface DivergentSample { allocation_id: string; employment_link_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; link_group_id: string | null; grupo: string | null; alloc_role_text: string | null; link_role_id: string | null; link_role_name: string | null; allocation_status: string | null; employment_link_status: string | null }
-interface OrphanSample { allocation_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; link_group_id: string | null; grupo: string | null; alloc_role_text: string | null }
-interface AmbiguousSample { allocation_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; candidate_count: number; candidates: CandidateRef[]; allocation_status: string | null }
-interface MultiAllocSample { employment_link_id: string; worker_id: string | null; event_id: string | null; link_role_name: string | null; active_alloc_count: number; distinct_active_roles: number; allocations: Array<{ allocation_id: string; alloc_role_text: string | null; link_group_id: string | null; active: boolean }> }
+interface OriginRow { id: string; name: string; created_at: string | null; created_by: string | null; first_insert_at: string | null; first_insert_by: string | null; origin: string; origin_evidence: Record<string, unknown> | null }
+interface OperationalFlags { alloc_vigent?: boolean; group_status?: string | null; group_vigent?: boolean; event_status?: string | null; event_vigent?: boolean }
+interface DivergentSample extends OperationalFlags { allocation_id: string; employment_link_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; link_group_id: string | null; grupo: string | null; alloc_role_text: string | null; link_role_id: string | null; link_role_name: string | null; allocation_status: string | null; employment_link_status: string | null }
+interface OrphanSample extends OperationalFlags { allocation_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; link_group_id: string | null; grupo: string | null; alloc_role_text: string | null }
+interface AmbiguousSample { allocation_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; link_group_id: string | null; grupo: string | null; candidate_count: number; candidates: CandidateRef[]; allocation_status: string | null; alloc_vigent?: boolean }
+interface MultiAllocSample { employment_link_id: string; worker_id: string | null; event_id: string | null; evento: string | null; link_role_name: string | null; active_alloc_count: number; distinct_active_roles: number; allocations: Array<{ allocation_id: string; alloc_role_text: string | null; link_group_id: string | null; group_name: string | null; active: boolean }> }
+interface StatusDistEntry { total: number; not_deleted: number }
+interface PairBucket { pairs_with_0: number; pairs_with_1: number; pairs_with_gt1: number }
 
 interface HygieneReport {
   generated_at: string;
   strategy: {
     match_key: string;
-    current_link_criteria: string;
+    current_link_criteria_used_for_classification: string;
+    alternative_current_link_criteria: Record<string, string>;
     active_allocation_criteria: string;
     cardinality_rule: string;
     role_comparison_rule: string;
+    operational_context_flags_available: string;
     unique_worker_event_index_present: boolean;
     similarity_threshold: number;
     safe_suggestion_rule: string;
+    origin_rule: string;
+    textual_usage_rule: string;
+    today: string;
   };
   summary: {
     catalog_size: number; catalog_active: number; catalog_inactive: number; catalog_with_zero_active_use: number;
-    duplicate_clusters: number; ghost_texts: number; ghost_occurrences_total: number;
+    duplicate_clusters: number; ambiguous_textual_clusters: number;
+    ghost_texts: number; ghost_occurrences_total: number;
     allocation_conflicts_total: number; allocation_conflicts_active: number; allocation_conflicts_historical: number;
     total_allocations_distinct: number; active_allocations: number; historical_allocations: number;
     unique_matches_total: number; unique_matches_active: number; unique_matches_historical: number;
@@ -73,9 +86,22 @@ interface HygieneReport {
     links_with_multiple_active_allocations: number;
     links_with_distinct_allocation_roles: number;
     links_with_distinct_active_allocation_roles: number;
+    employment_links_by_status: Record<string, StatusDistEntry>;
+    employment_links_not_deleted_total: number;
+    employment_links_vigent_total: number;
+    employment_links_status_active_total: number;
+    employment_links_status_active_and_vigent_total: number;
+    worker_event_candidate_distribution: {
+      not_deleted: PairBucket; vigent: PairBucket;
+      status_active: PairBucket; status_active_and_vigent: PairBucket;
+    };
+    input_allocation_rows: number;
+    classified_allocation_rows: number;
+    cardinality_ok: boolean;
   };
   catalog: CatalogRow[];
   duplicates: DuplicateCluster[];
+  ambiguous_textual_clusters: AmbiguousCluster[];
   ghost_texts: GhostRow[];
   allocation_conflicts: ConflictRow[];
   no_active_use: NoUseRow[];
@@ -89,9 +115,9 @@ interface HygieneReport {
 }
 
 // CSV injection hardening: neutralize cells that begin with =, +, -, @, \t or \r
-// after stripping leading whitespace. Prefix with an apostrophe per OWASP.
+// after stripping ONLY leading SPACE characters (preserve and detect tab/CR).
 function neutralizeCsvCell(raw: string): string {
-  const trimmedStart = raw.replace(/^\s+/, "");
+  const trimmedStart = raw.replace(/^ +/, "");
   if (/^[=+\-@\t\r]/.test(trimmedStart)) return "'" + raw;
   return raw;
 }
@@ -208,10 +234,18 @@ export function SettingsJobRolesHygiene() {
               <div className="rounded-md border p-3 text-xs space-y-1 bg-muted/30">
                 <div className="font-medium text-sm">Estratégia de casamento e critérios</div>
                 <div><span className="text-muted-foreground">Chave:</span> {report.strategy.match_key}</div>
-                <div><span className="text-muted-foreground">Vínculo corrente:</span> {report.strategy.current_link_criteria}</div>
+                <div><span className="text-muted-foreground">Vínculo corrente (classificação):</span> {report.strategy.current_link_criteria_used_for_classification}</div>
+                <div className="pl-3 space-y-0.5">
+                  {Object.entries(report.strategy.alternative_current_link_criteria ?? {}).map(([k, v]) => (
+                    <div key={k} className="text-[11px]"><span className="text-muted-foreground">{k}:</span> {v}</div>
+                  ))}
+                </div>
                 <div><span className="text-muted-foreground">Alocação ativa:</span> {report.strategy.active_allocation_criteria}</div>
                 <div><span className="text-muted-foreground">Cardinalidade:</span> {report.strategy.cardinality_rule}</div>
                 <div><span className="text-muted-foreground">Comparação de cargo:</span> {report.strategy.role_comparison_rule}</div>
+                <div><span className="text-muted-foreground">Flags operacionais nas amostras:</span> {report.strategy.operational_context_flags_available}</div>
+                <div><span className="text-muted-foreground">Origem:</span> {report.strategy.origin_rule}</div>
+                <div><span className="text-muted-foreground">Uso textual:</span> {report.strategy.textual_usage_rule}</div>
                 <div>
                   <span className="text-muted-foreground">Índice único (worker_id, event_id) em employment_links:</span>{" "}
                   {report.strategy.unique_worker_event_index_present ? "presente" : (
@@ -219,6 +253,56 @@ export function SettingsJobRolesHygiene() {
                   )}
                 </div>
                 <div><span className="text-muted-foreground">Similaridade:</span> limiar {report.strategy.similarity_threshold}; regra segura: {report.strategy.safe_suggestion_rule}</div>
+                <div className={report.summary.cardinality_ok ? "text-emerald-600" : "text-destructive"}>
+                  <span className="text-muted-foreground">Cardinalidade linhas de entrada = linhas classificadas:</span>{" "}
+                  {report.summary.input_allocation_rows} = {report.summary.classified_allocation_rows}{" "}
+                  {report.summary.cardinality_ok ? "✓" : "✗"}
+                </div>
+              </div>
+
+              {/* Distribuição de vínculos e candidatos por par */}
+              <div className="rounded-md border p-3 text-xs space-y-2 bg-muted/20">
+                <div className="font-medium text-sm">Distribuição real de vínculos e candidatos por (worker, event)</div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <SummaryTile label="EL não excluídos" value={report.summary.employment_links_not_deleted_total} />
+                  <SummaryTile label="EL vigentes (datas)" value={report.summary.employment_links_vigent_total} />
+                  <SummaryTile label="EL status=active" value={report.summary.employment_links_status_active_total} />
+                  <SummaryTile label="Interseção active × vigente" value={report.summary.employment_links_status_active_and_vigent_total} />
+                </div>
+                <div className="text-[11px] text-muted-foreground">Distribuição por status:</div>
+                <div className="flex flex-wrap gap-1">
+                  {Object.entries(report.summary.employment_links_by_status ?? {}).map(([status, v]) => (
+                    <Badge key={status} variant="outline" className="font-normal">
+                      {status}: {v.total} (não excluídos: {v.not_deleted})
+                    </Badge>
+                  ))}
+                </div>
+                <div className="text-[11px] text-muted-foreground pt-1">Candidatos por par (worker_id, event_id):</div>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Critério</TableHead>
+                        <TableHead className="text-right">0</TableHead>
+                        <TableHead className="text-right">1</TableHead>
+                        <TableHead className="text-right">&gt;1</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(["not_deleted","vigent","status_active","status_active_and_vigent"] as const).map((k) => {
+                        const b = report.summary.worker_event_candidate_distribution?.[k];
+                        return (
+                          <TableRow key={k}>
+                            <TableCell className="text-xs">{k}</TableCell>
+                            <TableCell className="text-right">{b?.pairs_with_0 ?? 0}</TableCell>
+                            <TableCell className="text-right">{b?.pairs_with_1 ?? 0}</TableCell>
+                            <TableCell className="text-right">{b?.pairs_with_gt1 ?? 0}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
 
               <Alert>
@@ -245,11 +329,11 @@ export function SettingsJobRolesHygiene() {
                             <TableHead>Nome</TableHead>
                             <TableHead>Código</TableHead>
                             <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Vínculos ativos</TableHead>
-                            <TableHead className="text-right">Vínculos hist.</TableHead>
-                            <TableHead className="text-right">Alocações ativas (role)</TableHead>
-                            <TableHead className="text-right">Alocações hist. (role)</TableHead>
-                            <TableHead className="text-right">Uso em função</TableHead>
+                            <TableHead className="text-right">FK ativos</TableHead>
+                            <TableHead className="text-right">FK hist.</TableHead>
+                            <TableHead className="text-right">FK vigente</TableHead>
+                            <TableHead className="text-right">Textual inequívoco ativo</TableHead>
+                            <TableHead className="text-right">Textual inequívoco hist.</TableHead>
                             <TableHead className="text-right">Requisitos</TableHead>
                             <TableHead>Origem</TableHead>
                           </TableRow>
@@ -264,9 +348,9 @@ export function SettingsJobRolesHygiene() {
                               </TableCell>
                               <TableCell className="text-right">{r.employment_links_active}</TableCell>
                               <TableCell className="text-right text-muted-foreground">{r.employment_links_historical}</TableCell>
-                              <TableCell className="text-right">{r.lgw_role_active}</TableCell>
-                              <TableCell className="text-right text-muted-foreground">{r.lgw_role_historical}</TableCell>
-                              <TableCell className="text-right">{r.lgw_function_active + r.employment_links_function_active}</TableCell>
+                              <TableCell className="text-right">{r.employment_links_vigent}</TableCell>
+                              <TableCell className="text-right">{r.textual_unambiguous_active}</TableCell>
+                              <TableCell className="text-right text-muted-foreground">{r.textual_unambiguous_historical}</TableCell>
                               <TableCell className="text-right">{r.requirement_count}</TableCell>
                               <TableCell className="text-xs">{r.origin}</TableCell>
                             </TableRow>
@@ -309,6 +393,53 @@ export function SettingsJobRolesHygiene() {
                 </AccordionItem>
 
                 {/* Fantasmas */}
+                {/* Textual ambíguo por cluster */}
+                <AccordionItem value="ambig_textual">
+                  <AccordionTrigger>Uso textual ambíguo por cluster ({report.ambiguous_textual_clusters.length})</AccordionTrigger>
+                  <AccordionContent>
+                    <div className="flex justify-end mb-2">
+                      <Button size="sm" variant="outline" onClick={() => downloadCsv(
+                        "ambiguous-textual-clusters.csv",
+                        report.ambiguous_textual_clusters.map((c) => ({
+                          normalized_name: c.normalized_name,
+                          total_occurrences: c.total_occurrences,
+                          active_occurrences: c.active_occurrences,
+                          historical_occurrences: c.historical_occurrences,
+                          candidate_job_roles: c.candidate_job_roles.map((r) => `${r.name} (${r.id})`).join(" | "),
+                        }))
+                      )}>
+                        <Download className="mr-1 h-4 w-4" /> Exportar CSV
+                      </Button>
+                    </div>
+                    {report.ambiguous_textual_clusters.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Nenhum cluster textual ambíguo — todo texto que casa com o catálogo aponta para um único cargo.</p>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Normalizado</TableHead>
+                            <TableHead className="text-right">Ocorrências</TableHead>
+                            <TableHead className="text-right">Ativas</TableHead>
+                            <TableHead>Cargos candidatos (não atribuir)</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {report.ambiguous_textual_clusters.map((c) => (
+                            <TableRow key={c.normalized_name}>
+                              <TableCell className="font-medium">{c.normalized_name}</TableCell>
+                              <TableCell className="text-right">{c.total_occurrences}</TableCell>
+                              <TableCell className="text-right">{c.active_occurrences}</TableCell>
+                              <TableCell className="text-xs">
+                                {c.candidate_job_roles.map((r) => r.name).join(" | ")}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+
                 <AccordionItem value="ghosts">
                   <AccordionTrigger>Cargos fantasmas ({report.ghost_texts.length})</AccordionTrigger>
                   <AccordionContent>
@@ -491,12 +622,12 @@ export function SettingsJobRolesHygiene() {
                     </Alert>
 
                     {/* Divergências ativas */}
-                    <SampleTable
+                    <SampleTable<DivergentSample>
                       title={`Divergências ativas (${report.link_allocation_relationship.divergent_role_samples_active.length})`}
                       filename="link-alloc-divergent-active.csv"
-                      rows={report.link_allocation_relationship.divergent_role_samples_active as unknown as Array<Record<string, unknown>>}
-                      headers={["Alocação", "Trabalhador", "Evento", "Grupo", "Cargo (aloc)", "Cargo (vínc)", "Status aloc/vínc"]}
-                      renderRow={(d: DivergentSample) => [
+                      rows={report.link_allocation_relationship.divergent_role_samples_active}
+                      headers={["Alocação", "Trabalhador", "Evento", "Grupo", "Cargo (aloc)", "Cargo (vínc)", "Status aloc/vínc", "Vig. aloc/grp/ev"]}
+                      renderRow={(d) => [
                         <span className="font-mono text-xs">{d.allocation_id.slice(0, 8)}…</span>,
                         d.trabalhador ?? d.worker_id.slice(0, 8) + "…",
                         d.evento ?? "—",
@@ -504,68 +635,99 @@ export function SettingsJobRolesHygiene() {
                         d.alloc_role_text ?? "—",
                         d.link_role_name ?? "—",
                         `${d.allocation_status ?? "—"} / ${d.employment_link_status ?? "—"}`,
+                        <span className="text-xs">{yn(d.alloc_vigent)}/{yn(d.group_vigent)}/{yn(d.event_vigent)}</span>,
                       ]}
+                      csvRow={(d) => ({
+                        allocation_id: d.allocation_id, employment_link_id: d.employment_link_id,
+                        worker_id: d.worker_id, trabalhador: d.trabalhador,
+                        event_id: d.event_id, evento: d.evento,
+                        link_group_id: d.link_group_id, grupo: d.grupo,
+                        alloc_role_text: d.alloc_role_text, link_role_id: d.link_role_id, link_role_name: d.link_role_name,
+                        allocation_status: d.allocation_status, employment_link_status: d.employment_link_status,
+                        alloc_vigent: d.alloc_vigent, group_status: d.group_status, group_vigent: d.group_vigent,
+                        event_status: d.event_status, event_vigent: d.event_vigent,
+                      })}
                     />
 
                     {/* Órfãs ativas */}
-                    <SampleTable
+                    <SampleTable<OrphanSample>
                       title={`Órfãs ativas (${report.link_allocation_relationship.orphan_samples_active.length})`}
                       filename="link-alloc-orphans-active.csv"
-                      rows={report.link_allocation_relationship.orphan_samples_active as unknown as Array<Record<string, unknown>>}
-                      headers={["Alocação", "Trabalhador", "Evento", "Grupo", "Cargo (aloc)"]}
-                      renderRow={(o: OrphanSample) => [
+                      rows={report.link_allocation_relationship.orphan_samples_active}
+                      headers={["Alocação", "Trabalhador", "Evento", "Grupo", "Cargo (aloc)", "Vig. aloc/grp/ev"]}
+                      renderRow={(o) => [
                         <span className="font-mono text-xs">{o.allocation_id.slice(0, 8)}…</span>,
                         o.trabalhador ?? o.worker_id.slice(0, 8) + "…",
                         o.evento ?? "—",
                         o.grupo ?? "—",
                         o.alloc_role_text ?? "—",
+                        <span className="text-xs">{yn(o.alloc_vigent)}/{yn(o.group_vigent)}/{yn(o.event_vigent)}</span>,
                       ]}
+                      csvRow={(o) => ({
+                        allocation_id: o.allocation_id, worker_id: o.worker_id, trabalhador: o.trabalhador,
+                        event_id: o.event_id, evento: o.evento,
+                        link_group_id: o.link_group_id, grupo: o.grupo,
+                        alloc_role_text: o.alloc_role_text,
+                        alloc_vigent: o.alloc_vigent, group_status: o.group_status, group_vigent: o.group_vigent,
+                        event_status: o.event_status, event_vigent: o.event_vigent,
+                      })}
                     />
 
                     {/* Ambíguas */}
-                    <SampleTable
+                    <SampleTable<AmbiguousSample>
                       title={`Correspondências ambíguas (${report.link_allocation_relationship.ambiguous_samples.length})`}
                       filename="link-alloc-ambiguous.csv"
-                      rows={report.link_allocation_relationship.ambiguous_samples.map((a) => ({
-                        allocation_id: a.allocation_id, worker_id: a.worker_id, trabalhador: a.trabalhador,
-                        event_id: a.event_id, evento: a.evento, candidate_count: a.candidate_count,
-                        candidate_employment_link_ids: a.candidates.map((c) => c.employment_link_id).join("|"),
-                        candidate_roles: a.candidates.map((c) => c.role_name ?? "—").join("|"),
-                        candidate_statuses: a.candidates.map((c) => c.status ?? "—").join("|"),
-                        allocation_status: a.allocation_status,
-                      })) as unknown as Array<Record<string, unknown>>}
-                      headers={["Alocação", "Trabalhador", "Evento", "# candidatos", "Vínculos candidatos", "Cargos", "Status"]}
-                      renderRow={(a: AmbiguousSample) => [
+                      rows={report.link_allocation_relationship.ambiguous_samples}
+                      headers={["Alocação", "Trabalhador", "Evento", "Grupo", "# candidatos", "Vínculos candidatos", "Cargos", "Status"]}
+                      renderRow={(a) => [
                         <span className="font-mono text-xs">{a.allocation_id.slice(0, 8)}…</span>,
                         a.trabalhador ?? a.worker_id.slice(0, 8) + "…",
                         a.evento ?? "—",
+                        a.grupo ?? "—",
                         a.candidate_count,
                         <span className="text-xs">{a.candidates.map((c) => c.employment_link_id.slice(0, 8) + "…").join(", ")}</span>,
                         <span className="text-xs">{a.candidates.map((c) => c.role_name ?? "—").join(" | ")}</span>,
                         <span className="text-xs">{a.candidates.map((c) => c.status ?? "—").join(" | ")}</span>,
                       ]}
+                      csvRow={(a) => ({
+                        allocation_id: a.allocation_id, worker_id: a.worker_id, trabalhador: a.trabalhador,
+                        event_id: a.event_id, evento: a.evento,
+                        link_group_id: a.link_group_id, grupo: a.grupo,
+                        candidate_count: a.candidate_count,
+                        candidate_employment_link_ids: a.candidates.map((c) => c.employment_link_id).join("|"),
+                        candidate_roles: a.candidates.map((c) => c.role_name ?? "—").join("|"),
+                        candidate_statuses: a.candidates.map((c) => c.status ?? "—").join("|"),
+                        allocation_status: a.allocation_status,
+                        alloc_vigent: a.alloc_vigent,
+                      })}
                     />
 
                     {/* Vínculos com múltiplas alocações ativas com cargos distintos */}
-                    <SampleTable
+                    <SampleTable<MultiAllocSample>
                       title={`Vínculos com múltiplas alocações ativas e cargos distintos (${report.link_allocation_relationship.links_with_multiple_active_allocations_distinct_roles.length})`}
                       filename="links-multi-active-distinct-roles.csv"
-                      rows={report.link_allocation_relationship.links_with_multiple_active_allocations_distinct_roles.map((m) => ({
+                      rows={report.link_allocation_relationship.links_with_multiple_active_allocations_distinct_roles}
+                      headers={["Vínculo", "Evento", "Cargo (vínc)", "# ativas", "# cargos distintos", "Alocações (grupo · cargo)"]}
+                      renderRow={(m) => [
+                        <span className="font-mono text-xs">{m.employment_link_id.slice(0, 8)}…</span>,
+                        m.evento ?? "—",
+                        m.link_role_name ?? "—",
+                        m.active_alloc_count,
+                        m.distinct_active_roles,
+                        <span className="text-xs">
+                          {m.allocations.map((a) => `${a.group_name ?? "—"} · ${a.alloc_role_text ?? "—"} (${a.allocation_id.slice(0, 6)}…)`).join(", ")}
+                        </span>,
+                      ]}
+                      csvRow={(m) => ({
                         employment_link_id: m.employment_link_id,
-                        worker_id: m.worker_id, event_id: m.event_id, link_role_name: m.link_role_name,
+                        worker_id: m.worker_id, event_id: m.event_id, evento: m.evento,
+                        link_role_name: m.link_role_name,
                         active_alloc_count: m.active_alloc_count, distinct_active_roles: m.distinct_active_roles,
                         allocation_ids: m.allocations.map((a) => a.allocation_id).join("|"),
                         allocation_role_texts: m.allocations.map((a) => a.alloc_role_text ?? "—").join("|"),
                         link_group_ids: m.allocations.map((a) => a.link_group_id ?? "—").join("|"),
-                      })) as unknown as Array<Record<string, unknown>>}
-                      headers={["Vínculo", "Cargo (vínc)", "# ativas", "# cargos distintos", "Alocações"]}
-                      renderRow={(m: MultiAllocSample) => [
-                        <span className="font-mono text-xs">{m.employment_link_id.slice(0, 8)}…</span>,
-                        m.link_role_name ?? "—",
-                        m.active_alloc_count,
-                        m.distinct_active_roles,
-                        <span className="text-xs">{m.allocations.map((a) => `${a.allocation_id.slice(0, 6)}… (${a.alloc_role_text ?? "—"})`).join(", ")}</span>,
-                      ]}
+                        link_group_names: m.allocations.map((a) => a.group_name ?? "—").join("|"),
+                      })}
                     />
                   </AccordionContent>
                 </AccordionItem>
@@ -595,13 +757,14 @@ function SummaryTile({ label, value, sub, tone }: { label: string; value: number
 }
 
 function SampleTable<T>({
-  title, filename, rows, headers, renderRow,
+  title, filename, rows, headers, renderRow, csvRow,
 }: {
   title: string;
   filename: string;
-  rows: Array<Record<string, unknown>>;
+  rows: T[];
   headers: string[];
   renderRow: (row: T) => React.ReactNode[];
+  csvRow?: (row: T) => Record<string, unknown>;
 }) {
   if (!rows || rows.length === 0) {
     return (
@@ -611,11 +774,12 @@ function SampleTable<T>({
       </div>
     );
   }
+  const csvRows = csvRow ? rows.map(csvRow) : (rows as unknown as Array<Record<string, unknown>>);
   return (
     <div className="rounded-md border overflow-x-auto">
       <div className="flex items-center justify-between px-3 py-2 bg-muted/40">
         <div className="text-xs font-medium">{title}</div>
-        <Button size="sm" variant="outline" onClick={() => downloadCsv(filename, rows)}>
+        <Button size="sm" variant="outline" onClick={() => downloadCsv(filename, csvRows)}>
           <Download className="mr-1 h-4 w-4" /> Exportar CSV
         </Button>
       </div>
@@ -624,7 +788,7 @@ function SampleTable<T>({
           <TableRow>{headers.map((h) => <TableHead key={h}>{h}</TableHead>)}</TableRow>
         </TableHeader>
         <TableBody>
-          {(rows as unknown as T[]).map((r, i) => (
+          {rows.map((r, i) => (
             <TableRow key={i}>
               {renderRow(r).map((cell, j) => <TableCell key={j}>{cell as React.ReactNode}</TableCell>)}
             </TableRow>
@@ -633,4 +797,8 @@ function SampleTable<T>({
       </Table>
     </div>
   );
+}
+
+function yn(v?: boolean | null): string {
+  return v === true ? "sim" : v === false ? "não" : "—";
 }
