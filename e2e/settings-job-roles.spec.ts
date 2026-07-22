@@ -26,7 +26,8 @@ test.describe("Configurações → Cargos", () => {
   });
 
   test("opens role action menu and rename dialog without insertBefore crash", async ({ authedPage }) => {
-    const firstRow = authedPage.locator("ul > li").first();
+    const rolesList = authedPage.locator("ul.divide-y").first();
+    const firstRow = rolesList.locator("li").first();
     await expect(firstRow).toBeVisible();
     const menuTrigger = firstRow.getByRole("button").last();
     await menuTrigger.click();
@@ -44,7 +45,9 @@ test.describe("Configurações → Cargos", () => {
   });
 
   test("inactivate/activate opens AlertDialog with impact preview", async ({ authedPage }) => {
-    const firstRow = authedPage.locator("ul > li").first();
+    const rolesList = authedPage.locator("ul.divide-y").first();
+    const firstRow = rolesList.locator("li").first();
+    await expect(firstRow).toBeVisible();
     await firstRow.getByRole("button").last().click();
     const toggleItem = authedPage.getByRole("menuitem", { name: /Inativar|Ativar/i });
     await toggleItem.click();
