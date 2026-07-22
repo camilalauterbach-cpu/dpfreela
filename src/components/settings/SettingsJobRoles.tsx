@@ -16,6 +16,24 @@ import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
 import { invalidateComplianceCaches } from "@/lib/compliance-cache";
 import { SettingsJobRolesHygiene } from "./SettingsJobRolesHygiene";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface JobRole { id: string; code: string; name: string; is_active: boolean }
 interface DocType { id: string; code: string; name: string; category: string | null; default_validity_days: number | null; is_active: boolean }
@@ -46,13 +64,24 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
   const [reqs, setReqs] = useState<Requirement[]>([]);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState("");
-  const [creating, setCreating] = useState(false);
+  // Dialog-driven state — no inline mutations from inside DropdownMenuItem
+  // (previous inline approach caused NotFoundError: insertBefore because
+  // menu unmount raced with the React commit of the mutated tree).
+  const [createOpen, setCreateOpen] = useState(false);
   const [newRoleName, setNewRoleName] = useState("");
-  const [busyRoleId, setBusyRoleId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const [renameRole, setRenameRole] = useState<JobRole | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renaming, setRenaming] = useState(false);
+
+  const [toggleRole, setToggleRole] = useState<JobRole | null>(null);
+  const [toggling, setToggling] = useState(false);
+
   const [deleteRole, setDeleteRole] = useState<JobRole | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const [busyRoleId, setBusyRoleId] = useState<string | null>(null);
 
   const rolesQ = useQuery({
     queryKey: ["settings-job-roles"],
@@ -60,6 +89,23 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
       const { data, error } = await supabase.from("job_roles").select("id, code, name, is_active").order("name");
       if (error) throw error;
       return (data ?? []) as JobRole[];
+    },
+  });
+
+  // Impact preview when inactivating/deleting: how many workers/links use it.
+  const usageQ = useQuery({
+    queryKey: ["settings-job-role-usage", toggleRole?.id ?? deleteRole?.id],
+    enabled: !!(toggleRole?.id || deleteRole?.id),
+    queryFn: async () => {
+      const id = (toggleRole?.id ?? deleteRole?.id)!;
+      const [links, groupWorkers] = await Promise.all([
+        supabase.from("employment_links").select("id", { count: "exact", head: true }).eq("job_role_id", id).is("deleted_at", null),
+        supabase.from("link_group_workers").select("id", { count: "exact", head: true }).eq("job_role_id", id).is("deleted_at", null),
+      ]);
+      return {
+        links: links.count ?? 0,
+        groupWorkers: groupWorkers.count ?? 0,
+      };
     },
   });
 
@@ -133,37 +179,45 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
       return;
     }
     setNewRoleName("");
+    setCreateOpen(false);
     toast({ title: "Cargo criado" });
     await qc.invalidateQueries({ queryKey: ["settings-job-roles"] });
     if (data?.id) setSelectedRoleId(data.id);
   };
 
-  const handleRename = async (role: JobRole) => {
+  const handleRename = async () => {
+    const role = renameRole;
+    if (!role) return;
     const name = renameValue.trim();
     if (!name || name === role.name) {
-      setRenamingId(null);
+      setRenameRole(null);
       return;
     }
-    setBusyRoleId(role.id);
+    setRenaming(true);
     const { error } = await supabase.from("job_roles").update({ name }).eq("id", role.id);
-    setBusyRoleId(null);
-    setRenamingId(null);
+    setRenaming(false);
     if (error) {
       toast({ title: "Erro ao renomear", description: error.message, variant: "destructive" });
       return;
     }
+    setRenameRole(null);
     toast({ title: "Cargo renomeado" });
     qc.invalidateQueries({ queryKey: ["settings-job-roles"] });
   };
 
-  const handleToggleActive = async (role: JobRole) => {
+  const handleToggleActive = async () => {
+    const role = toggleRole;
+    if (!role) return;
+    setToggling(true);
     setBusyRoleId(role.id);
     const { error } = await supabase.from("job_roles").update({ is_active: !role.is_active }).eq("id", role.id);
+    setToggling(false);
     setBusyRoleId(null);
     if (error) {
       toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
       return;
     }
+    setToggleRole(null);
     toast({ title: role.is_active ? "Cargo inativado" : "Cargo ativado" });
     qc.invalidateQueries({ queryKey: ["settings-job-roles"] });
   };
@@ -251,6 +305,16 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
     return <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>;
   }
 
+  if (rolesQ.error) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          Erro ao carregar cargos: {(rolesQ.error as Error).message}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   const roles = rolesQ.data ?? [];
 
   return (
@@ -271,16 +335,14 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
             <CardDescription>Selecione, renomeie, inative ou exclua</CardDescription>
           </CardHeader>
           {!readOnly && (
-            <div className="px-3 pb-2 flex gap-1">
-              <Input
-                value={newRoleName}
-                onChange={(e) => setNewRoleName(e.target.value)}
-                placeholder="Novo cargo"
-                className="h-8 text-sm"
-                onKeyDown={(e) => e.key === "Enter" && handleCreateRole()}
-              />
-              <Button size="sm" onClick={handleCreateRole} disabled={creating || !newRoleName.trim()} className="h-8">
-                {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            <div className="px-3 pb-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 w-full"
+                onClick={() => { setNewRoleName(""); setCreateOpen(true); }}
+              >
+                <Plus className="h-4 w-4 mr-1" /> Novo cargo
               </Button>
             </div>
           )}
@@ -289,19 +351,6 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
               {roles.map((r) => (
                 <li key={r.id}>
                   <div className={`flex items-center gap-1 px-2 py-1.5 hover:bg-muted/50 ${selectedRoleId === r.id ? "bg-muted" : ""}`}>
-                    {renamingId === r.id ? (
-                      <Input
-                        autoFocus
-                        value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onBlur={() => handleRename(r)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleRename(r);
-                          if (e.key === "Escape") setRenamingId(null);
-                        }}
-                        className="h-7 text-sm"
-                      />
-                    ) : (
                       <button
                         type="button"
                         onClick={() => selectedRoleId !== r.id && (dirty ? confirm("Descartar alterações não salvas?") && setSelectedRoleId(r.id) : setSelectedRoleId(r.id))}
@@ -313,8 +362,7 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
                         </div>
                         <p className="text-xs text-muted-foreground truncate">{r.code}</p>
                       </button>
-                    )}
-                    {!readOnly && renamingId !== r.id && (
+                    {!readOnly && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" disabled={busyRoleId === r.id}>
@@ -322,15 +370,33 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => { setRenamingId(r.id); setRenameValue(r.name); }}>
+                          <DropdownMenuItem
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              // Defer state changes until after the menu unmount commit
+                              // to avoid racing React reconciler (fixes insertBefore crash).
+                              setTimeout(() => { setRenameValue(r.name); setRenameRole(r); }, 0);
+                            }}
+                          >
                             <Pencil className="h-3.5 w-3.5 mr-2" /> Renomear
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleToggleActive(r)}>
+                          <DropdownMenuItem
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              setTimeout(() => setToggleRole(r), 0);
+                            }}
+                          >
                             {r.is_active ? <PowerOff className="h-3.5 w-3.5 mr-2" /> : <Power className="h-3.5 w-3.5 mr-2" />}
                             {r.is_active ? "Inativar" : "Ativar"}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive" onClick={() => setDeleteRole(r)}>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              setTimeout(() => setDeleteRole(r), 0);
+                            }}
+                          >
                             <Trash2 className="h-3.5 w-3.5 mr-2" /> Excluir
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -457,10 +523,103 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
         open={!!deleteRole}
         onOpenChange={(o) => !o && setDeleteRole(null)}
         title={`Excluir "${deleteRole?.name ?? ""}"?`}
-        description="A exclusão é permanente e só é permitida se o cargo não estiver vinculado a nenhum trabalhador. Se estiver em uso, inative-o."
+        description={
+          usageQ.data && (usageQ.data.links + usageQ.data.groupWorkers) > 0
+            ? `Este cargo está em uso: ${usageQ.data.links} vínculo(s) e ${usageQ.data.groupWorkers} alocação(ões) em grupos. A exclusão será bloqueada — inative-o em vez disso.`
+            : "A exclusão é permanente e só é permitida se o cargo não estiver vinculado a nenhum trabalhador. Se estiver em uso, inative-o."
+        }
         onConfirm={handleDelete}
         isDeleting={deleting}
       />
+
+      {/* Create role dialog */}
+      <Dialog open={createOpen} onOpenChange={(o) => { if (!creating) setCreateOpen(o); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo cargo</DialogTitle>
+            <DialogDescription>Informe o nome do cargo. O código é gerado automaticamente.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="new-role-name">Nome</Label>
+            <Input
+              id="new-role-name"
+              value={newRoleName}
+              onChange={(e) => setNewRoleName(e.target.value)}
+              placeholder="Ex.: Eletricista de Palco"
+              onKeyDown={(e) => { if (e.key === "Enter") handleCreateRole(); }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>Cancelar</Button>
+            <Button onClick={handleCreateRole} disabled={creating || !newRoleName.trim()}>
+              {creating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+              Criar cargo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename role dialog */}
+      <Dialog open={!!renameRole} onOpenChange={(o) => { if (!o && !renaming) setRenameRole(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Renomear cargo</DialogTitle>
+            <DialogDescription>
+              Renomear "{renameRole?.name}". O código interno ({renameRole?.code}) não muda.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="rename-role">Novo nome</Label>
+            <Input
+              id="rename-role"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleRename(); }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameRole(null)} disabled={renaming}>Cancelar</Button>
+            <Button onClick={handleRename} disabled={renaming || !renameValue.trim()}>
+              {renaming ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Pencil className="h-4 w-4 mr-2" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Toggle active/inactive confirmation */}
+      <AlertDialog open={!!toggleRole} onOpenChange={(o) => { if (!o && !toggling) setToggleRole(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {toggleRole?.is_active ? "Inativar cargo?" : "Ativar cargo?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  {toggleRole?.is_active
+                    ? `"${toggleRole?.name}" deixará de aparecer nos seletores de cargo (mantendo vínculos e alocações existentes).`
+                    : `"${toggleRole?.name}" voltará a aparecer nos seletores de cargo.`}
+                </p>
+                {toggleRole?.is_active && usageQ.data && (
+                  <p className="text-sm">
+                    <strong>Uso atual:</strong> {usageQ.data.links} vínculo(s) e {usageQ.data.groupWorkers} alocação(ões) em grupos.
+                  </p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={toggling}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); handleToggleActive(); }} disabled={toggling}>
+              {toggling ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              {toggleRole?.is_active ? "Inativar" : "Ativar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
