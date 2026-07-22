@@ -1,50 +1,45 @@
-import { useState, useMemo } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Loader2, Search, UserPlus, ArrowLeft } from "lucide-react";
-import { invalidateSstCaches } from "@/hooks/useSstQualifications";
+import { SstCertificateDrawer } from "@/components/workers/sst/SstCertificateDrawer";
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }
 
-type Step = "pick_worker" | "new_worker" | "qualification";
+type Step = "pick_worker" | "new_worker";
 
 interface WorkerLite { id: string; full_name: string; cpf: string | null; nickname: string | null }
 
 export function AddSstDialog({ open, onOpenChange }: Props) {
-  const qc = useQueryClient();
   const [step, setStep] = useState<Step>("pick_worker");
   const [search, setSearch] = useState("");
   const [selectedWorker, setSelectedWorker] = useState<WorkerLite | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Novo trabalhador (mínimo para ensure_worker)
   const [nwName, setNwName] = useState("");
   const [nwCpf, setNwCpf] = useState("");
   const [nwPhone, setNwPhone] = useState("");
 
-  // Qualificação
-  const [nrCode, setNrCode] = useState("");
-  const [trainingType, setTrainingType] = useState("");
-  const [issuedAt, setIssuedAt] = useState("");
-  const [expiresAt, setExpiresAt] = useState("");
-  const [workload, setWorkload] = useState("");
-  const [provider, setProvider] = useState("");
-  const [instructor, setInstructor] = useState("");
-  const [notes, setNotes] = useState("");
-
   const reset = () => {
     setStep("pick_worker"); setSearch(""); setSelectedWorker(null);
     setNwName(""); setNwCpf(""); setNwPhone("");
-    setNrCode(""); setTrainingType(""); setIssuedAt(""); setExpiresAt("");
-    setWorkload(""); setProvider(""); setInstructor(""); setNotes("");
+  };
+
+  // Fluxo unificado: seleciona trabalhador → abre o drawer padrão de upload.
+  // O drawer chama register_sst_revision + reevaluate_worker_links.
+  const openDrawerFor = (w: WorkerLite) => {
+    setSelectedWorker(w);
+    onOpenChange(false); // fecha o dialog
+    setDrawerOpen(true);
   };
 
   const workersQuery = useQuery({
@@ -78,9 +73,8 @@ export function AddSstDialog({ open, onOpenChange }: Props) {
     },
     onSuccess: (res) => {
       if (res?.result === "created" || res?.result === "existing") {
-        setSelectedWorker({ id: res.workerId, full_name: nwName.trim(), cpf: nwCpf, nickname: null });
-        setStep("qualification");
         if (res.result === "existing") toast.info("Trabalhador já cadastrado — reutilizando cadastro existente.");
+        openDrawerFor({ id: res.workerId, full_name: nwName.trim(), cpf: nwCpf, nickname: null });
       } else if (res?.result === "possible_duplicate") {
         toast.warning("Encontramos cadastros parecidos. Use a busca acima para localizá-los.");
         setStep("pick_worker");
@@ -94,38 +88,8 @@ export function AddSstDialog({ open, onOpenChange }: Props) {
     },
   });
 
-  const saveQualification = useMutation({
-    mutationFn: async () => {
-      if (!selectedWorker) throw new Error("no_worker");
-      const payload = {
-        worker_id: selectedWorker.id,
-        nr_code: nrCode.trim().toUpperCase(),
-        training_type: trainingType.trim() || null,
-        issued_at: issuedAt,
-        expires_at: expiresAt || null,
-        workload_hours: workload ? Number(workload) : null,
-        provider_name: provider.trim() || null,
-        instructor_name: instructor.trim() || null,
-        notes: notes.trim() || null,
-      };
-      const { error } = await supabase.from("worker_sst_qualifications").insert(payload as any);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Qualificação SST registrada.");
-      invalidateSstCaches(qc);
-      onOpenChange(false);
-      reset();
-    },
-    onError: (e: any) => toast.error(String(e?.message || "Falha ao salvar."))
-  });
-
-  const canSaveQual = useMemo(
-    () => !!selectedWorker && nrCode.trim() && issuedAt && (!expiresAt || expiresAt > issuedAt),
-    [selectedWorker, nrCode, issuedAt, expiresAt]
-  );
-
   return (
+    <>
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
@@ -133,7 +97,6 @@ export function AddSstDialog({ open, onOpenChange }: Props) {
           <DialogDescription>
             {step === "pick_worker" && "Selecione um trabalhador existente ou cadastre um novo."}
             {step === "new_worker" && "Novo cadastro mínimo. O restante pode ser completado depois."}
-            {step === "qualification" && `Registrar qualificação para ${selectedWorker?.full_name}.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -152,7 +115,7 @@ export function AddSstDialog({ open, onOpenChange }: Props) {
               )}
               {!workersQuery.isFetching && (workersQuery.data || []).map((w) => (
                 <button key={w.id} className="w-full text-left px-3 py-2 hover:bg-muted/50 border-b last:border-b-0"
-                  onClick={() => { setSelectedWorker(w); setStep("qualification"); }}>
+                  onClick={() => openDrawerFor(w)}>
                   <div className="font-medium text-sm">{w.full_name}</div>
                   <div className="text-xs text-muted-foreground">{w.cpf || "sem CPF"}</div>
                 </button>
@@ -194,54 +157,20 @@ export function AddSstDialog({ open, onOpenChange }: Props) {
             </div>
           </div>
         )}
-
-        {step === "qualification" && selectedWorker && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>NR *</Label>
-                <Input value={nrCode} onChange={(e) => setNrCode(e.target.value)} placeholder="Ex.: NR-35" />
-              </div>
-              <div>
-                <Label>Tipo</Label>
-                <Input value={trainingType} onChange={(e) => setTrainingType(e.target.value)} placeholder="Inicial, Reciclagem…" />
-              </div>
-              <div>
-                <Label>Emissão *</Label>
-                <Input type="date" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} />
-              </div>
-              <div>
-                <Label>Validade</Label>
-                <Input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
-              </div>
-              <div>
-                <Label>Carga horária</Label>
-                <Input value={workload} onChange={(e) => setWorkload(e.target.value)} placeholder="Horas" />
-              </div>
-              <div>
-                <Label>Formador</Label>
-                <Input value={provider} onChange={(e) => setProvider(e.target.value)} />
-              </div>
-              <div className="col-span-2">
-                <Label>Instrutor</Label>
-                <Input value={instructor} onChange={(e) => setInstructor(e.target.value)} />
-              </div>
-              <div className="col-span-2">
-                <Label>Observações</Label>
-                <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
-              </div>
-            </div>
-            <DialogFooter className="gap-2">
-              <Button variant="ghost" className="gap-2" onClick={() => { setSelectedWorker(null); setStep("pick_worker"); }}>
-                <ArrowLeft className="h-4 w-4" /> Trocar trabalhador
-              </Button>
-              <Button onClick={() => saveQualification.mutate()} disabled={!canSaveQual || saveQualification.isPending}>
-                {saveQualification.isPending ? "Salvando…" : "Registrar"}
-              </Button>
-            </DialogFooter>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
+    {selectedWorker && (
+      <SstCertificateDrawer
+        open={drawerOpen}
+        onOpenChange={(v) => {
+          setDrawerOpen(v);
+          if (!v) { setSelectedWorker(null); reset(); }
+        }}
+        mode="create"
+        workerId={selectedWorker.id}
+        workerName={selectedWorker.full_name}
+      />
+    )}
+    </>
   );
 }
