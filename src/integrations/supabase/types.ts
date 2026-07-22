@@ -1033,6 +1033,7 @@ export type Database = {
           daily_rate: number | null
           deleted_at: string | null
           department: string | null
+          employment_link_id: string | null
           end_date: string | null
           fixed_salary: number | null
           has_meal_allowance: boolean
@@ -1066,6 +1067,7 @@ export type Database = {
           daily_rate?: number | null
           deleted_at?: string | null
           department?: string | null
+          employment_link_id?: string | null
           end_date?: string | null
           fixed_salary?: number | null
           has_meal_allowance?: boolean
@@ -1099,6 +1101,7 @@ export type Database = {
           daily_rate?: number | null
           deleted_at?: string | null
           department?: string | null
+          employment_link_id?: string | null
           end_date?: string | null
           fixed_salary?: number | null
           has_meal_allowance?: boolean
@@ -1124,6 +1127,13 @@ export type Database = {
           worker_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "link_group_workers_employment_link_id_fkey"
+            columns: ["employment_link_id"]
+            isOneToOne: false
+            referencedRelation: "employment_links"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "link_group_workers_job_role_id_fkey"
             columns: ["job_role_id"]
@@ -2686,6 +2696,17 @@ export type Database = {
       register_sst_revision: { Args: { payload: Json }; Returns: Json }
       release_public_invite: {
         Args: { _error_code: string; _invite_id: string; _nonce: string }
+        Returns: Json
+      }
+      repair_worker_group_formal_link: {
+        Args: {
+          p_canonicalize_existing?: boolean
+          p_existing_employment_link_id: string
+          p_expected_allocation_id: string
+          p_link_group_id: string
+          p_reason: string
+          p_worker_id: string
+        }
         Returns: Json
       }
       resend_invite: {
