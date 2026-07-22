@@ -1,6 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:8080";
+// The sandbox ships a single Chromium build under /chromium-<ver>/. Point
+// Playwright at it so we don't depend on `npx playwright install` matching the
+// package version. Override with PLAYWRIGHT_CHROMIUM_PATH if needed.
+const CHROMIUM_PATH =
+  process.env.PLAYWRIGHT_CHROMIUM_PATH ?? "/chromium-1217/chrome-linux64/chrome";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -20,7 +25,11 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 900 } },
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1280, height: 900 },
+        launchOptions: { executablePath: CHROMIUM_PATH },
+      },
     },
   ],
 });
