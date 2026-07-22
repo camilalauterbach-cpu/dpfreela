@@ -757,13 +757,14 @@ function SummaryTile({ label, value, sub, tone }: { label: string; value: number
 }
 
 function SampleTable<T>({
-  title, filename, rows, headers, renderRow,
+  title, filename, rows, headers, renderRow, csvRow,
 }: {
   title: string;
   filename: string;
-  rows: Array<Record<string, unknown>>;
+  rows: T[];
   headers: string[];
   renderRow: (row: T) => React.ReactNode[];
+  csvRow?: (row: T) => Record<string, unknown>;
 }) {
   if (!rows || rows.length === 0) {
     return (
@@ -773,11 +774,12 @@ function SampleTable<T>({
       </div>
     );
   }
+  const csvRows = csvRow ? rows.map(csvRow) : (rows as unknown as Array<Record<string, unknown>>);
   return (
     <div className="rounded-md border overflow-x-auto">
       <div className="flex items-center justify-between px-3 py-2 bg-muted/40">
         <div className="text-xs font-medium">{title}</div>
-        <Button size="sm" variant="outline" onClick={() => downloadCsv(filename, rows)}>
+        <Button size="sm" variant="outline" onClick={() => downloadCsv(filename, csvRows)}>
           <Download className="mr-1 h-4 w-4" /> Exportar CSV
         </Button>
       </div>
@@ -786,7 +788,7 @@ function SampleTable<T>({
           <TableRow>{headers.map((h) => <TableHead key={h}>{h}</TableHead>)}</TableRow>
         </TableHeader>
         <TableBody>
-          {(rows as unknown as T[]).map((r, i) => (
+          {rows.map((r, i) => (
             <TableRow key={i}>
               {renderRow(r).map((cell, j) => <TableCell key={j}>{cell as React.ReactNode}</TableCell>)}
             </TableRow>
@@ -795,4 +797,8 @@ function SampleTable<T>({
       </Table>
     </div>
   );
+}
+
+function yn(v?: boolean | null): string {
+  return v === true ? "sim" : v === false ? "não" : "—";
 }
