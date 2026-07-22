@@ -2484,7 +2484,10 @@ export type Database = {
         }[]
       }
       dry_run_job_role_backfill: { Args: never; Returns: Json }
-      dry_run_job_roles_hygiene: { Args: never; Returns: Json }
+      dry_run_job_roles_hygiene: {
+        Args: { p_current_link_criterion?: string }
+        Returns: Json
+      }
       ensure_current_user_access: {
         Args: never
         Returns: {
