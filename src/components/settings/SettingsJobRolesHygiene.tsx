@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, RefreshCw, Download, ChevronDown, ChevronRight, ShieldAlert, Info } from "lucide-react";
+import { Loader2, RefreshCw, Download, ChevronDown, ChevronRight, ShieldAlert, Info, Camera } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
 
 interface CandidateRef { employment_link_id: string; job_role_id: string | null; role_name: string | null; status: string | null }
 interface CatalogRow {
@@ -150,6 +151,7 @@ export function SettingsJobRolesHygiene() {
   const [open, setOpen] = useState(false);
   type Criterion = "not_deleted" | "vigent" | "status_active" | "status_active_and_vigent";
   const [criterion, setCriterion] = useState<Criterion>("status_active");
+  const queryClient = useQueryClient();
 
   const q = useQuery({
     queryKey: ["job-roles-hygiene-dry-run", criterion],
@@ -166,6 +168,59 @@ export function SettingsJobRolesHygiene() {
   });
 
   const report = q.data;
+
+  interface SnapshotRow {
+    id: string;
+    generated_at: string;
+    saved_at: string;
+    generated_by: string;
+    criterion: string;
+    report_hash: string;
+    data_fingerprint: string;
+    baseline: Record<string, unknown>;
+  }
+
+  const snapshotsQ = useQuery({
+    queryKey: ["job-roles-hygiene-snapshots"],
+    enabled: open,
+    staleTime: 30_000,
+    queryFn: async (): Promise<SnapshotRow[]> => {
+      const { data, error } = await supabase
+        .from("job_roles_hygiene_snapshots" as never)
+        .select("id, generated_at, saved_at, generated_by, criterion, report_hash, data_fingerprint, baseline")
+        .order("saved_at", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return (data ?? []) as unknown as SnapshotRow[];
+    },
+  });
+
+  const saveSnapshot = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc(
+        "save_job_roles_hygiene_snapshot" as never,
+        { p_criterion: criterion } as never,
+      );
+      if (error) throw error;
+      return data as unknown as { snapshot_id: string; report_hash: string };
+    },
+    onSuccess: (data) => {
+      toast.success(`Snapshot salvo (${data.report_hash.slice(0, 8)}…)`);
+      queryClient.invalidateQueries({ queryKey: ["job-roles-hygiene-snapshots"] });
+    },
+    onError: (err: Error) => {
+      const msg = err.message ?? "";
+      if (msg.includes("cardinality_mismatch")) {
+        toast.error("Snapshot rejeitado: cardinalidade divergente no relatório.");
+      } else if (msg.includes("permission_denied")) {
+        toast.error("Apenas administradores ou gerentes podem salvar snapshots.");
+      } else {
+        toast.error(`Falha ao salvar snapshot: ${msg}`);
+      }
+    },
+  });
+
+  const latestSnapshot = snapshotsQ.data?.[0];
 
   return (
     <Card>
@@ -210,6 +265,18 @@ export function SettingsJobRolesHygiene() {
                   {q.isFetching ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1 h-4 w-4" />}
                   Rodar novamente
                 </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => saveSnapshot.mutate()}
+                  disabled={saveSnapshot.isPending || q.isFetching || !report}
+                  title="Salva um registro append-only e imutável do relatório atual"
+                >
+                  {saveSnapshot.isPending
+                    ? <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    : <Camera className="mr-1 h-4 w-4" />}
+                  Salvar snapshot
+                </Button>
                 <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
                   <ChevronDown className="mr-1 h-4 w-4" /> Recolher
                 </Button>
@@ -221,6 +288,35 @@ export function SettingsJobRolesHygiene() {
 
       {open && (
         <CardContent className="space-y-4">
+          {/* Snapshots imutáveis */}
+          <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-medium flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4" /> Snapshots imutáveis do relatório
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {snapshotsQ.isLoading ? "carregando…" : `${snapshotsQ.data?.length ?? 0} registro(s)`}
+              </div>
+            </div>
+            {latestSnapshot ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+                <div><span className="text-muted-foreground">Último salvo:</span> {new Date(latestSnapshot.saved_at).toLocaleString("pt-BR")}</div>
+                <div><span className="text-muted-foreground">Gerado em:</span> {new Date(latestSnapshot.generated_at).toLocaleString("pt-BR")}</div>
+                <div><span className="text-muted-foreground">Critério:</span> <code>{latestSnapshot.criterion}</code></div>
+                <div className="truncate" title={latestSnapshot.report_hash}>
+                  <span className="text-muted-foreground">Hash:</span> <code>{latestSnapshot.report_hash.slice(0, 12)}…</code>
+                </div>
+                <div className="sm:col-span-2 lg:col-span-4 truncate" title={latestSnapshot.data_fingerprint}>
+                  <span className="text-muted-foreground">Fingerprint dos dados:</span> <code>{latestSnapshot.data_fingerprint}</code>
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-muted-foreground">
+                Nenhum snapshot salvo. Use "Salvar snapshot" para congelar o relatório atual — sem executar nenhuma ação sobre os cargos.
+              </div>
+            )}
+          </div>
+
           {q.isLoading && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Gerando relatório…
