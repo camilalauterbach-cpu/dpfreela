@@ -9,98 +9,70 @@ import { Loader2, RefreshCw, Download, ChevronDown, ChevronRight, ShieldAlert, I
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
+interface CandidateRef { employment_link_id: string; job_role_id: string | null; role_name: string | null; status: string | null }
 interface CatalogRow {
-  id: string;
-  code: string | null;
-  name: string;
-  is_active: boolean;
-  created_at: string | null;
-  created_by: string | null;
-  origin_hint: string;
-  employment_links_active: number;
-  employment_links_historical: number;
-  lgw_role_active: number;
-  lgw_role_historical: number;
-  lgw_function_active: number;
-  lgw_function_historical: number;
-  employment_links_function_active: number;
-  employment_links_function_historical: number;
-  active_usage_total: number;
-  historical_usage_total: number;
+  id: string; code: string | null; name: string; is_active: boolean;
+  created_at: string | null; created_by: string | null;
+  origin: string; origin_evidence: Record<string, unknown> | null;
+  employment_links_active: number; employment_links_historical: number;
+  lgw_role_active: number; lgw_role_historical: number;
+  lgw_function_active: number; lgw_function_historical: number;
+  employment_links_function_active: number; employment_links_function_historical: number;
+  active_usage_total: number; historical_usage_total: number;
   requirement_count: number;
 }
 interface DuplicateCluster {
-  normalized_name: string;
-  role_count: number;
+  normalized_name: string; role_count: number;
   roles: Array<{ id: string; name: string; code: string | null; is_active: boolean; active_usage: number; historical_usage: number; requirement_count: number }>;
 }
 interface GhostRow {
-  source: string;
-  normalized: string;
-  sample_text: string;
-  occurrences: number;
-  active_occurrences: number;
-  historical_occurrences: number;
-  workers_affected: number;
-  events_affected: number;
-  groups_affected: number;
-  first_seen: string | null;
-  last_seen: string | null;
-  suggestion: { id: string; name: string } | null;
+  source: string; normalized: string; sample_text: string;
+  occurrences: number; active_occurrences: number; historical_occurrences: number;
+  workers_affected: number; events_affected: number; groups_affected: number;
+  first_seen: string | null; last_seen: string | null;
+  best: { id: string; name: string; score: number } | null; best_score: number;
+  second: { id: string; name: string; score: number } | null; second_score: number;
+  score_delta: number; candidates_above_threshold: number;
   match_confidence: string;
 }
-interface ConflictRow {
-  allocation_id: string;
-  link_group_id: string | null;
-  event_id: string | null;
-  worker_id: string;
-  job_role_text: string;
-  job_function_text: string;
-  is_active: boolean;
-}
-interface NoUseRow {
-  id: string;
-  name: string;
-  code: string | null;
-  is_active: boolean;
-  historical_usage_total: number;
-  requirement_count: number;
-}
-interface OriginRow {
-  id: string;
-  name: string;
-  created_at: string | null;
-  created_by: string | null;
-  origin_hint: string;
-}
-interface LinkAllocReport {
-  summary: {
-    total_allocations: number;
-    matched_to_link: number;
-    orphan_allocations: number;
-    divergent_role: number;
-    consistent_role: number;
-    distinct_worker_event_pairs: number;
-  };
-  links_with_multiple_allocations: Array<{ employment_link_id: string; allocation_count: number }>;
-  links_with_divergent_allocation_roles: Array<{ employment_link_id: string }>;
-  orphan_allocations: Array<{ allocation_id: string; worker_id: string; event_id: string | null; link_group_id: string | null; alloc_role_text: string; active: boolean }>;
-  divergent_role_samples: Array<{ allocation_id: string; employment_link_id: string; worker_id: string; event_id: string | null; alloc_role_text: string; link_role_name: string; active: boolean }>;
-}
+interface ConflictRow { allocation_id: string; link_group_id: string | null; event_id: string | null; worker_id: string; job_role_text: string; job_function_text: string; is_active: boolean }
+interface NoUseRow { id: string; name: string; code: string | null; is_active: boolean; historical_usage_total: number; requirement_count: number }
+interface OriginRow { id: string; name: string; created_at: string | null; created_by: string | null; origin: string; origin_evidence: Record<string, unknown> | null }
+interface DivergentSample { allocation_id: string; employment_link_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; link_group_id: string | null; grupo: string | null; alloc_role_text: string | null; link_role_id: string | null; link_role_name: string | null; allocation_status: string | null; employment_link_status: string | null }
+interface OrphanSample { allocation_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; link_group_id: string | null; grupo: string | null; alloc_role_text: string | null }
+interface AmbiguousSample { allocation_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; candidate_count: number; candidates: CandidateRef[]; allocation_status: string | null }
+interface MultiAllocSample { employment_link_id: string; worker_id: string | null; event_id: string | null; link_role_name: string | null; active_alloc_count: number; distinct_active_roles: number; allocations: Array<{ allocation_id: string; alloc_role_text: string | null; link_group_id: string | null; active: boolean }> }
+
 interface HygieneReport {
   generated_at: string;
+  strategy: {
+    match_key: string;
+    current_link_criteria: string;
+    active_allocation_criteria: string;
+    cardinality_rule: string;
+    role_comparison_rule: string;
+    unique_worker_event_index_present: boolean;
+    similarity_threshold: number;
+    safe_suggestion_rule: string;
+  };
   summary: {
-    catalog_size: number;
-    catalog_active: number;
-    catalog_inactive: number;
-    catalog_with_zero_active_use: number;
-    duplicate_clusters: number;
-    ghost_texts: number;
-    ghost_occurrences_total: number;
-    allocation_conflicts: number;
-    link_allocation: LinkAllocReport["summary"];
+    catalog_size: number; catalog_active: number; catalog_inactive: number; catalog_with_zero_active_use: number;
+    duplicate_clusters: number; ghost_texts: number; ghost_occurrences_total: number;
+    allocation_conflicts_total: number; allocation_conflicts_active: number; allocation_conflicts_historical: number;
+    total_allocations_distinct: number; active_allocations: number; historical_allocations: number;
+    unique_matches_total: number; unique_matches_active: number; unique_matches_historical: number;
+    orphan_allocations_total: number; orphan_allocations_active: number; orphan_allocations_historical: number;
+    ambiguous_allocations_total: number; ambiguous_allocations_active: number; ambiguous_allocations_historical: number;
+    equal_role_total: number; equal_role_active: number; equal_role_historical: number;
+    divergent_role_total: number; divergent_role_active: number; divergent_role_historical: number;
+    allocation_role_missing_total: number; allocation_role_missing_active: number;
+    link_role_missing_total: number; link_role_missing_active: number;
+    both_roles_missing_total: number; both_roles_missing_active: number;
+    worker_event_pairs_with_multiple_current_links: number;
     links_with_multiple_allocations: number;
-    links_with_divergent_allocation_roles: number;
+    links_with_multiple_active_allocations: number;
+    links_with_distinct_allocation_roles: number;
+    links_with_distinct_active_allocation_roles: number;
   };
   catalog: CatalogRow[];
   duplicates: DuplicateCluster[];
@@ -108,15 +80,28 @@ interface HygieneReport {
   allocation_conflicts: ConflictRow[];
   no_active_use: NoUseRow[];
   origin: OriginRow[];
-  link_allocation_relationship: LinkAllocReport;
+  link_allocation_relationship: {
+    divergent_role_samples_active: DivergentSample[];
+    orphan_samples_active: OrphanSample[];
+    ambiguous_samples: AmbiguousSample[];
+    links_with_multiple_active_allocations_distinct_roles: MultiAllocSample[];
+  };
 }
 
+// CSV injection hardening: neutralize cells that begin with =, +, -, @, \t or \r
+// after stripping leading whitespace. Prefix with an apostrophe per OWASP.
+function neutralizeCsvCell(raw: string): string {
+  const trimmedStart = raw.replace(/^\s+/, "");
+  if (/^[=+\-@\t\r]/.test(trimmedStart)) return "'" + raw;
+  return raw;
+}
 function toCsv(rows: Array<Record<string, unknown>>): string {
   if (rows.length === 0) return "";
   const cols = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
   const esc = (v: unknown) => {
     if (v === null || v === undefined) return "";
-    const s = typeof v === "object" ? JSON.stringify(v) : String(v);
+    const raw = typeof v === "object" ? JSON.stringify(v) : String(v);
+    const s = neutralizeCsvCell(raw);
     if (/[",;\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
     return s;
   };
@@ -208,8 +193,32 @@ export function SettingsJobRolesHygiene() {
                 <SummaryTile label="Sem uso ativo" value={report.summary.catalog_with_zero_active_use} tone={report.summary.catalog_with_zero_active_use > 0 ? "warn" : "ok"} />
                 <SummaryTile label="Clusters duplicados" value={report.summary.duplicate_clusters} tone={report.summary.duplicate_clusters > 0 ? "warn" : "ok"} />
                 <SummaryTile label="Textos fantasmas" value={report.summary.ghost_texts} sub={`${report.summary.ghost_occurrences_total} ocorrências`} tone={report.summary.ghost_texts > 0 ? "warn" : "ok"} />
-                <SummaryTile label="Conflitos cargo × função" value={report.summary.allocation_conflicts} tone={report.summary.allocation_conflicts > 0 ? "warn" : "ok"} />
-                <SummaryTile label="Alocações divergentes do vínculo" value={report.summary.link_allocation?.divergent_role ?? 0} tone={(report.summary.link_allocation?.divergent_role ?? 0) > 0 ? "warn" : "ok"} />
+                <SummaryTile label="Conflitos cargo × função (ativos)" value={report.summary.allocation_conflicts_active} sub={`${report.summary.allocation_conflicts_total} totais`} tone={report.summary.allocation_conflicts_active > 0 ? "warn" : "ok"} />
+                <SummaryTile label="Divergentes ativas" value={report.summary.divergent_role_active} sub={`${report.summary.divergent_role_total} totais`} tone={report.summary.divergent_role_active > 0 ? "warn" : "ok"} />
+                <SummaryTile label="Alocações (distintas)" value={report.summary.total_allocations_distinct} sub={`${report.summary.active_allocations} ativas · ${report.summary.historical_allocations} hist.`} />
+                <SummaryTile label="Unique match" value={report.summary.unique_matches_total} sub={`${report.summary.unique_matches_active} ativas`} />
+                <SummaryTile label="Órfãs (0 candidatos)" value={report.summary.orphan_allocations_total} sub={`${report.summary.orphan_allocations_active} ativas`} tone={report.summary.orphan_allocations_active > 0 ? "warn" : "ok"} />
+                <SummaryTile label="Ambíguas (>1 candidato)" value={report.summary.ambiguous_allocations_total} sub={`${report.summary.ambiguous_allocations_active} ativas`} tone={report.summary.ambiguous_allocations_active > 0 ? "warn" : "ok"} />
+                <SummaryTile label="Cargo faltante (aloc/vínc/ambos)" value={`${report.summary.allocation_role_missing_active}/${report.summary.link_role_missing_active}/${report.summary.both_roles_missing_active}`} sub="ativos" />
+                <SummaryTile label="Vínc. c/ múltiplas alocações ativas c/ cargos distintos" value={report.summary.links_with_distinct_active_allocation_roles} tone={report.summary.links_with_distinct_active_allocation_roles > 0 ? "warn" : "ok"} />
+                <SummaryTile label="Pares (worker+event) c/ >1 vínculo corrente" value={report.summary.worker_event_pairs_with_multiple_current_links} tone={report.summary.worker_event_pairs_with_multiple_current_links > 0 ? "warn" : "ok"} />
+              </div>
+
+              {/* Estratégia de casamento */}
+              <div className="rounded-md border p-3 text-xs space-y-1 bg-muted/30">
+                <div className="font-medium text-sm">Estratégia de casamento e critérios</div>
+                <div><span className="text-muted-foreground">Chave:</span> {report.strategy.match_key}</div>
+                <div><span className="text-muted-foreground">Vínculo corrente:</span> {report.strategy.current_link_criteria}</div>
+                <div><span className="text-muted-foreground">Alocação ativa:</span> {report.strategy.active_allocation_criteria}</div>
+                <div><span className="text-muted-foreground">Cardinalidade:</span> {report.strategy.cardinality_rule}</div>
+                <div><span className="text-muted-foreground">Comparação de cargo:</span> {report.strategy.role_comparison_rule}</div>
+                <div>
+                  <span className="text-muted-foreground">Índice único (worker_id, event_id) em employment_links:</span>{" "}
+                  {report.strategy.unique_worker_event_index_present ? "presente" : (
+                    <Badge variant="outline">ausente — não há garantia estrutural de unicidade</Badge>
+                  )}
+                </div>
+                <div><span className="text-muted-foreground">Similaridade:</span> limiar {report.strategy.similarity_threshold}; regra segura: {report.strategy.safe_suggestion_rule}</div>
               </div>
 
               <Alert>
@@ -259,7 +268,7 @@ export function SettingsJobRolesHygiene() {
                               <TableCell className="text-right text-muted-foreground">{r.lgw_role_historical}</TableCell>
                               <TableCell className="text-right">{r.lgw_function_active + r.employment_links_function_active}</TableCell>
                               <TableCell className="text-right">{r.requirement_count}</TableCell>
-                              <TableCell className="text-xs">{r.origin_hint}</TableCell>
+                              <TableCell className="text-xs">{r.origin}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -304,7 +313,18 @@ export function SettingsJobRolesHygiene() {
                   <AccordionTrigger>Cargos fantasmas ({report.ghost_texts.length})</AccordionTrigger>
                   <AccordionContent>
                     <div className="flex justify-end mb-2">
-                      <Button size="sm" variant="outline" onClick={() => downloadCsv("job-roles-ghosts.csv", report.ghost_texts.map((g) => ({ ...g, suggestion: g.suggestion ? `${g.suggestion.name} (${g.suggestion.id})` : "" })))}>
+                      <Button size="sm" variant="outline" onClick={() => downloadCsv("job-roles-ghosts.csv", report.ghost_texts.map((g) => ({
+                        source: g.source, normalized: g.normalized, sample_text: g.sample_text,
+                        occurrences: g.occurrences, active_occurrences: g.active_occurrences, historical_occurrences: g.historical_occurrences,
+                        workers_affected: g.workers_affected, events_affected: g.events_affected, groups_affected: g.groups_affected,
+                        best: g.best ? `${g.best.name} (${g.best.id})` : "",
+                        best_score: g.best_score,
+                        second: g.second ? `${g.second.name} (${g.second.id})` : "",
+                        second_score: g.second_score,
+                        score_delta: g.score_delta,
+                        candidates_above_threshold: g.candidates_above_threshold,
+                        match_confidence: g.match_confidence,
+                      })))}>
                         <Download className="mr-1 h-4 w-4" /> Exportar CSV
                       </Button>
                     </div>
@@ -319,10 +339,12 @@ export function SettingsJobRolesHygiene() {
                               <TableHead>Texto</TableHead>
                               <TableHead className="text-right">Ocorrências</TableHead>
                               <TableHead className="text-right">Ativas</TableHead>
-                              <TableHead className="text-right">Hist.</TableHead>
-                              <TableHead className="text-right">Trab.</TableHead>
-                              <TableHead className="text-right">Eventos</TableHead>
-                              <TableHead>Sugestão</TableHead>
+                              <TableHead>Melhor candidato</TableHead>
+                              <TableHead className="text-right">Score 1º</TableHead>
+                              <TableHead>2º candidato</TableHead>
+                              <TableHead className="text-right">Score 2º</TableHead>
+                              <TableHead className="text-right">Δ</TableHead>
+                              <TableHead className="text-right"># ≥ limiar</TableHead>
                               <TableHead>Confiança</TableHead>
                             </TableRow>
                           </TableHeader>
@@ -333,13 +355,16 @@ export function SettingsJobRolesHygiene() {
                                 <TableCell className="font-medium">{g.sample_text}</TableCell>
                                 <TableCell className="text-right">{g.occurrences}</TableCell>
                                 <TableCell className="text-right">{g.active_occurrences}</TableCell>
-                                <TableCell className="text-right text-muted-foreground">{g.historical_occurrences}</TableCell>
-                                <TableCell className="text-right">{g.workers_affected}</TableCell>
-                                <TableCell className="text-right">{g.events_affected}</TableCell>
-                                <TableCell className="text-xs">{g.suggestion ? g.suggestion.name : "—"}</TableCell>
+                                <TableCell className="text-xs">{g.best ? g.best.name : "—"}</TableCell>
+                                <TableCell className="text-right text-xs">{g.best ? g.best_score.toFixed(2) : "—"}</TableCell>
+                                <TableCell className="text-xs">{g.second ? g.second.name : "—"}</TableCell>
+                                <TableCell className="text-right text-xs">{g.second ? g.second_score.toFixed(2) : "—"}</TableCell>
+                                <TableCell className="text-right text-xs">{g.score_delta.toFixed(2)}</TableCell>
+                                <TableCell className="text-right text-xs">{g.candidates_above_threshold}</TableCell>
                                 <TableCell className="text-xs">
-                                  {g.match_confidence === "sugestao_por_similaridade"
-                                    ? <Badge variant="secondary">sugestão</Badge>
+                                  {g.match_confidence === "sugestao_segura" ? <Badge variant="secondary">segura</Badge>
+                                    : g.match_confidence === "sugestao_ambigua" ? <Badge variant="outline">ambígua</Badge>
+                                    : g.match_confidence === "sugestao_por_similaridade" ? <Badge variant="outline">similaridade</Badge>
                                     : <Badge variant="outline">sem correspondência segura</Badge>}
                                 </TableCell>
                               </TableRow>
@@ -355,6 +380,11 @@ export function SettingsJobRolesHygiene() {
                 <AccordionItem value="conflicts">
                   <AccordionTrigger>Cargo × função divergentes na mesma alocação ({report.allocation_conflicts.length})</AccordionTrigger>
                   <AccordionContent>
+                    <div className="flex justify-end mb-2">
+                      <Button size="sm" variant="outline" onClick={() => downloadCsv("allocation-conflicts.csv", report.allocation_conflicts as unknown as Array<Record<string, unknown>>)}>
+                        <Download className="mr-1 h-4 w-4" /> Exportar CSV
+                      </Button>
+                    </div>
                     {report.allocation_conflicts.length === 0 ? (
                       <p className="text-sm text-muted-foreground">Nenhum conflito interno na alocação.</p>
                     ) : (
@@ -434,7 +464,14 @@ export function SettingsJobRolesHygiene() {
                             <TableCell className="font-medium">{r.name}</TableCell>
                             <TableCell className="text-xs">{r.created_at ? new Date(r.created_at).toLocaleString("pt-BR") : "—"}</TableCell>
                             <TableCell className="text-xs font-mono">{r.created_by ? r.created_by.slice(0, 8) + "…" : "—"}</TableCell>
-                            <TableCell className="text-xs">{r.origin_hint}</TableCell>
+                            <TableCell className="text-xs">
+                              {r.origin}
+                              {r.origin_evidence && (
+                                <span className="ml-1 text-muted-foreground">
+                                  · {typeof r.origin_evidence["events"] === "number" ? `${r.origin_evidence["events"]} evento(s)` : "com evidência"}
+                                </span>
+                              )}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -444,70 +481,92 @@ export function SettingsJobRolesHygiene() {
 
                 {/* Vínculo × Alocação */}
                 <AccordionItem value="link_alloc">
-                  <AccordionTrigger>Relação vínculo × alocação</AccordionTrigger>
-                  <AccordionContent>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-sm mb-4">
-                      <SummaryTile label="Alocações totais" value={report.link_allocation_relationship.summary.total_allocations} />
-                      <SummaryTile label="Casadas com vínculo" value={report.link_allocation_relationship.summary.matched_to_link} />
-                      <SummaryTile label="Órfãs (sem vínculo)" value={report.link_allocation_relationship.summary.orphan_allocations} tone={report.link_allocation_relationship.summary.orphan_allocations > 0 ? "warn" : "ok"} />
-                      <SummaryTile label="Consistentes com vínculo" value={report.link_allocation_relationship.summary.consistent_role} />
-                      <SummaryTile label="Divergentes do vínculo" value={report.link_allocation_relationship.summary.divergent_role} tone={report.link_allocation_relationship.summary.divergent_role > 0 ? "warn" : "ok"} />
-                      <SummaryTile label="Vínculos c/ múltiplas alocações" value={report.summary.links_with_multiple_allocations} />
-                    </div>
+                  <AccordionTrigger>Vínculo × alocação (amostras decisórias)</AccordionTrigger>
+                  <AccordionContent className="space-y-4">
+                    <Alert>
+                      <Info className="h-4 w-4" />
+                      <AlertDescription className="text-sm">
+                        Uma linha por alocação. Casos com <strong>múltiplos vínculos candidatos</strong> não são resolvidos automaticamente — aparecem como <code>ambiguous_match</code>. A comparação de cargo só se aplica quando há um único candidato.
+                      </AlertDescription>
+                    </Alert>
 
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Decisão arquitetural pendente: se toda alocação herda o cargo do vínculo → fonte única é <code>employment_links.job_role_id</code>. Se um mesmo vínculo tem alocações com cargos diferentes → <code>link_group_workers</code> precisa de <code>job_role_id</code> próprio e o vínculo assume papel contratual.
-                    </p>
+                    {/* Divergências ativas */}
+                    <SampleTable
+                      title={`Divergências ativas (${report.link_allocation_relationship.divergent_role_samples_active.length})`}
+                      filename="link-alloc-divergent-active.csv"
+                      rows={report.link_allocation_relationship.divergent_role_samples_active as unknown as Array<Record<string, unknown>>}
+                      headers={["Alocação", "Trabalhador", "Evento", "Grupo", "Cargo (aloc)", "Cargo (vínc)", "Status aloc/vínc"]}
+                      renderRow={(d: DivergentSample) => [
+                        <span className="font-mono text-xs">{d.allocation_id.slice(0, 8)}…</span>,
+                        d.trabalhador ?? d.worker_id.slice(0, 8) + "…",
+                        d.evento ?? "—",
+                        d.grupo ?? "—",
+                        d.alloc_role_text ?? "—",
+                        d.link_role_name ?? "—",
+                        `${d.allocation_status ?? "—"} / ${d.employment_link_status ?? "—"}`,
+                      ]}
+                    />
 
-                    {report.link_allocation_relationship.divergent_role_samples.length > 0 && (
-                      <div className="rounded-md border overflow-x-auto mb-3">
-                        <div className="px-3 py-2 text-xs font-medium bg-muted/40">Amostras de divergência (alocação × vínculo)</div>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Alocação</TableHead>
-                              <TableHead>Cargo na alocação (texto)</TableHead>
-                              <TableHead>Cargo no vínculo</TableHead>
-                              <TableHead>Ativa</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {report.link_allocation_relationship.divergent_role_samples.slice(0, 50).map((d) => (
-                              <TableRow key={d.allocation_id}>
-                                <TableCell className="text-xs font-mono">{d.allocation_id.slice(0, 8)}…</TableCell>
-                                <TableCell>{d.alloc_role_text}</TableCell>
-                                <TableCell>{d.link_role_name}</TableCell>
-                                <TableCell>{d.active ? <Badge variant="secondary">ativa</Badge> : <Badge variant="outline">hist.</Badge>}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
+                    {/* Órfãs ativas */}
+                    <SampleTable
+                      title={`Órfãs ativas (${report.link_allocation_relationship.orphan_samples_active.length})`}
+                      filename="link-alloc-orphans-active.csv"
+                      rows={report.link_allocation_relationship.orphan_samples_active as unknown as Array<Record<string, unknown>>}
+                      headers={["Alocação", "Trabalhador", "Evento", "Grupo", "Cargo (aloc)"]}
+                      renderRow={(o: OrphanSample) => [
+                        <span className="font-mono text-xs">{o.allocation_id.slice(0, 8)}…</span>,
+                        o.trabalhador ?? o.worker_id.slice(0, 8) + "…",
+                        o.evento ?? "—",
+                        o.grupo ?? "—",
+                        o.alloc_role_text ?? "—",
+                      ]}
+                    />
 
-                    {report.link_allocation_relationship.orphan_allocations.length > 0 && (
-                      <div className="rounded-md border overflow-x-auto">
-                        <div className="px-3 py-2 text-xs font-medium bg-muted/40">Alocações órfãs (sem vínculo correspondente no mesmo evento)</div>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Alocação</TableHead>
-                              <TableHead>Cargo (texto)</TableHead>
-                              <TableHead>Ativa</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {report.link_allocation_relationship.orphan_allocations.slice(0, 50).map((o) => (
-                              <TableRow key={o.allocation_id}>
-                                <TableCell className="text-xs font-mono">{o.allocation_id.slice(0, 8)}…</TableCell>
-                                <TableCell>{o.alloc_role_text}</TableCell>
-                                <TableCell>{o.active ? <Badge variant="secondary">ativa</Badge> : <Badge variant="outline">hist.</Badge>}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
+                    {/* Ambíguas */}
+                    <SampleTable
+                      title={`Correspondências ambíguas (${report.link_allocation_relationship.ambiguous_samples.length})`}
+                      filename="link-alloc-ambiguous.csv"
+                      rows={report.link_allocation_relationship.ambiguous_samples.map((a) => ({
+                        allocation_id: a.allocation_id, worker_id: a.worker_id, trabalhador: a.trabalhador,
+                        event_id: a.event_id, evento: a.evento, candidate_count: a.candidate_count,
+                        candidate_employment_link_ids: a.candidates.map((c) => c.employment_link_id).join("|"),
+                        candidate_roles: a.candidates.map((c) => c.role_name ?? "—").join("|"),
+                        candidate_statuses: a.candidates.map((c) => c.status ?? "—").join("|"),
+                        allocation_status: a.allocation_status,
+                      })) as unknown as Array<Record<string, unknown>>}
+                      headers={["Alocação", "Trabalhador", "Evento", "# candidatos", "Vínculos candidatos", "Cargos", "Status"]}
+                      renderRow={(a: AmbiguousSample) => [
+                        <span className="font-mono text-xs">{a.allocation_id.slice(0, 8)}…</span>,
+                        a.trabalhador ?? a.worker_id.slice(0, 8) + "…",
+                        a.evento ?? "—",
+                        a.candidate_count,
+                        <span className="text-xs">{a.candidates.map((c) => c.employment_link_id.slice(0, 8) + "…").join(", ")}</span>,
+                        <span className="text-xs">{a.candidates.map((c) => c.role_name ?? "—").join(" | ")}</span>,
+                        <span className="text-xs">{a.candidates.map((c) => c.status ?? "—").join(" | ")}</span>,
+                      ]}
+                    />
+
+                    {/* Vínculos com múltiplas alocações ativas com cargos distintos */}
+                    <SampleTable
+                      title={`Vínculos com múltiplas alocações ativas e cargos distintos (${report.link_allocation_relationship.links_with_multiple_active_allocations_distinct_roles.length})`}
+                      filename="links-multi-active-distinct-roles.csv"
+                      rows={report.link_allocation_relationship.links_with_multiple_active_allocations_distinct_roles.map((m) => ({
+                        employment_link_id: m.employment_link_id,
+                        worker_id: m.worker_id, event_id: m.event_id, link_role_name: m.link_role_name,
+                        active_alloc_count: m.active_alloc_count, distinct_active_roles: m.distinct_active_roles,
+                        allocation_ids: m.allocations.map((a) => a.allocation_id).join("|"),
+                        allocation_role_texts: m.allocations.map((a) => a.alloc_role_text ?? "—").join("|"),
+                        link_group_ids: m.allocations.map((a) => a.link_group_id ?? "—").join("|"),
+                      })) as unknown as Array<Record<string, unknown>>}
+                      headers={["Vínculo", "Cargo (vínc)", "# ativas", "# cargos distintos", "Alocações"]}
+                      renderRow={(m: MultiAllocSample) => [
+                        <span className="font-mono text-xs">{m.employment_link_id.slice(0, 8)}…</span>,
+                        m.link_role_name ?? "—",
+                        m.active_alloc_count,
+                        m.distinct_active_roles,
+                        <span className="text-xs">{m.allocations.map((a) => `${a.allocation_id.slice(0, 6)}… (${a.alloc_role_text ?? "—"})`).join(", ")}</span>,
+                      ]}
+                    />
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
@@ -531,6 +590,47 @@ function SummaryTile({ label, value, sub, tone }: { label: string; value: number
       <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="text-lg font-semibold">{value}</div>
       {sub && <div className="text-[11px] text-muted-foreground">{sub}</div>}
+    </div>
+  );
+}
+
+function SampleTable<T>({
+  title, filename, rows, headers, renderRow,
+}: {
+  title: string;
+  filename: string;
+  rows: Array<Record<string, unknown>>;
+  headers: string[];
+  renderRow: (row: T) => React.ReactNode[];
+}) {
+  if (!rows || rows.length === 0) {
+    return (
+      <div className="rounded-md border p-3 text-sm text-muted-foreground">
+        <div className="text-sm font-medium mb-1 text-foreground">{title}</div>
+        Sem registros neste grupo.
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-md border overflow-x-auto">
+      <div className="flex items-center justify-between px-3 py-2 bg-muted/40">
+        <div className="text-xs font-medium">{title}</div>
+        <Button size="sm" variant="outline" onClick={() => downloadCsv(filename, rows)}>
+          <Download className="mr-1 h-4 w-4" /> Exportar CSV
+        </Button>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>{headers.map((h) => <TableHead key={h}>{h}</TableHead>)}</TableRow>
+        </TableHeader>
+        <TableBody>
+          {(rows as unknown as T[]).map((r, i) => (
+            <TableRow key={i}>
+              {renderRow(r).map((cell, j) => <TableCell key={j}>{cell as React.ReactNode}</TableCell>)}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }
