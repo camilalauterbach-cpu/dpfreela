@@ -9,98 +9,70 @@ import { Loader2, RefreshCw, Download, ChevronDown, ChevronRight, ShieldAlert, I
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
+interface CandidateRef { employment_link_id: string; job_role_id: string | null; role_name: string | null; status: string | null }
 interface CatalogRow {
-  id: string;
-  code: string | null;
-  name: string;
-  is_active: boolean;
-  created_at: string | null;
-  created_by: string | null;
-  origin_hint: string;
-  employment_links_active: number;
-  employment_links_historical: number;
-  lgw_role_active: number;
-  lgw_role_historical: number;
-  lgw_function_active: number;
-  lgw_function_historical: number;
-  employment_links_function_active: number;
-  employment_links_function_historical: number;
-  active_usage_total: number;
-  historical_usage_total: number;
+  id: string; code: string | null; name: string; is_active: boolean;
+  created_at: string | null; created_by: string | null;
+  origin: string; origin_evidence: Record<string, unknown> | null;
+  employment_links_active: number; employment_links_historical: number;
+  lgw_role_active: number; lgw_role_historical: number;
+  lgw_function_active: number; lgw_function_historical: number;
+  employment_links_function_active: number; employment_links_function_historical: number;
+  active_usage_total: number; historical_usage_total: number;
   requirement_count: number;
 }
 interface DuplicateCluster {
-  normalized_name: string;
-  role_count: number;
+  normalized_name: string; role_count: number;
   roles: Array<{ id: string; name: string; code: string | null; is_active: boolean; active_usage: number; historical_usage: number; requirement_count: number }>;
 }
 interface GhostRow {
-  source: string;
-  normalized: string;
-  sample_text: string;
-  occurrences: number;
-  active_occurrences: number;
-  historical_occurrences: number;
-  workers_affected: number;
-  events_affected: number;
-  groups_affected: number;
-  first_seen: string | null;
-  last_seen: string | null;
-  suggestion: { id: string; name: string } | null;
+  source: string; normalized: string; sample_text: string;
+  occurrences: number; active_occurrences: number; historical_occurrences: number;
+  workers_affected: number; events_affected: number; groups_affected: number;
+  first_seen: string | null; last_seen: string | null;
+  best: { id: string; name: string; score: number } | null; best_score: number;
+  second: { id: string; name: string; score: number } | null; second_score: number;
+  score_delta: number; candidates_above_threshold: number;
   match_confidence: string;
 }
-interface ConflictRow {
-  allocation_id: string;
-  link_group_id: string | null;
-  event_id: string | null;
-  worker_id: string;
-  job_role_text: string;
-  job_function_text: string;
-  is_active: boolean;
-}
-interface NoUseRow {
-  id: string;
-  name: string;
-  code: string | null;
-  is_active: boolean;
-  historical_usage_total: number;
-  requirement_count: number;
-}
-interface OriginRow {
-  id: string;
-  name: string;
-  created_at: string | null;
-  created_by: string | null;
-  origin_hint: string;
-}
-interface LinkAllocReport {
-  summary: {
-    total_allocations: number;
-    matched_to_link: number;
-    orphan_allocations: number;
-    divergent_role: number;
-    consistent_role: number;
-    distinct_worker_event_pairs: number;
-  };
-  links_with_multiple_allocations: Array<{ employment_link_id: string; allocation_count: number }>;
-  links_with_divergent_allocation_roles: Array<{ employment_link_id: string }>;
-  orphan_allocations: Array<{ allocation_id: string; worker_id: string; event_id: string | null; link_group_id: string | null; alloc_role_text: string; active: boolean }>;
-  divergent_role_samples: Array<{ allocation_id: string; employment_link_id: string; worker_id: string; event_id: string | null; alloc_role_text: string; link_role_name: string; active: boolean }>;
-}
+interface ConflictRow { allocation_id: string; link_group_id: string | null; event_id: string | null; worker_id: string; job_role_text: string; job_function_text: string; is_active: boolean }
+interface NoUseRow { id: string; name: string; code: string | null; is_active: boolean; historical_usage_total: number; requirement_count: number }
+interface OriginRow { id: string; name: string; created_at: string | null; created_by: string | null; origin: string; origin_evidence: Record<string, unknown> | null }
+interface DivergentSample { allocation_id: string; employment_link_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; link_group_id: string | null; grupo: string | null; alloc_role_text: string | null; link_role_id: string | null; link_role_name: string | null; allocation_status: string | null; employment_link_status: string | null }
+interface OrphanSample { allocation_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; link_group_id: string | null; grupo: string | null; alloc_role_text: string | null }
+interface AmbiguousSample { allocation_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; candidate_count: number; candidates: CandidateRef[]; allocation_status: string | null }
+interface MultiAllocSample { employment_link_id: string; worker_id: string | null; event_id: string | null; link_role_name: string | null; active_alloc_count: number; distinct_active_roles: number; allocations: Array<{ allocation_id: string; alloc_role_text: string | null; link_group_id: string | null; active: boolean }> }
+
 interface HygieneReport {
   generated_at: string;
+  strategy: {
+    match_key: string;
+    current_link_criteria: string;
+    active_allocation_criteria: string;
+    cardinality_rule: string;
+    role_comparison_rule: string;
+    unique_worker_event_index_present: boolean;
+    similarity_threshold: number;
+    safe_suggestion_rule: string;
+  };
   summary: {
-    catalog_size: number;
-    catalog_active: number;
-    catalog_inactive: number;
-    catalog_with_zero_active_use: number;
-    duplicate_clusters: number;
-    ghost_texts: number;
-    ghost_occurrences_total: number;
-    allocation_conflicts: number;
-    link_allocation: LinkAllocReport["summary"];
+    catalog_size: number; catalog_active: number; catalog_inactive: number; catalog_with_zero_active_use: number;
+    duplicate_clusters: number; ghost_texts: number; ghost_occurrences_total: number;
+    allocation_conflicts_total: number; allocation_conflicts_active: number; allocation_conflicts_historical: number;
+    total_allocations_distinct: number; active_allocations: number; historical_allocations: number;
+    unique_matches_total: number; unique_matches_active: number; unique_matches_historical: number;
+    orphan_allocations_total: number; orphan_allocations_active: number; orphan_allocations_historical: number;
+    ambiguous_allocations_total: number; ambiguous_allocations_active: number; ambiguous_allocations_historical: number;
+    equal_role_total: number; equal_role_active: number; equal_role_historical: number;
+    divergent_role_total: number; divergent_role_active: number; divergent_role_historical: number;
+    allocation_role_missing_total: number; allocation_role_missing_active: number;
+    link_role_missing_total: number; link_role_missing_active: number;
+    both_roles_missing_total: number; both_roles_missing_active: number;
+    worker_event_pairs_with_multiple_current_links: number;
     links_with_multiple_allocations: number;
-    links_with_divergent_allocation_roles: number;
+    links_with_multiple_active_allocations: number;
+    links_with_distinct_allocation_roles: number;
+    links_with_distinct_active_allocation_roles: number;
   };
   catalog: CatalogRow[];
   duplicates: DuplicateCluster[];
@@ -108,15 +80,28 @@ interface HygieneReport {
   allocation_conflicts: ConflictRow[];
   no_active_use: NoUseRow[];
   origin: OriginRow[];
-  link_allocation_relationship: LinkAllocReport;
+  link_allocation_relationship: {
+    divergent_role_samples_active: DivergentSample[];
+    orphan_samples_active: OrphanSample[];
+    ambiguous_samples: AmbiguousSample[];
+    links_with_multiple_active_allocations_distinct_roles: MultiAllocSample[];
+  };
 }
 
+// CSV injection hardening: neutralize cells that begin with =, +, -, @, \t or \r
+// after stripping leading whitespace. Prefix with an apostrophe per OWASP.
+function neutralizeCsvCell(raw: string): string {
+  const trimmedStart = raw.replace(/^\s+/, "");
+  if (/^[=+\-@\t\r]/.test(trimmedStart)) return "'" + raw;
+  return raw;
+}
 function toCsv(rows: Array<Record<string, unknown>>): string {
   if (rows.length === 0) return "";
   const cols = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
   const esc = (v: unknown) => {
     if (v === null || v === undefined) return "";
-    const s = typeof v === "object" ? JSON.stringify(v) : String(v);
+    const raw = typeof v === "object" ? JSON.stringify(v) : String(v);
+    const s = neutralizeCsvCell(raw);
     if (/[",;\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
     return s;
   };
