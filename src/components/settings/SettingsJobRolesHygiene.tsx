@@ -234,10 +234,18 @@ export function SettingsJobRolesHygiene() {
               <div className="rounded-md border p-3 text-xs space-y-1 bg-muted/30">
                 <div className="font-medium text-sm">Estratégia de casamento e critérios</div>
                 <div><span className="text-muted-foreground">Chave:</span> {report.strategy.match_key}</div>
-                <div><span className="text-muted-foreground">Vínculo corrente:</span> {report.strategy.current_link_criteria}</div>
+                <div><span className="text-muted-foreground">Vínculo corrente (classificação):</span> {report.strategy.current_link_criteria_used_for_classification}</div>
+                <div className="pl-3 space-y-0.5">
+                  {Object.entries(report.strategy.alternative_current_link_criteria ?? {}).map(([k, v]) => (
+                    <div key={k} className="text-[11px]"><span className="text-muted-foreground">{k}:</span> {v}</div>
+                  ))}
+                </div>
                 <div><span className="text-muted-foreground">Alocação ativa:</span> {report.strategy.active_allocation_criteria}</div>
                 <div><span className="text-muted-foreground">Cardinalidade:</span> {report.strategy.cardinality_rule}</div>
                 <div><span className="text-muted-foreground">Comparação de cargo:</span> {report.strategy.role_comparison_rule}</div>
+                <div><span className="text-muted-foreground">Flags operacionais nas amostras:</span> {report.strategy.operational_context_flags_available}</div>
+                <div><span className="text-muted-foreground">Origem:</span> {report.strategy.origin_rule}</div>
+                <div><span className="text-muted-foreground">Uso textual:</span> {report.strategy.textual_usage_rule}</div>
                 <div>
                   <span className="text-muted-foreground">Índice único (worker_id, event_id) em employment_links:</span>{" "}
                   {report.strategy.unique_worker_event_index_present ? "presente" : (
@@ -245,6 +253,56 @@ export function SettingsJobRolesHygiene() {
                   )}
                 </div>
                 <div><span className="text-muted-foreground">Similaridade:</span> limiar {report.strategy.similarity_threshold}; regra segura: {report.strategy.safe_suggestion_rule}</div>
+                <div className={report.summary.cardinality_ok ? "text-emerald-600" : "text-destructive"}>
+                  <span className="text-muted-foreground">Cardinalidade linhas de entrada = linhas classificadas:</span>{" "}
+                  {report.summary.input_allocation_rows} = {report.summary.classified_allocation_rows}{" "}
+                  {report.summary.cardinality_ok ? "✓" : "✗"}
+                </div>
+              </div>
+
+              {/* Distribuição de vínculos e candidatos por par */}
+              <div className="rounded-md border p-3 text-xs space-y-2 bg-muted/20">
+                <div className="font-medium text-sm">Distribuição real de vínculos e candidatos por (worker, event)</div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <SummaryTile label="EL não excluídos" value={report.summary.employment_links_not_deleted_total} />
+                  <SummaryTile label="EL vigentes (datas)" value={report.summary.employment_links_vigent_total} />
+                  <SummaryTile label="EL status=active" value={report.summary.employment_links_status_active_total} />
+                  <SummaryTile label="Interseção active × vigente" value={report.summary.employment_links_status_active_and_vigent_total} />
+                </div>
+                <div className="text-[11px] text-muted-foreground">Distribuição por status:</div>
+                <div className="flex flex-wrap gap-1">
+                  {Object.entries(report.summary.employment_links_by_status ?? {}).map(([status, v]) => (
+                    <Badge key={status} variant="outline" className="font-normal">
+                      {status}: {v.total} (não excluídos: {v.not_deleted})
+                    </Badge>
+                  ))}
+                </div>
+                <div className="text-[11px] text-muted-foreground pt-1">Candidatos por par (worker_id, event_id):</div>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Critério</TableHead>
+                        <TableHead className="text-right">0</TableHead>
+                        <TableHead className="text-right">1</TableHead>
+                        <TableHead className="text-right">&gt;1</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(["not_deleted","vigent","status_active","status_active_and_vigent"] as const).map((k) => {
+                        const b = report.summary.worker_event_candidate_distribution?.[k];
+                        return (
+                          <TableRow key={k}>
+                            <TableCell className="text-xs">{k}</TableCell>
+                            <TableCell className="text-right">{b?.pairs_with_0 ?? 0}</TableCell>
+                            <TableCell className="text-right">{b?.pairs_with_1 ?? 0}</TableCell>
+                            <TableCell className="text-right">{b?.pairs_with_gt1 ?? 0}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
 
               <Alert>
@@ -271,11 +329,11 @@ export function SettingsJobRolesHygiene() {
                             <TableHead>Nome</TableHead>
                             <TableHead>Código</TableHead>
                             <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Vínculos ativos</TableHead>
-                            <TableHead className="text-right">Vínculos hist.</TableHead>
-                            <TableHead className="text-right">Alocações ativas (role)</TableHead>
-                            <TableHead className="text-right">Alocações hist. (role)</TableHead>
-                            <TableHead className="text-right">Uso em função</TableHead>
+                            <TableHead className="text-right">FK ativos</TableHead>
+                            <TableHead className="text-right">FK hist.</TableHead>
+                            <TableHead className="text-right">FK vigente</TableHead>
+                            <TableHead className="text-right">Textual inequívoco ativo</TableHead>
+                            <TableHead className="text-right">Textual inequívoco hist.</TableHead>
                             <TableHead className="text-right">Requisitos</TableHead>
                             <TableHead>Origem</TableHead>
                           </TableRow>
@@ -290,9 +348,9 @@ export function SettingsJobRolesHygiene() {
                               </TableCell>
                               <TableCell className="text-right">{r.employment_links_active}</TableCell>
                               <TableCell className="text-right text-muted-foreground">{r.employment_links_historical}</TableCell>
-                              <TableCell className="text-right">{r.lgw_role_active}</TableCell>
-                              <TableCell className="text-right text-muted-foreground">{r.lgw_role_historical}</TableCell>
-                              <TableCell className="text-right">{r.lgw_function_active + r.employment_links_function_active}</TableCell>
+                              <TableCell className="text-right">{r.employment_links_vigent}</TableCell>
+                              <TableCell className="text-right">{r.textual_unambiguous_active}</TableCell>
+                              <TableCell className="text-right text-muted-foreground">{r.textual_unambiguous_historical}</TableCell>
                               <TableCell className="text-right">{r.requirement_count}</TableCell>
                               <TableCell className="text-xs">{r.origin}</TableCell>
                             </TableRow>
