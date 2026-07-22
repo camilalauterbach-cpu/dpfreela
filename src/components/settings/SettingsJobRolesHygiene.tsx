@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, RefreshCw, Download, ChevronDown, ChevronRight, ShieldAlert, Info } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface CandidateRef { employment_link_id: string; job_role_id: string | null; role_name: string | null; status: string | null }
 interface CatalogRow {
@@ -54,6 +55,7 @@ interface HygieneReport {
   generated_at: string;
   strategy: {
     match_key: string;
+    current_link_criterion_selected?: string;
     current_link_criteria_used_for_classification: string;
     alternative_current_link_criteria: Record<string, string>;
     active_allocation_criteria: string;
@@ -146,13 +148,18 @@ function downloadCsv(filename: string, rows: Array<Record<string, unknown>>) {
 
 export function SettingsJobRolesHygiene() {
   const [open, setOpen] = useState(false);
+  type Criterion = "not_deleted" | "vigent" | "status_active" | "status_active_and_vigent";
+  const [criterion, setCriterion] = useState<Criterion>("status_active");
 
   const q = useQuery({
-    queryKey: ["job-roles-hygiene-dry-run"],
+    queryKey: ["job-roles-hygiene-dry-run", criterion],
     enabled: open,
     staleTime: 0,
     queryFn: async (): Promise<HygieneReport> => {
-      const { data, error } = await supabase.rpc("dry_run_job_roles_hygiene" as never);
+      const { data, error } = await supabase.rpc(
+        "dry_run_job_roles_hygiene" as never,
+        { p_current_link_criterion: criterion } as never,
+      );
       if (error) throw error;
       return data as unknown as HygieneReport;
     },
@@ -179,6 +186,26 @@ export function SettingsJobRolesHygiene() {
               </Button>
             ) : (
               <>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground hidden sm:inline">
+                    Vínculo corrente:
+                  </span>
+                  <Select
+                    value={criterion}
+                    onValueChange={(v) => setCriterion(v as Criterion)}
+                    disabled={q.isFetching}
+                  >
+                    <SelectTrigger className="h-8 w-[220px] text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="status_active">status = active (padrão)</SelectItem>
+                      <SelectItem value="vigent">vigente por datas</SelectItem>
+                      <SelectItem value="status_active_and_vigent">status active ∧ vigente</SelectItem>
+                      <SelectItem value="not_deleted">apenas não excluído</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Button variant="outline" size="sm" onClick={() => q.refetch()} disabled={q.isFetching}>
                   {q.isFetching ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1 h-4 w-4" />}
                   Rodar novamente
