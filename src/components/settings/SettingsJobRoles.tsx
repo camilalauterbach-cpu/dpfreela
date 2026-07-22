@@ -371,20 +371,17 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
-                            onSelect={(e) => {
-                              e.preventDefault();
-                              // Defer state changes until after the menu unmount commit
-                              // to avoid racing React reconciler (fixes insertBefore crash).
+                            onSelect={() => {
+                              // Radix closes the menu, then we open the dialog on the
+                              // next microtask so unmount commit happens first (avoids
+                              // the insertBefore race that plagued the inline flow).
                               setTimeout(() => { setRenameValue(r.name); setRenameRole(r); }, 0);
                             }}
                           >
                             <Pencil className="h-3.5 w-3.5 mr-2" /> Renomear
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onSelect={(e) => {
-                              e.preventDefault();
-                              setTimeout(() => setToggleRole(r), 0);
-                            }}
+                            onSelect={() => { setTimeout(() => setToggleRole(r), 0); }}
                           >
                             {r.is_active ? <PowerOff className="h-3.5 w-3.5 mr-2" /> : <Power className="h-3.5 w-3.5 mr-2" />}
                             {r.is_active ? "Inativar" : "Ativar"}
@@ -392,10 +389,7 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive"
-                            onSelect={(e) => {
-                              e.preventDefault();
-                              setTimeout(() => setDeleteRole(r), 0);
-                            }}
+                            onSelect={() => { setTimeout(() => setDeleteRole(r), 0); }}
                           >
                             <Trash2 className="h-3.5 w-3.5 mr-2" /> Excluir
                           </DropdownMenuItem>
