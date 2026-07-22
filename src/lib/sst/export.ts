@@ -252,3 +252,53 @@ export function collectPendencies(workers: SstWorkerRow[]): PendencyRow[] {
   });
   return out;
 }
+
+export interface WorkerPendencyGroup {
+  worker: SstWorkerRow;
+  pendencies: PendencyRow[]; // ordenadas por rank, daysLeft, NR
+  worstRank: number;
+  worstDaysLeft: number | null;
+}
+
+/**
+ * Agrupa pendências por trabalhador — uma linha por worker_id.
+ * Ordena trabalhadores pela pior pendência (menor rank, depois menor daysLeft).
+ * Dentro de cada trabalhador, ordena por rank, daysLeft e NR.
+ */
+export function groupPendenciesByWorker(rows: PendencyRow[]): WorkerPendencyGroup[] {
+  const byId = new Map<string, WorkerPendencyGroup>();
+  for (const r of rows) {
+    const key = r.worker.worker_id;
+    const g = byId.get(key);
+    if (g) {
+      g.pendencies.push(r);
+    } else {
+      byId.set(key, {
+        worker: r.worker,
+        pendencies: [r],
+        worstRank: r.rank,
+        worstDaysLeft: r.daysLeft,
+      });
+    }
+  }
+  const groups = Array.from(byId.values());
+  for (const g of groups) {
+    g.pendencies.sort((a, b) => {
+      if (a.rank !== b.rank) return a.rank - b.rank;
+      const ad = a.daysLeft ?? Number.MAX_SAFE_INTEGER;
+      const bd = b.daysLeft ?? Number.MAX_SAFE_INTEGER;
+      if (ad !== bd) return ad - bd;
+      return a.q.nr_code.localeCompare(b.q.nr_code);
+    });
+    g.worstRank = g.pendencies[0].rank;
+    g.worstDaysLeft = g.pendencies[0].daysLeft;
+  }
+  groups.sort((a, b) => {
+    if (a.worstRank !== b.worstRank) return a.worstRank - b.worstRank;
+    const ad = a.worstDaysLeft ?? Number.MAX_SAFE_INTEGER;
+    const bd = b.worstDaysLeft ?? Number.MAX_SAFE_INTEGER;
+    if (ad !== bd) return ad - bd;
+    return a.worker.full_name.localeCompare(b.worker.full_name, "pt-BR");
+  });
+  return groups;
+}
