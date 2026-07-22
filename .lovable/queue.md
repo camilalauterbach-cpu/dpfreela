@@ -1,12 +1,12 @@
 # Fila oficial de pendências — DPfreela
 
-Última atualização: Fase 0 + 1.1 aplicadas. Aguardando autorização para Fase 1.2.
+Última atualização: Fase 1.2 + 1.4 aplicadas. Playwright rodando localmente (4/4 verde).
 
 | ID | Pendência | Prioridade | Status | Evidência | Bloqueio |
 |----|-----------|------------|--------|-----------|----------|
-| Q-001 | Crash `insertBefore` em Configurações → Cargos | P0 | IN_PROGRESS | Fase 1.1 aplicada (`translate="no"` em `index.html`). Falta refatoração Fase 1.2 (Dialog em vez de inline rename + mutations fora do DropdownMenu). | Aguarda autorização Fase 1.2 |
-| Q-002 | Texto "Cargos" e botão "Novo cargo" habilitado | P0 | VALIDATING | Grep em `src/` não encontra ocorrência de "Cargas" — o label já é "Cargos" em `SettingsPage.tsx:62` e `SettingsJobRoles.tsx:270`. Hipótese confirmada: era tradução automática do Chrome. Bloqueada pelo `translate="no"`. | Precisa validação no preview após deploy |
-| Q-003 | Criar/editar/ativar/inativar cargos sem crash | P0 | IN_PROGRESS | Depende da refatoração Fase 1.2. | Aguarda autorização |
+| Q-001 | Crash `insertBefore` em Configurações → Cargos | P0 | DONE | Fase 1.1 (`translate="no"`) + Fase 1.2 (Dialog/AlertDialog, mutations fora do menu) + spec `page does not throw uncaught errors on load` verde. | — |
+| Q-002 | Texto "Cargos" e botão "Novo cargo" habilitado | P0 | DONE | Bloqueio Google Translate via `translate="no"`; spec `opens the "Novo cargo" dialog without crashing` verde. | — |
+| Q-003 | Criar/editar/ativar/inativar cargos sem crash | P0 | DONE | Specs de rename e inativar/ativar verdes; validação no preview ok. | — |
 | Q-004 | Higiene de cargos: classificação de órfãos/fantasmas | P0 | OPEN | Relatório atual em `SettingsJobRolesHygiene` — revisão prevista Fase 2. | — |
 | Q-005 | Preservar 56 RIR + 29 Shakira | P0 | VALIDATING | Snapshot Fase 0: RIR=56 not-deleted (57 total), Shakira=29 not-deleted (37 total). Nenhum DML executado. | — |
 | Q-006 | Eliminar cargo livre / fonte única | P0 | OPEN | `JobRoleCombobox` já em uso; auditoria completa Fase 2.7. | — |
@@ -15,7 +15,7 @@
 | Q-009 | Indicador cadastral verde/amarelo/vermelho | P1 | OPEN | Fase 4 — `worker-readiness.ts`. | Bloqueada por P0 |
 | Q-010 | Remover "Aptos/Bloqueados" do Dashboard | P1 | OPEN | Fase 5.1 — `DocumentComplianceSection` a substituir. | Bloqueada por P0 |
 | Q-011 | Seletor/exportação de Qualificações | P1 | VALIDATING | Aplicado em entrega anterior; falta persistência por `user_id` (5.3) e teste E2E. | — |
-| Q-012 | Suíte E2E + CI | P1 | OPEN | Playwright configurado, 0 specs. Fase 6.2/6.4. | — |
+| Q-012 | Suíte E2E + CI | P1 | IN_PROGRESS | `playwright.config.ts` self-contained (sem `lovable-agent-playwright-config`). `e2e/settings-job-roles.spec.ts` — 4 passed, 0 failed, 0 skipped em 7s. Falta workflow CI. | — |
 | Q-013 | Lint e otimização de chunks grandes | P2 | OPEN | Baseline Fase 0: 376 problemas (351 erros), majoritariamente `no-explicit-any` em `supabase/functions/*` — pré-existentes. | — |
 
 ## Fase 0 — Baseline (concluída, somente leitura)
