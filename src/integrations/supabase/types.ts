@@ -948,6 +948,48 @@ export type Database = {
         }
         Relationships: []
       }
+      job_roles_hygiene_snapshots: {
+        Row: {
+          baseline: Json
+          criterion: string
+          data_fingerprint: string
+          generated_at: string
+          generated_by: string
+          id: string
+          report: Json
+          report_hash: string
+          report_schema_version: number
+          saved_at: string
+          summary: Json
+        }
+        Insert: {
+          baseline: Json
+          criterion: string
+          data_fingerprint: string
+          generated_at: string
+          generated_by: string
+          id?: string
+          report: Json
+          report_hash: string
+          report_schema_version?: number
+          saved_at?: string
+          summary: Json
+        }
+        Update: {
+          baseline?: Json
+          criterion?: string
+          data_fingerprint?: string
+          generated_at?: string
+          generated_by?: string
+          id?: string
+          report?: Json
+          report_hash?: string
+          report_schema_version?: number
+          saved_at?: string
+          summary?: Json
+        }
+        Relationships: []
+      }
       link_group_workers: {
         Row: {
           call_time: string | null
@@ -2454,6 +2496,10 @@ export type Database = {
       }
     }
     Functions: {
+      assert_job_roles_hygiene_snapshot: {
+        Args: { p_max_age?: string; p_snapshot_id: string }
+        Returns: Json
+      }
       calculate_compliance_overall: {
         Args: { p_documents: Json }
         Returns: Json
@@ -2509,6 +2555,8 @@ export type Database = {
       }
       ensure_worker: { Args: { mode?: string; payload: Json }; Returns: Json }
       evaluate_link_compliance: { Args: { p_link_id: string }; Returns: Json }
+      f_job_roles_hygiene_baseline: { Args: never; Returns: Json }
+      f_job_roles_hygiene_data_fingerprint: { Args: never; Returns: string }
       f_normalize_job_role: { Args: { p_text: string }; Returns: string }
       f_normalize_nr_code: { Args: { _raw: string }; Returns: string }
       f_slugify_job_role: { Args: { p_text: string }; Returns: string }
@@ -2630,6 +2678,10 @@ export type Database = {
       }
       save_job_role_requirements: {
         Args: { p_job_role_id: string; p_requirements: Json }
+        Returns: Json
+      }
+      save_job_roles_hygiene_snapshot: {
+        Args: { p_criterion?: string }
         Returns: Json
       }
       save_link_document_override: {
