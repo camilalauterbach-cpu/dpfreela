@@ -292,6 +292,13 @@ export type Database = {
             | Database["public"]["Enums"]["document_storage_scope"]
             | null
           updated_at: string
+          validity_mode:
+            | Database["public"]["Enums"]["document_validity_mode"]
+            | null
+          validity_unit:
+            | Database["public"]["Enums"]["document_validity_unit"]
+            | null
+          validity_value: number | null
         }
         Insert: {
           category?: string
@@ -311,6 +318,13 @@ export type Database = {
             | Database["public"]["Enums"]["document_storage_scope"]
             | null
           updated_at?: string
+          validity_mode?:
+            | Database["public"]["Enums"]["document_validity_mode"]
+            | null
+          validity_unit?:
+            | Database["public"]["Enums"]["document_validity_unit"]
+            | null
+          validity_value?: number | null
         }
         Update: {
           category?: string
@@ -330,6 +344,13 @@ export type Database = {
             | Database["public"]["Enums"]["document_storage_scope"]
             | null
           updated_at?: string
+          validity_mode?:
+            | Database["public"]["Enums"]["document_validity_mode"]
+            | null
+          validity_unit?:
+            | Database["public"]["Enums"]["document_validity_unit"]
+            | null
+          validity_value?: number | null
         }
         Relationships: []
       }
@@ -871,6 +892,10 @@ export type Database = {
           required_by: string
           updated_at: string
           validity_days_override: number | null
+          validity_override_unit:
+            | Database["public"]["Enums"]["document_validity_unit"]
+            | null
+          validity_override_value: number | null
         }
         Insert: {
           created_at?: string
@@ -884,6 +909,10 @@ export type Database = {
           required_by?: string
           updated_at?: string
           validity_days_override?: number | null
+          validity_override_unit?:
+            | Database["public"]["Enums"]["document_validity_unit"]
+            | null
+          validity_override_value?: number | null
         }
         Update: {
           created_at?: string
@@ -897,6 +926,10 @@ export type Database = {
           required_by?: string
           updated_at?: string
           validity_days_override?: number | null
+          validity_override_unit?:
+            | Database["public"]["Enums"]["document_validity_unit"]
+            | null
+          validity_override_value?: number | null
         }
         Relationships: [
           {
@@ -2504,6 +2537,16 @@ export type Database = {
         Args: { p_documents: Json }
         Returns: Json
       }
+      calculate_document_expiry: {
+        Args: {
+          p_explicit_date?: string
+          p_issue_date: string
+          p_mode: Database["public"]["Enums"]["document_validity_mode"]
+          p_unit?: Database["public"]["Enums"]["document_validity_unit"]
+          p_value?: number
+        }
+        Returns: string
+      }
       claim_public_invite: {
         Args: { _ip_hash: string; _token_hash: string }
         Returns: Json
@@ -2707,6 +2750,8 @@ export type Database = {
     Enums: {
       app_role: "admin" | "manager" | "operator" | "viewer"
       document_storage_scope: "worker" | "employment_link"
+      document_validity_mode: "fixed_duration" | "explicit_date" | "no_expiry"
+      document_validity_unit: "day" | "month" | "year"
       link_document_override_action: "add" | "waive"
       sst_revision_reason:
         | "created"
@@ -2845,6 +2890,8 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "manager", "operator", "viewer"],
       document_storage_scope: ["worker", "employment_link"],
+      document_validity_mode: ["fixed_duration", "explicit_date", "no_expiry"],
+      document_validity_unit: ["day", "month", "year"],
       link_document_override_action: ["add", "waive"],
       sst_revision_reason: [
         "created",
