@@ -50,11 +50,14 @@ export interface QualFilters {
 export function useWorkerQualifications(filters: QualFilters) {
   return useQuery({
     queryKey: ["worker-qualifications", filters],
+    // Não consultar quando o usuário desmarcou todas as colunas.
+    enabled: filters.documentTypeIds == null || filters.documentTypeIds.length > 0,
     queryFn: async (): Promise<QualMatrix> => {
       const { data, error } = await supabase.rpc("list_worker_qualifications", {
         p_search: filters.search || null,
         p_state: filters.state || null,
-        p_document_type_ids: filters.documentTypeIds?.length ? filters.documentTypeIds : null,
+        // Passa exatamente a seleção. null = "todos" (comportamento antigo do RPC).
+        p_document_type_ids: filters.documentTypeIds ?? null,
         p_only_relevant: filters.onlyRelevant ?? true,
         p_limit: filters.limit ?? 200,
         p_offset: filters.offset ?? 0,
