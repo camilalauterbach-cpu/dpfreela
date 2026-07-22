@@ -7,7 +7,7 @@
 | Q-001 | Crash `insertBefore` em Configurações → Cargos | P0 | DONE | Fase 1.1 (`translate="no"`) + Fase 1.2 (Dialog/AlertDialog, mutations fora do menu) + spec `page does not throw uncaught errors on load` verde. | — |
 | Q-002 | Texto "Cargos" e botão "Novo cargo" habilitado | P0 | DONE | Bloqueio Google Translate via `translate="no"`; spec `opens the "Novo cargo" dialog without crashing` verde. | — |
 | Q-003 | Criar/editar/ativar/inativar cargos sem crash | P0 | DONE | Specs de rename e inativar/ativar verdes; validação no preview ok. | — |
-| Q-004 | Higiene de cargos: classificação de órfãos/fantasmas | P0 | OPEN | Relatório atual em `SettingsJobRolesHygiene` — revisão prevista Fase 2. | — |
+| Q-004 | Higiene de cargos: classificação de órfãos/fantasmas | P0 | IN PROGRESS | Q-004.A entregue (snapshots imutáveis + RPC `save_job_roles_hygiene_snapshot` / `assert_job_roles_hygiene_snapshot`). Q-004.B/C/D aguardam autorização. | — |
 | Q-005 | Preservar 56 RIR + 29 Shakira | P0 | VALIDATING | Snapshot Fase 0: RIR=56 not-deleted (57 total), Shakira=29 not-deleted (37 total). Nenhum DML executado. | — |
 | Q-006 | Eliminar cargo livre / fonte única | P0 | OPEN | `JobRoleCombobox` já em uso; auditoria completa Fase 2.7. | — |
 | Q-007 | Lotes no Controle SST (`sst_control_batches`) | P1 | OPEN | Fase 3 — migration + UI + hooks. | Bloqueada por P0 |
