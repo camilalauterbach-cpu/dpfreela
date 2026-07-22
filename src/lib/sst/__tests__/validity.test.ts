@@ -10,7 +10,7 @@ describe("computeCertificateExpiry", () => {
         defaultValidityDays: 730,
       }),
     ).toEqual({
-      expiresAt: "2027-12-31",
+      expiresAt: "2028-01-01",
       source: "document_type_default",
       validityDaysUsed: 730,
     });
@@ -69,6 +69,7 @@ describe("computeEffectiveExpiry — precedência de cargo", () => {
       issuedAt: "2026-01-01",
       validityDaysOverride: 180,
     });
+    // 2026-01-01 + 180 dias = 2026-06-30
     expect(r.effectiveExpiry).toBe("2026-06-30");
     expect(r.source).toBe("role_override");
   });
