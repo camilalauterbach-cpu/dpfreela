@@ -16,6 +16,7 @@ import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
 import { invalidateComplianceCaches } from "@/lib/compliance-cache";
 import { SettingsJobRolesHygiene } from "./SettingsJobRolesHygiene";
+import { JOB_ROLES_CATALOG_KEYS } from "@/hooks/useJobRoles";
 import {
   Dialog,
   DialogContent,
@@ -182,6 +183,8 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
     setCreateOpen(false);
     toast({ title: "Cargo criado" });
     await qc.invalidateQueries({ queryKey: ["settings-job-roles"] });
+    qc.invalidateQueries({ queryKey: JOB_ROLES_CATALOG_KEYS.active });
+    qc.invalidateQueries({ queryKey: JOB_ROLES_CATALOG_KEYS.all });
     if (data?.id) setSelectedRoleId(data.id);
   };
 
@@ -203,6 +206,8 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
     setRenameRole(null);
     toast({ title: "Cargo renomeado" });
     qc.invalidateQueries({ queryKey: ["settings-job-roles"] });
+    qc.invalidateQueries({ queryKey: JOB_ROLES_CATALOG_KEYS.active });
+    qc.invalidateQueries({ queryKey: JOB_ROLES_CATALOG_KEYS.all });
   };
 
   const handleToggleActive = async () => {
@@ -220,6 +225,8 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
     setToggleRole(null);
     toast({ title: role.is_active ? "Cargo inativado" : "Cargo ativado" });
     qc.invalidateQueries({ queryKey: ["settings-job-roles"] });
+    qc.invalidateQueries({ queryKey: JOB_ROLES_CATALOG_KEYS.active });
+    qc.invalidateQueries({ queryKey: JOB_ROLES_CATALOG_KEYS.all });
   };
 
   const handleDelete = async () => {
@@ -241,6 +248,8 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
     setDeleteRole(null);
     toast({ title: "Cargo excluído" });
     qc.invalidateQueries({ queryKey: ["settings-job-roles"] });
+    qc.invalidateQueries({ queryKey: JOB_ROLES_CATALOG_KEYS.active });
+    qc.invalidateQueries({ queryKey: JOB_ROLES_CATALOG_KEYS.all });
   };
 
   const addRequirement = (docId: string) => {
@@ -437,20 +446,34 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
                           />
                           Obrigatório
                         </label>
-                        <div className="flex items-center gap-1">
-                          <Label className="text-xs whitespace-nowrap">Validade (dias)</Label>
-                          <Input
-                            type="number"
-                            className="h-8 w-24"
-                            value={r.validity_days_override ?? ""}
-                            placeholder={doc?.default_validity_days ? String(doc.default_validity_days) : "—"}
-                            onChange={(e) =>
-                              patch(i, {
-                                validity_days_override: e.target.value === "" ? null : Number(e.target.value),
-                              })
-                            }
-                            disabled={readOnly}
-                          />
+                        <div className="flex flex-col gap-1 sm:min-w-[240px]">
+                          <div className="flex items-center gap-2">
+                            <Label
+                              className="text-xs whitespace-nowrap"
+                              title="Use somente quando este cargo exigir renovação em prazo diferente do padrão do documento."
+                            >
+                              Validade específica do cargo — opcional
+                            </Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              className="h-8 w-24"
+                              value={r.validity_days_override ?? ""}
+                              placeholder="—"
+                              onChange={(e) =>
+                                patch(i, {
+                                  validity_days_override:
+                                    e.target.value === "" ? null : Number(e.target.value),
+                                })
+                              }
+                              disabled={readOnly}
+                            />
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            {doc?.default_validity_days
+                              ? `Padrão do documento: ${doc.default_validity_days} dias a partir da realização`
+                              : "Validade padrão não configurada"}
+                          </p>
                         </div>
                         <div className="flex items-center gap-1">
                           <Button size="icon" variant="ghost" onClick={() => move(i, -1)} disabled={readOnly || i === 0} className="h-8 w-8">

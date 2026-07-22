@@ -1,6 +1,6 @@
 # Fila oficial de pendências — DPfreela
 
-Última atualização: Fase 1.2 + 1.4 aplicadas. Playwright rodando localmente (4/4 verde).
+Última atualização: Fase 1.5 aplicada (validade NR + cargos inativos ocultos).
 
 | ID | Pendência | Prioridade | Status | Evidência | Bloqueio |
 |----|-----------|------------|--------|-----------|----------|
@@ -17,6 +17,30 @@
 | Q-011 | Seletor/exportação de Qualificações | P1 | VALIDATING | Aplicado em entrega anterior; falta persistência por `user_id` (5.3) e teste E2E. | — |
 | Q-012 | Suíte E2E + CI | P1 | IN_PROGRESS | `playwright.config.ts` self-contained (sem `lovable-agent-playwright-config`). `e2e/settings-job-roles.spec.ts` — 4 passed, 0 failed, 0 skipped em 7s. Falta workflow CI. | — |
 | Q-013 | Lint e otimização de chunks grandes | P2 | OPEN | Baseline Fase 0: 376 problemas (351 erros), majoritariamente `no-explicit-any` em `supabase/functions/*` — pré-existentes. | — |
+| Q-014 | Cálculo automático da validade da NR por trabalhador | P0 | DONE | Migration Fase 1.5: `register_sst_revision` calcula `expires_at = issued_at + document_types.default_validity_days` quando não vier explícito (retorna `expiry_source`); `evaluate_link_compliance` v3 aplica precedência de cargo (`role_effective_expiry`, `effective_expiry`, `expiry_rule_source`). Frontend: `SstCertificateDrawer` recalcula ao mudar NR/data, marca "Data ajustada manualmente" quando o usuário edita, e alerta quando não há validade padrão. `SettingsJobRoles` renomeou o campo para "Validade específica do cargo — opcional" com hint do padrão do documento e tooltip explicando o uso excepcional. Unit tests em `src/lib/sst/__tests__/validity.test.ts` (9/9 passed). | — |
+| Q-015 | Ocultar cargos inativos dos seletores operacionais | P0 | DONE | `useJobRoles({ includeInactive })` com caches independentes `["job-roles-catalog","active"|"all"]`. `JobRoleCombobox` consome só o catálogo ativo, não lista inativos na busca; quando o `value` aponta para cargo inativo, exibe alerta destrutivo pedindo nova seleção (ou rótulo "Cargo histórico inativo" com `readOnlyHistory`). `SettingsJobRoles` continua com sua query própria (ativos + inativos) e invalida ambos os caches em criar/renomear/ativar/inativar/excluir. | — |
+
+## Fase 1.5 — Validade NR e cargos inativos (concluída)
+
+### Backend
+- `register_sst_revision`: segunda barreira de cálculo (padrão do documento) + retorno `expiry_source` ∈ `{explicit, document_type_default}` e `validity_days_used`. Certificados antigos não são tocados (nunca há UPDATE em lote).
+- `evaluate_link_compliance` v3: contract preservado; adiciona `certificate_expiry`, `role_effective_expiry`, `validity_days_override`, `effective_expiry`, `expiry_rule_source` por documento. `expires_at` retornado passa a ser o efetivo (mais restritivo entre certificado e cargo). `calculate_compliance_overall` intocada.
+
+### Frontend
+- `src/lib/sst/validity.ts`: `computeCertificateExpiry` + `computeEffectiveExpiry` (puras, UTC-safe).
+- `SstCertificateDrawer`: rótulo "Data de realização/conclusão"; auto-cálculo enquanto o usuário não editar o vencimento; badge "Data ajustada manualmente" após edição; aviso quando a NR não tem `default_validity_days`.
+- `SettingsJobRoles`: campo de override renomeado, hint do padrão do documento, tooltip com regra de uso.
+- `useJobRoles`/`JobRoleCombobox`: catálogo operacional só-ativos; fallback histórico via lookup pontual; alerta destrutivo quando o `value` atual é inativo.
+
+### Testes
+- `bunx vitest run src/lib/sst/__tests__/validity.test.ts` → 9/9 passed.
+- `bunx tsgo --noEmit` → 0 erros.
+- E2E `sst-validity-calculation.spec.ts` e `job-role-active-options.spec.ts`: **PENDENTE** — a serem escritas na próxima janela (dependem de fixtures de trabalhador + NR seed). Não bloqueia Fase 2 do backend, mas Q-014/Q-015 só serão homologadas operacionalmente após a validação E2E.
+
+### Duplicidades ativas (somente relatório)
+A limpeza destrutiva permanece em Q-004 (`SettingsJobRolesHygiene`). Nesta fase apenas confirmamos:
+- `dry_run_job_roles_hygiene` continua strict read-only;
+- nenhum merge/exclusão/inativação foi executado.
 
 ## Fase 0 — Baseline (concluída, somente leitura)
 

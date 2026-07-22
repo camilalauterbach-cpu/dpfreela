@@ -19,6 +19,8 @@ import {
   validateUpload, getSafeContentType, ALLOWED_FILE_EXTENSIONS,
 } from "@/lib/upload-validation";
 import { normalizeNr } from "@/lib/sst/nr-inference";
+import { computeCertificateExpiry } from "@/lib/sst/validity";
+import { useQuery } from "@tanstack/react-query";
 
 export type SstDrawerMode = "create" | "renew" | "replace";
 
@@ -62,6 +64,9 @@ export function SstCertificateDrawer({
   const [issuedAt, setIssuedAt] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [hasExpiry, setHasExpiry] = useState(true);
+  // Sinaliza que o usuário editou o vencimento manualmente — evita
+  // sobrescrever o valor ao recalcular a partir da NR/data de realização.
+  const [expiryTouched, setExpiryTouched] = useState(false);
   const [workload, setWorkload] = useState("");
   const [provider, setProvider] = useState("");
   const [instructor, setInstructor] = useState("");
@@ -71,12 +76,31 @@ export function SstCertificateDrawer({
 
   const nrLocked = mode !== "create" || !!presetNrCode;
 
+  // Catálogo de NR/treinamento: usamos a validade padrão do document_type.
+  const catalogQ = useQuery({
+    queryKey: ["sst-doc-catalog"],
+    staleTime: 300_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("document_types")
+        .select("code, category, default_validity_days")
+        .in("category", ["sst_nr", "training", "sst_aso"]);
+      if (error) throw error;
+      return (data ?? []) as { code: string; category: string; default_validity_days: number | null }[];
+    },
+  });
+
+  const normalizedNr = normalizeNr(nrCode) || nrCode.trim().toUpperCase();
+  const catalogEntry = (catalogQ.data ?? []).find((d) => d.code === normalizedNr);
+  const defaultValidityDays = catalogEntry?.default_validity_days ?? null;
+
   useEffect(() => {
     if (!open) return;
     // Pré-carregamento por modo
     setFile(null);
     setNotes("");
     setLastError(null);
+    setExpiryTouched(false);
     if (mode === "create") {
       setNrCode(presetNrCode || "");
       setTrainingType("");
@@ -98,6 +122,25 @@ export function SstCertificateDrawer({
     }
   }, [open, mode, current, presetNrCode]);
 
+  // Cálculo automático do vencimento: só se o usuário não tiver editado.
+  useEffect(() => {
+    if (!open || !hasExpiry || expiryTouched || !issuedAt) return;
+    const { expiresAt: auto } = computeCertificateExpiry({
+      issuedAt,
+      hasExpiry: true,
+      defaultValidityDays,
+    });
+    if (auto) setExpiresAt(auto);
+  }, [open, hasExpiry, expiryTouched, issuedAt, defaultValidityDays]);
+
+  // Se o usuário alternar para "Sem vencimento", limpa e reseta o toque manual.
+  useEffect(() => {
+    if (!hasExpiry) {
+      setExpiresAt("");
+      setExpiryTouched(false);
+    }
+  }, [hasExpiry]);
+
   const today = new Date().toISOString().slice(0, 10);
 
   const errors = useMemo(() => {
@@ -105,12 +148,12 @@ export function SstCertificateDrawer({
     if (!file) errs.push("Selecione o arquivo do certificado.");
     if (!nrCode.trim()) errs.push("Informe a NR.");
     else if (!normalizeNr(nrCode)) errs.push("Formato de NR inválido (use NRxx).");
-    if (!issuedAt) errs.push("Informe a data de emissão.");
-    else if (issuedAt > today) errs.push("Emissão não pode ser futura.");
+    if (!issuedAt) errs.push("Informe a data de realização/conclusão.");
+    else if (issuedAt > today) errs.push("Realização não pode ser futura.");
     if (hasExpiry) {
       if (!expiresAt) errs.push("Informe a data de validade.");
       else if (issuedAt && expiresAt <= issuedAt)
-        errs.push("Validade deve ser posterior à emissão.");
+        errs.push("Validade deve ser posterior à realização.");
       else if (expiresAt <= today)
         errs.push("Validade deve ser posterior a hoje.");
     }
@@ -323,7 +366,7 @@ export function SstCertificateDrawer({
               />
             </div>
             <div>
-              <Label>Emissão *</Label>
+              <Label>Data de realização/conclusão *</Label>
               <Input
                 type="date" max={today} value={issuedAt}
                 onChange={(e) => setIssuedAt(e.target.value)}
@@ -346,8 +389,29 @@ export function SstCertificateDrawer({
                 <Input
                   type="date" min={issuedAt || undefined}
                   value={expiresAt}
-                  onChange={(e) => setExpiresAt(e.target.value)}
+                  onChange={(e) => {
+                    setExpiresAt(e.target.value);
+                    setExpiryTouched(true);
+                  }}
                 />
+                {issuedAt && hasExpiry && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {expiryTouched ? (
+                      <span className="text-amber-700 dark:text-amber-400">
+                        Data ajustada manualmente.
+                      </span>
+                    ) : defaultValidityDays && expiresAt ? (
+                      <>
+                        Vencimento calculado automaticamente:{" "}
+                        <strong>{fmtDate(expiresAt)}</strong> — {defaultValidityDays} dias após a realização.
+                      </>
+                    ) : !defaultValidityDays ? (
+                      <span className="text-amber-700 dark:text-amber-400">
+                        Esta NR não possui validade padrão configurada. Informe o vencimento manualmente.
+                      </span>
+                    ) : null}
+                  </p>
+                )}
               </div>
             )}
             <div>

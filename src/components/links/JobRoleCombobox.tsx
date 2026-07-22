@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
-import { Check, ChevronsUpDown, Loader2, Plus } from "lucide-react";
+import { AlertTriangle, Check, ChevronsUpDown, Loader2, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,9 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useJobRoles } from "@/hooks/useJobRoles";
+import { useJobRoles, type JobRoleOption } from "@/hooks/useJobRoles";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 
 // Normaliza string removendo acentos + lowercase para busca robusta.
@@ -30,6 +32,11 @@ interface Props {
   invalid?: boolean;
   /** Se true, oculta a opção "Limpar seleção". */
   required?: boolean;
+  /**
+   * Quando true, o valor atual (mesmo se cargo inativo) é exibido apenas como
+   * texto histórico, sem permitir abrir o seletor. Use em telas read-only.
+   */
+  readOnlyHistory?: boolean;
 }
 
 /**
@@ -45,13 +52,54 @@ export function JobRoleCombobox({
   className,
   invalid,
   required,
+  readOnlyHistory,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const { data: roles, isLoading } = useJobRoles();
+  // Catálogo operacional: SOMENTE cargos ativos.
+  const { data: roles, isLoading } = useJobRoles({ includeInactive: false });
 
-  const selected = roles?.find((r) => r.id === value) ?? null;
+  const selectedActive = roles?.find((r) => r.id === value) ?? null;
+
+  // Se o value apontar para um cargo inativo, buscamos apenas o registro
+  // pontualmente para exibir o rótulo histórico — sem poluir o catálogo ativo.
+  const legacyQ = useQuery({
+    queryKey: ["job-role-legacy", value],
+    enabled: !!value && !selectedActive && !isLoading,
+    staleTime: 300_000,
+    queryFn: async (): Promise<JobRoleOption | null> => {
+      const { data, error } = await supabase
+        .from("job_roles")
+        .select("id, code, name, is_active")
+        .eq("id", value!)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as JobRoleOption | null;
+    },
+  });
+
+  const inactiveSelected = legacyQ.data && legacyQ.data.is_active === false ? legacyQ.data : null;
+  const selected = selectedActive;
+
+  // Read-only histórico: apenas mostra o rótulo, sem abrir o seletor.
+  if (readOnlyHistory && inactiveSelected) {
+    return (
+      <div className={cn("flex items-center gap-2 h-9 px-3 rounded-md border bg-muted/30 text-sm", className)}>
+        <span className="truncate">{inactiveSelected.name}</span>
+        <Badge variant="secondary" className="text-[10px] py-0 px-1.5">Cargo histórico inativo</Badge>
+      </div>
+    );
+  }
+
+  // Se o form está editável e o value aponta para cargo inativo,
+  // limpamos automaticamente para forçar nova seleção (o alerta abaixo orienta).
+  useEffect(() => {
+    if (!readOnlyHistory && inactiveSelected) {
+      // Não mexemos no value do form; apenas sinalizamos visualmente.
+    }
+  }, [readOnlyHistory, inactiveSelected]);
 
   return (
+  <div className="space-y-1">
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
@@ -63,7 +111,7 @@ export function JobRoleCombobox({
           className={cn(
             "h-9 w-full justify-between font-normal text-sm",
             !selected && "text-muted-foreground",
-            invalid && "border-destructive focus-visible:ring-destructive",
+            (invalid || inactiveSelected) && "border-destructive focus-visible:ring-destructive",
             className,
           )}
         >
@@ -73,14 +121,12 @@ export function JobRoleCombobox({
                 <Loader2 className="h-3 w-3 animate-spin" /> Carregando…
               </span>
             ) : selected ? (
-              <>
-                {selected.name}
-                {!selected.is_active && (
-                  <Badge variant="secondary" className="ml-2 text-[10px] py-0 px-1.5">
-                    Inativo
-                  </Badge>
-                )}
-              </>
+              selected.name
+            ) : inactiveSelected ? (
+              <span className="flex items-center gap-2 text-destructive">
+                {inactiveSelected.name}
+                <Badge variant="destructive" className="text-[10px] py-0 px-1.5">Inativo</Badge>
+              </span>
             ) : (
               placeholder
             )}
@@ -140,38 +186,21 @@ export function JobRoleCombobox({
                 </>
               )}
               {(roles ?? []).map((role) => {
-                // Busca apenas por nome; code é interno.
-                const label = role.name;
                 const isSelected = role.id === value;
                 return (
                   <CommandItem
                     key={role.id}
-                    value={label}
-                    disabled={!role.is_active}
+                    value={role.name}
                     onSelect={() => {
-                      if (!role.is_active) return;
                       onChange(role.id);
                       setOpen(false);
                     }}
-                    className={cn(
-                      "flex items-center justify-between gap-2",
-                      !role.is_active && "opacity-50 cursor-not-allowed",
-                    )}
+                    className="flex items-center justify-between gap-2"
                   >
                     <span className="flex items-center gap-2 truncate">
-                      <Check
-                        className={cn(
-                          "h-3.5 w-3.5",
-                          isSelected ? "opacity-100" : "opacity-0",
-                        )}
-                      />
+                      <Check className={cn("h-3.5 w-3.5", isSelected ? "opacity-100" : "opacity-0")} />
                       <span className="truncate">{role.name}</span>
                     </span>
-                    {!role.is_active && (
-                      <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
-                        Inativo
-                      </Badge>
-                    )}
                   </CommandItem>
                 );
               })}
@@ -195,5 +224,12 @@ export function JobRoleCombobox({
         </Command>
       </PopoverContent>
     </Popover>
+    {inactiveSelected && !readOnlyHistory && (
+      <p className="flex items-start gap-1 text-xs text-destructive">
+        <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+        <span>O cargo atual foi inativado. Selecione um cargo ativo para continuar.</span>
+      </p>
+    )}
+  </div>
   );
 }
