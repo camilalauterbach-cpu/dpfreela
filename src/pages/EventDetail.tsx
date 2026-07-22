@@ -14,15 +14,14 @@ import { useDeleteRecord } from "@/hooks/useDeleteRecord";
 
 const statusLabels: Record<string, string> = {
   planned: "Planejado",
-  active: "Ativo",
   confirmed: "Confirmado",
+  in_progress: "Em andamento",
   completed: "Concluído",
   cancelled: "Cancelado",
 };
 
 const statusVariant = (s: string) => {
-  if (s === "active") return "default" as const;
-  if (s === "confirmed") return "default" as const;
+  if (s === "confirmed" || s === "in_progress") return "default" as const;
   if (s === "completed") return "secondary" as const;
   if (s === "cancelled") return "destructive" as const;
   return "outline" as const;
