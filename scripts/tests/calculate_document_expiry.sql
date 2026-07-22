@@ -4,6 +4,21 @@
 
 BEGIN;
 
+-- Temporary helper: pass/fail recorder scoped to this transaction.
+CREATE OR REPLACE FUNCTION pg_temp.record_ok(
+  label text,
+  ok boolean,
+  detail text DEFAULT NULL
+) RETURNS boolean LANGUAGE plpgsql AS $$
+BEGIN
+  IF ok THEN
+    RAISE NOTICE 'PASS  %', label;
+  ELSE
+    RAISE WARNING 'FAIL  % — %', label, COALESCE(detail, '(no detail)');
+  END IF;
+  RETURN ok;
+END $$;
+
 DO $tests$
 DECLARE
   fn CONSTANT text := 'public.calculate_document_expiry';
@@ -12,20 +27,6 @@ DECLARE
   err_msg text;
   err_code text;
   got date;
-
-  -- ok(label, expected, got) — records pass/fail
-  -- raises(label, sqlstate_expected, body) — expects a raised error
-
-  PROCEDURE record_ok(label text, ok boolean, detail text DEFAULT NULL) AS $$
-  BEGIN
-    IF ok THEN
-      passed := passed + 1;
-      RAISE NOTICE 'PASS  %', label;
-    ELSE
-      failed := failed + 1;
-      RAISE WARNING 'FAIL  % — %', label, COALESCE(detail, '(no detail)');
-    END IF;
-  END $$ LANGUAGE plpgsql;
 BEGIN
   --------------------------------------------------------------------
   -- 1. NULL handling
