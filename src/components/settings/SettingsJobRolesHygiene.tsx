@@ -15,15 +15,19 @@ interface CatalogRow {
   created_at: string | null; created_by: string | null;
   origin: string; origin_evidence: Record<string, unknown> | null;
   employment_links_active: number; employment_links_historical: number;
-  lgw_role_active: number; lgw_role_historical: number;
-  lgw_function_active: number; lgw_function_historical: number;
-  employment_links_function_active: number; employment_links_function_historical: number;
+  employment_links_vigent: number; employment_links_status_active_and_vigent: number;
+  textual_unambiguous_active: number; textual_unambiguous_historical: number;
   active_usage_total: number; historical_usage_total: number;
   requirement_count: number;
 }
 interface DuplicateCluster {
   normalized_name: string; role_count: number;
   roles: Array<{ id: string; name: string; code: string | null; is_active: boolean; active_usage: number; historical_usage: number; requirement_count: number }>;
+}
+interface AmbiguousCluster {
+  normalized_name: string;
+  total_occurrences: number; active_occurrences: number; historical_occurrences: number;
+  candidate_job_roles: Array<{ id: string; name: string }>;
 }
 interface GhostRow {
   source: string; normalized: string; sample_text: string;
@@ -37,27 +41,36 @@ interface GhostRow {
 }
 interface ConflictRow { allocation_id: string; link_group_id: string | null; event_id: string | null; worker_id: string; job_role_text: string; job_function_text: string; is_active: boolean }
 interface NoUseRow { id: string; name: string; code: string | null; is_active: boolean; historical_usage_total: number; requirement_count: number }
-interface OriginRow { id: string; name: string; created_at: string | null; created_by: string | null; origin: string; origin_evidence: Record<string, unknown> | null }
-interface DivergentSample { allocation_id: string; employment_link_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; link_group_id: string | null; grupo: string | null; alloc_role_text: string | null; link_role_id: string | null; link_role_name: string | null; allocation_status: string | null; employment_link_status: string | null }
-interface OrphanSample { allocation_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; link_group_id: string | null; grupo: string | null; alloc_role_text: string | null }
-interface AmbiguousSample { allocation_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; candidate_count: number; candidates: CandidateRef[]; allocation_status: string | null }
-interface MultiAllocSample { employment_link_id: string; worker_id: string | null; event_id: string | null; link_role_name: string | null; active_alloc_count: number; distinct_active_roles: number; allocations: Array<{ allocation_id: string; alloc_role_text: string | null; link_group_id: string | null; active: boolean }> }
+interface OriginRow { id: string; name: string; created_at: string | null; created_by: string | null; first_insert_at: string | null; first_insert_by: string | null; origin: string; origin_evidence: Record<string, unknown> | null }
+interface OperationalFlags { alloc_vigent?: boolean; group_status?: string | null; group_vigent?: boolean; event_status?: string | null; event_vigent?: boolean }
+interface DivergentSample extends OperationalFlags { allocation_id: string; employment_link_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; link_group_id: string | null; grupo: string | null; alloc_role_text: string | null; link_role_id: string | null; link_role_name: string | null; allocation_status: string | null; employment_link_status: string | null }
+interface OrphanSample extends OperationalFlags { allocation_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; link_group_id: string | null; grupo: string | null; alloc_role_text: string | null }
+interface AmbiguousSample { allocation_id: string; worker_id: string; trabalhador: string | null; event_id: string | null; evento: string | null; link_group_id: string | null; grupo: string | null; candidate_count: number; candidates: CandidateRef[]; allocation_status: string | null; alloc_vigent?: boolean }
+interface MultiAllocSample { employment_link_id: string; worker_id: string | null; event_id: string | null; evento: string | null; link_role_name: string | null; active_alloc_count: number; distinct_active_roles: number; allocations: Array<{ allocation_id: string; alloc_role_text: string | null; link_group_id: string | null; group_name: string | null; active: boolean }> }
+interface StatusDistEntry { total: number; not_deleted: number }
+interface PairBucket { pairs_with_0: number; pairs_with_1: number; pairs_with_gt1: number }
 
 interface HygieneReport {
   generated_at: string;
   strategy: {
     match_key: string;
-    current_link_criteria: string;
+    current_link_criteria_used_for_classification: string;
+    alternative_current_link_criteria: Record<string, string>;
     active_allocation_criteria: string;
     cardinality_rule: string;
     role_comparison_rule: string;
+    operational_context_flags_available: string;
     unique_worker_event_index_present: boolean;
     similarity_threshold: number;
     safe_suggestion_rule: string;
+    origin_rule: string;
+    textual_usage_rule: string;
+    today: string;
   };
   summary: {
     catalog_size: number; catalog_active: number; catalog_inactive: number; catalog_with_zero_active_use: number;
-    duplicate_clusters: number; ghost_texts: number; ghost_occurrences_total: number;
+    duplicate_clusters: number; ambiguous_textual_clusters: number;
+    ghost_texts: number; ghost_occurrences_total: number;
     allocation_conflicts_total: number; allocation_conflicts_active: number; allocation_conflicts_historical: number;
     total_allocations_distinct: number; active_allocations: number; historical_allocations: number;
     unique_matches_total: number; unique_matches_active: number; unique_matches_historical: number;
@@ -73,9 +86,22 @@ interface HygieneReport {
     links_with_multiple_active_allocations: number;
     links_with_distinct_allocation_roles: number;
     links_with_distinct_active_allocation_roles: number;
+    employment_links_by_status: Record<string, StatusDistEntry>;
+    employment_links_not_deleted_total: number;
+    employment_links_vigent_total: number;
+    employment_links_status_active_total: number;
+    employment_links_status_active_and_vigent_total: number;
+    worker_event_candidate_distribution: {
+      not_deleted: PairBucket; vigent: PairBucket;
+      status_active: PairBucket; status_active_and_vigent: PairBucket;
+    };
+    input_allocation_rows: number;
+    classified_allocation_rows: number;
+    cardinality_ok: boolean;
   };
   catalog: CatalogRow[];
   duplicates: DuplicateCluster[];
+  ambiguous_textual_clusters: AmbiguousCluster[];
   ghost_texts: GhostRow[];
   allocation_conflicts: ConflictRow[];
   no_active_use: NoUseRow[];
@@ -89,9 +115,9 @@ interface HygieneReport {
 }
 
 // CSV injection hardening: neutralize cells that begin with =, +, -, @, \t or \r
-// after stripping leading whitespace. Prefix with an apostrophe per OWASP.
+// after stripping ONLY leading SPACE characters (preserve and detect tab/CR).
 function neutralizeCsvCell(raw: string): string {
-  const trimmedStart = raw.replace(/^\s+/, "");
+  const trimmedStart = raw.replace(/^ +/, "");
   if (/^[=+\-@\t\r]/.test(trimmedStart)) return "'" + raw;
   return raw;
 }
