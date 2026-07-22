@@ -1,5 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, UserCircle, Building2, Palette, FileText, ShieldCheck, Users2, Mail, Briefcase, FileCog } from "lucide-react";
+import { Users, UserCircle, Building2, Palette, FileText, ShieldCheck, Users2, Mail, Briefcase, FileCog, HardHat } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { SettingsUsers } from "@/components/settings/SettingsUsers";
@@ -12,6 +12,7 @@ import { SettingsDuplicates } from "@/components/settings/SettingsDuplicates";
 import { SettingsInvites } from "@/components/settings/SettingsInvites";
 import { SettingsJobRoles } from "@/components/settings/SettingsJobRoles";
 import { SettingsDocumentTypes } from "@/components/settings/SettingsDocumentTypes";
+import { SettingsSstReadiness } from "@/components/settings/SettingsSstReadiness";
 
 export default function SettingsPage() {
   const { hasAnyRole, hasRole } = useAuth();
@@ -21,7 +22,7 @@ export default function SettingsPage() {
   const canEditGlobal = hasAnyRole(["admin", "manager"]);
   const isManager = hasAnyRole(["admin", "manager"]);
   const adminOnlyTabs = ["users", "audit", "duplicates"];
-  const managerTabs = ["invites", "job-roles", "document-types"];
+  const managerTabs = ["invites", "job-roles", "document-types", "sst"];
   const defaultTab =
     tab && (
       (isAdmin || !adminOnlyTabs.includes(tab)) &&
@@ -66,6 +67,12 @@ export default function SettingsPage() {
             <TabsTrigger value="document-types" className="gap-1.5 text-xs sm:text-sm">
               <FileCog className="h-4 w-4" />
               <span className="hidden sm:inline">Tipos de Documento</span>
+            </TabsTrigger>
+          )}
+          {isManager && (
+            <TabsTrigger value="sst" className="gap-1.5 text-xs sm:text-sm">
+              <HardHat className="h-4 w-4" />
+              <span className="hidden sm:inline">SST</span>
             </TabsTrigger>
           )}
           <TabsTrigger value="preferences" className="gap-1.5 text-xs sm:text-sm">
@@ -138,6 +145,11 @@ export default function SettingsPage() {
         {isManager && (
           <TabsContent value="document-types">
             <SettingsDocumentTypes readOnly={!isAdmin} />
+          </TabsContent>
+        )}
+        {isManager && (
+          <TabsContent value="sst">
+            <SettingsSstReadiness />
           </TabsContent>
         )}
       </Tabs>
