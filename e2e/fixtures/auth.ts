@@ -1,5 +1,7 @@
 import { test as base, expect, type Page } from "@playwright/test";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * Authenticated fixture for DPfreela E2E.
  *
