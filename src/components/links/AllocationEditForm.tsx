@@ -59,6 +59,7 @@ export function AllocationEditForm({ allocation, groupId, onSaved }: Props) {
     const payload: Record<string, any> = {
       id: allocation.id,
       link_group_id: groupId,
+      worker_id: allocation.worker_id,
       job_role_id: form.job_role_id,
       job_function: form.job_function || null,
       department: form.department || null,

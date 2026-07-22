@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateComplianceCaches } from "@/lib/compliance-cache";
 
 // ── Queries ──
 
@@ -208,6 +209,14 @@ export function useAllocateWorker() {
       queryClient.invalidateQueries({ queryKey: ["link-group", vars.link_group_id] });
       queryClient.invalidateQueries({ queryKey: ["worker-group-allocations", vars.worker_id] });
       INVALIDATE_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
+      // Q-020 hotfix: força reavaliação SST imediatamente após alocar,
+      // para que o Controle SST reconheça o vínculo formal correspondente.
+      if (vars.worker_id) {
+        invalidateComplianceCaches(queryClient, {
+          workerId: vars.worker_id,
+          eventSource: "manual",
+        });
+      }
     },
   });
 }
@@ -215,7 +224,7 @@ export function useAllocateWorker() {
 export function useUpdateGroupWorker() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, link_group_id, ...values }: { id: string; link_group_id: string } & Record<string, any>) => {
+    mutationFn: async ({ id, link_group_id, worker_id: _wid, ...values }: { id: string; link_group_id: string; worker_id?: string } & Record<string, any>) => {
       const { error } = await supabase
         .from("link_group_workers")
         .update(values as any)
@@ -227,6 +236,13 @@ export function useUpdateGroupWorker() {
       queryClient.invalidateQueries({ queryKey: ["link-group", vars.link_group_id] });
       queryClient.invalidateQueries({ queryKey: ["worker-group-allocations"] });
       INVALIDATE_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
+      // Q-020 hotfix: força reavaliação SST imediatamente após editar a alocação.
+      if (vars.worker_id) {
+        invalidateComplianceCaches(queryClient, {
+          workerId: vars.worker_id,
+          eventSource: "manual",
+        });
+      }
     },
   });
 }
