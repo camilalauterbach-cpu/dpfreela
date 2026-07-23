@@ -754,6 +754,56 @@ export type Database = {
           },
         ]
       }
+      global_document_requirements: {
+        Row: {
+          allow_waive: boolean
+          applies_to_active_context: boolean
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          document_type_id: string
+          id: string
+          is_active: boolean
+          is_mandatory: boolean
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          allow_waive?: boolean
+          applies_to_active_context?: boolean
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          document_type_id: string
+          id?: string
+          is_active?: boolean
+          is_mandatory?: boolean
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          allow_waive?: boolean
+          applies_to_active_context?: boolean
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          document_type_id?: string
+          id?: string
+          is_active?: boolean
+          is_mandatory?: boolean
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "global_document_requirements_document_type_id_fkey"
+            columns: ["document_type_id"]
+            isOneToOne: false
+            referencedRelation: "document_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invite_attempts: {
         Row: {
           attempted_at: string
@@ -2755,6 +2805,28 @@ export type Database = {
       resolve_worker_merge_chain: {
         Args: { _worker_id: string }
         Returns: string
+      }
+      resolve_worker_operational_contexts: {
+        Args: {
+          p_event_id?: string
+          p_link_group_id?: string
+          p_only_active?: boolean
+          p_worker_ids?: string[]
+        }
+        Returns: {
+          context_source: string
+          context_status: string
+          employment_link_id: string
+          end_date: string
+          event_id: string
+          event_name: string
+          hire_date: string
+          job_role_id: string
+          job_role_name: string
+          link_group_id: string
+          link_group_worker_id: string
+          worker_id: string
+        }[]
       }
       restore_worker: { Args: { _worker_id: string }; Returns: Json }
       restore_worker_preview: { Args: { _worker_id: string }; Returns: Json }
