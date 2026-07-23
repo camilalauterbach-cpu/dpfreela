@@ -1003,6 +1003,7 @@ export type Database = {
           code: string
           created_at: string
           created_by: string | null
+          deleted_at: string | null
           description: string | null
           id: string
           is_active: boolean
@@ -1013,6 +1014,7 @@ export type Database = {
           code: string
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
@@ -1023,6 +1025,7 @@ export type Database = {
           code?: string
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
