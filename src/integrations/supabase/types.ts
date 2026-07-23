@@ -2539,6 +2539,19 @@ export type Database = {
       }
     }
     Functions: {
+      _q020_apply_allocation_values: {
+        Args: { p_id: string; p_values: Json }
+        Returns: undefined
+      }
+      allocate_worker_to_group: {
+        Args: {
+          p_job_role_id: string
+          p_link_group_id: string
+          p_values?: Json
+          p_worker_id: string
+        }
+        Returns: Json
+      }
       assert_job_roles_hygiene_snapshot: {
         Args: { p_max_age?: string; p_snapshot_id: string }
         Returns: Json
@@ -2613,6 +2626,18 @@ export type Database = {
       f_job_roles_hygiene_data_fingerprint: { Args: never; Returns: string }
       f_normalize_job_role: { Args: { p_text: string }; Returns: string }
       f_normalize_nr_code: { Args: { _raw: string }; Returns: string }
+      f_resolve_or_create_allocation_employment_link: {
+        Args: {
+          p_company_id: string
+          p_end_date: string
+          p_event_id: string
+          p_hire_date: string
+          p_initial_status: string
+          p_job_role_id: string
+          p_worker_id: string
+        }
+        Returns: string
+      }
       f_slugify_job_role: { Args: { p_text: string }; Returns: string }
       get_audit_user_emails: {
         Args: { _user_ids: string[] }
@@ -2767,6 +2792,10 @@ export type Database = {
         Returns: Json
       }
       unaccent: { Args: { "": string }; Returns: string }
+      update_group_worker_allocation: {
+        Args: { p_allocation_id: string; p_values?: Json }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "operator" | "viewer"
