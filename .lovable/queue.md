@@ -6,9 +6,12 @@
 - Q-020.C — Joins, IDs, tratamento de erro e remoção da heurística de vínculo.
 
 ## BLOCKED
+- Q-021.1..4 — Schema/UI/Integração do Controle SST por escopo/lote (aguardam relatório Q-021.0).
 - Q-020.D — Backfill global e promoção estrutural (NOT NULL).
-- Q-021 — Controle SST por escopo/lote (evento/grupo/manual, membros efetivos, arquivamento).
-- Q-022 — Precedência canônica de requisitos (cargo + evento + overrides add/waive, atribuição por origem).
+- Q-022 — Precedência canônica de requisitos (cargo + evento + overrides add/waive).
+
+## VALIDATING
+- Q-021.0 — Diagnóstico read-only e contrato do Controle SST por escopo/lote.
 
 ## PAUSED
 - Q-014.1-CLOSEOUT — Pausada pelo P0 (Q-020). Não desfazer.
