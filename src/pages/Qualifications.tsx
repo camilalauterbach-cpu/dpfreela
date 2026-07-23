@@ -232,6 +232,9 @@ export default function Qualifications() {
             <ToggleGroupItem value="ok" className="data-[state=on]:bg-emerald-500/15 data-[state=on]:text-emerald-700">
               Válidos
             </ToggleGroupItem>
+            <ToggleGroupItem value="context_unresolved" className="data-[state=on]:bg-amber-400/15 data-[state=on]:text-amber-700">
+              Contexto pendente {stateCounts.context_unresolved > 0 && <Badge variant="secondary" className="ml-1">{stateCounts.context_unresolved}</Badge>}
+            </ToggleGroupItem>
           </ToggleGroup>
 
           <Popover>
@@ -279,9 +282,9 @@ export default function Qualifications() {
           </Popover>
 
           <div className="flex items-center gap-2 ml-auto">
-            <Switch id="relevant" checked={onlyRelevant} onCheckedChange={setOnlyRelevant} />
-            <Label htmlFor="relevant" className="text-sm cursor-pointer">
-              Apenas com vínculo ativo
+            <Switch id="active-ctx" checked={onlyActiveContexts} onCheckedChange={setOnlyActiveContexts} />
+            <Label htmlFor="active-ctx" className="text-sm cursor-pointer">
+              Apenas trabalhadores com vínculo operacional ativo
             </Label>
           </div>
         </div>
@@ -290,10 +293,25 @@ export default function Qualifications() {
           <span className="inline-flex items-center gap-1"><StatusIcon status="ok" size={14} /> Válido</span>
           <span className="inline-flex items-center gap-1"><StatusIcon status="warning" size={14} /> Vence em ≤ {data?.warning_days ?? 30}d</span>
           <span className="inline-flex items-center gap-1"><StatusIcon status="expired" size={14} /> Vencido</span>
-          <span className="inline-flex items-center gap-1"><StatusIcon status="missing" size={14} /> Ausente (exigido pelo cargo)</span>
+          <span className="inline-flex items-center gap-1"><StatusIcon status="missing" size={14} /> Ausente (exigido)</span>
+          <span className="inline-flex items-center gap-1"><StatusIcon status="context_unresolved" size={14} /> Contexto pendente</span>
           <span className="inline-flex items-center gap-1"><StatusIcon status="not_applicable" size={14} /> Não aplicável</span>
         </div>
       </div>
+
+      {totalCtxUnresolved > 0 && (
+        <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-3 flex items-start gap-2 text-sm">
+          <AlertOctagon className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+          <div className="space-y-0.5">
+            <p className="font-medium text-amber-800 dark:text-amber-300">
+              {totalCtxUnresolved} exigência{totalCtxUnresolved === 1 ? "" : "s"} com contexto pendente
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Existem trabalhadores com cargo/vínculo legado ainda não reconciliado. As exigências dessas pessoas <b>não podem ser classificadas como não aplicáveis</b> — reconcilie o cargo em Configurações → Higiene de cargos ou promova o vínculo formal.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Matrix */}
       <div className="rounded-lg border bg-card overflow-hidden">
