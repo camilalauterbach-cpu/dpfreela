@@ -426,6 +426,46 @@ export default function Qualifications() {
                   <span className="text-muted-foreground">Estado:</span>{" "}
                   <span className="font-medium">{STATUS_META[detail.cell.status].label}</span>
                 </div>
+                <div>
+                  <span className="text-muted-foreground">Exigido:</span>{" "}
+                  <span className="font-medium">
+                    {detail.cell.is_required ? "Sim" : detail.cell.status === "context_unresolved" ? "Contexto pendente" : "Não neste contexto"}
+                  </span>
+                </div>
+                {detail.cell.required_by_sources && detail.cell.required_by_sources.length > 0 && (
+                  <div>
+                    <span className="text-muted-foreground">Origem da exigência:</span>
+                    <ul className="mt-1 space-y-0.5 text-xs">
+                      {detail.cell.required_by_sources.map((s) => (
+                        <li key={s} className="font-mono text-muted-foreground">
+                          {s.startsWith("global") ? "Global (obrigatório para todo vínculo ativo)"
+                           : s.startsWith("job_role:") ? "Cargo"
+                           : s.startsWith("event:") ? "Evento"
+                           : s.startsWith("link_override_add:") ? "Override do vínculo (adicionado)"
+                           : s}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {detail.row.contexts && detail.row.contexts.length > 0 && (
+                  <div>
+                    <span className="text-muted-foreground">Contextos do trabalhador:</span>
+                    <ul className="mt-1 space-y-1 text-xs">
+                      {detail.row.contexts.map((c, i) => (
+                        <li key={i} className="rounded border bg-muted/30 px-2 py-1">
+                          <div className="font-medium">{c.event_name ?? "—"}</div>
+                          <div className="text-muted-foreground">
+                            {c.job_role_name ?? "Cargo não reconciliado"}
+                            {c.context_status === "unresolved" && (
+                              <Badge variant="outline" className="ml-1 border-amber-400 text-amber-700">pendente</Badge>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {detail.cell.issue_date && (
                   <div>
                     <span className="text-muted-foreground">Emissão:</span>{" "}
@@ -444,9 +484,14 @@ export default function Qualifications() {
                     <span>{detail.cell.issuer}</span>
                   </div>
                 )}
-                {!detail.cell.is_relevant && detail.cell.status === "not_applicable" && (
+                {detail.cell.status === "not_applicable" && (
                   <p className="text-xs text-muted-foreground mt-2">
-                    Este documento não é exigido pelo cargo/vínculo atual do trabalhador.
+                    O contexto foi resolvido e este documento não é exigido pelo cargo/vínculo atual.
+                  </p>
+                )}
+                {detail.cell.status === "context_unresolved" && (
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-2">
+                    Não foi possível determinar o cargo desta alocação legada. Reconcilie o vínculo antes de classificar a exigência.
                   </p>
                 )}
                 <div className="pt-3 border-t flex flex-wrap gap-2">
