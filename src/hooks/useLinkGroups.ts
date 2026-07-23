@@ -81,7 +81,7 @@ export function useLinkGroupWorkers(groupId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("link_group_workers")
-        .select("*, workers(full_name, nickname, cpf, phone_main)")
+        .select("*, workers(full_name, nickname, cpf, phone_main), job_roles:job_role_id(id, name, code, is_active)")
         .eq("link_group_id", groupId!)
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
@@ -105,7 +105,7 @@ export function useWorkerGroupAllocations(workerId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("link_group_workers")
-        .select("id, worker_id, link_group_id, job_role, status, hire_date, link_groups(group_name, events(name))")
+        .select("id, worker_id, link_group_id, job_role, job_role_id, employment_link_id, status, hire_date, link_groups(group_name, events(name)), job_roles:job_role_id(id, name, code, is_active)")
         .eq("worker_id", workerId!)
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
@@ -196,11 +196,13 @@ export function useAllocateWorker() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (values: Record<string, any>) => {
-      const { data, error } = await supabase
-        .from("link_group_workers")
-        .insert(values as any)
-        .select("id")
-        .single();
+      const { link_group_id, worker_id, job_role_id, ...rest } = values;
+      const { data, error } = await (supabase.rpc as any)("allocate_worker_to_group", {
+        p_link_group_id: link_group_id,
+        p_worker_id: worker_id,
+        p_job_role_id: job_role_id,
+        p_values: rest,
+      });
       if (error) throw error;
       return data;
     },
@@ -208,6 +210,13 @@ export function useAllocateWorker() {
       queryClient.invalidateQueries({ queryKey: ["link-group-workers", vars.link_group_id] });
       queryClient.invalidateQueries({ queryKey: ["link-group", vars.link_group_id] });
       queryClient.invalidateQueries({ queryKey: ["worker-group-allocations", vars.worker_id] });
+      queryClient.invalidateQueries({ queryKey: ["employment-links"] });
+      queryClient.invalidateQueries({ queryKey: ["employment-links-worker", vars.worker_id] });
+      queryClient.invalidateQueries({ queryKey: ["employment-link-for", vars.worker_id] });
+      queryClient.invalidateQueries({ queryKey: ["sst-qualifications"] });
+      queryClient.invalidateQueries({ queryKey: ["sst-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["sst-alert-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["sst-pendencies"] });
       INVALIDATE_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
       // Q-020 hotfix: força reavaliação SST imediatamente após alocar,
       // para que o Controle SST reconheça o vínculo formal correspondente.
@@ -224,17 +233,25 @@ export function useAllocateWorker() {
 export function useUpdateGroupWorker() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, link_group_id, worker_id: _wid, ...values }: { id: string; link_group_id: string; worker_id?: string } & Record<string, any>) => {
-      const { error } = await supabase
-        .from("link_group_workers")
-        .update(values as any)
-        .eq("id", id);
+    mutationFn: async ({ id, link_group_id: _lgid, worker_id: _wid, ...values }: { id: string; link_group_id: string; worker_id?: string } & Record<string, any>) => {
+      const { data, error } = await (supabase.rpc as any)("update_group_worker_allocation", {
+        p_allocation_id: id,
+        p_values: values,
+      });
       if (error) throw error;
+      return data;
     },
     onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: ["link-group-workers", vars.link_group_id] });
       queryClient.invalidateQueries({ queryKey: ["link-group", vars.link_group_id] });
       queryClient.invalidateQueries({ queryKey: ["worker-group-allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["employment-links"] });
+      queryClient.invalidateQueries({ queryKey: ["employment-links-worker", vars.worker_id] });
+      queryClient.invalidateQueries({ queryKey: ["employment-link-for", vars.worker_id] });
+      queryClient.invalidateQueries({ queryKey: ["sst-qualifications"] });
+      queryClient.invalidateQueries({ queryKey: ["sst-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["sst-alert-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["sst-pendencies"] });
       INVALIDATE_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
       // Q-020 hotfix: força reavaliação SST imediatamente após editar a alocação.
       if (vars.worker_id) {
@@ -254,7 +271,7 @@ export function useLinkGroupWorker(groupId: string | undefined, workerId: string
     queryFn: async () => {
       const { data, error } = await supabase
         .from("link_group_workers")
-        .select("*, workers(full_name, nickname, cpf, phone_main)")
+        .select("*, workers(full_name, nickname, cpf, phone_main), job_roles:job_role_id(id, name, code, is_active)")
         .eq("link_group_id", groupId!)
         .eq("worker_id", workerId!)
         .is("deleted_at", null)

@@ -1,39 +1,18 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useLinkGroup, useLinkGroupWorker } from "@/hooks/useLinkGroups";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, Pencil } from "lucide-react";
+import { ArrowLeft, Loader2, Pencil, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { LinkDocumentsTab } from "@/components/links/LinkDocumentsTab";
 import { AllocationEditForm } from "@/components/links/AllocationEditForm";
 import { LinkComplianceCard } from "@/components/compliance/LinkComplianceCard";
 import { ComplianceTimeline } from "@/components/compliance/ComplianceTimeline";
-
-function useEmploymentLinkId(workerId?: string, eventId?: string | null) {
-  return useQuery({
-    queryKey: ["employment-link-for", workerId, eventId],
-    enabled: !!workerId && !!eventId,
-    staleTime: 60_000,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("employment_links")
-        .select("id")
-        .eq("worker_id", workerId!)
-        .eq("event_id", eventId!)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      return data?.id ?? null;
-    },
-  });
-}
 
 const statusLabels: Record<string, string> = {
   draft: "Rascunho", active: "Ativo", suspended: "Suspenso",
@@ -91,9 +70,6 @@ export default function LinkWorkerDetail() {
   const { data: group, isLoading: loadingGroup } = useLinkGroup(groupId);
   const { data: allocation, isLoading: loadingAlloc } = useLinkGroupWorker(groupId, workerId);
   const [editing, setEditing] = useState(false);
-  // IMPORTANT: hooks must run before any early return to preserve hook order.
-  const eventId = (group as any)?.event_id ?? null;
-  const { data: employmentLinkId } = useEmploymentLinkId(workerId, eventId);
 
   if (loadingGroup || loadingAlloc) {
     return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -105,6 +81,7 @@ export default function LinkWorkerDetail() {
 
   const g = group as any;
   const a = allocation as any;
+  const employmentLinkId: string | null = a.employment_link_id ?? null;
   const worker = a.workers;
   const eventName = g.events?.name || "—";
 
@@ -246,22 +223,43 @@ export default function LinkWorkerDetail() {
         </TabsContent>
 
         <TabsContent value="conformidade" className="mt-4">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <LinkComplianceCard linkId={employmentLinkId} />
-            <ComplianceTimeline linkId={employmentLinkId} />
-          </div>
+          {employmentLinkId ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <LinkComplianceCard linkId={employmentLinkId} />
+              <ComplianceTimeline linkId={employmentLinkId} />
+            </div>
+          ) : (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Alocação sem vínculo formal</AlertTitle>
+              <AlertDescription>
+                Esta alocação legada ainda não está associada a um vínculo formal (employment_link).
+                A conformidade e os documentos contextuais permanecem indisponíveis até que um administrador execute o reparo.
+              </AlertDescription>
+            </Alert>
+          )}
         </TabsContent>
 
         <TabsContent value="documentos" className="mt-4">
-          <LinkDocumentsTab
-            workerId={workerId!}
-            employmentLinkId=""
-            linkGroupWorkerId={a.id}
-            event={g.events}
-            workerName={worker?.full_name || ""}
-            workerCpf={worker?.cpf}
-            requiredDocuments={g.required_documents}
-          />
+          {employmentLinkId ? (
+            <LinkDocumentsTab
+              workerId={workerId!}
+              employmentLinkId={employmentLinkId}
+              linkGroupWorkerId={a.id}
+              event={g.events}
+              workerName={worker?.full_name || ""}
+              workerCpf={worker?.cpf}
+              requiredDocuments={g.required_documents}
+            />
+          ) : (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Documentos indisponíveis</AlertTitle>
+              <AlertDescription>
+                Esta alocação ainda não está associada a um vínculo formal. Reparar antes de gerenciar documentos contextuais.
+              </AlertDescription>
+            </Alert>
+          )}
         </TabsContent>
       </Tabs>
     </div>

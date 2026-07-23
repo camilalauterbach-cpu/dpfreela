@@ -85,7 +85,7 @@ function useActiveAllocationsForWorkers(workerIds: string[]) {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("link_group_workers")
-        .select("worker_id, link_groups!inner(group_name, events(name), job_roles(name))")
+        .select("worker_id, job_role_id, employment_link_id, job_roles:job_role_id(id, name, is_active), link_groups!inner(group_name, events(name))")
         .in("worker_id", key)
         .is("deleted_at", null);
       if (error) throw error;
@@ -93,7 +93,7 @@ function useActiveAllocationsForWorkers(workerIds: string[]) {
       for (const row of (data || []) as any[]) {
         const info: AllocationInfo = {
           event_name: row.link_groups?.events?.name ?? row.link_groups?.group_name ?? null,
-          job_role_name: row.link_groups?.job_roles?.name ?? null,
+          job_role_name: row.job_roles?.name ?? null,
         };
         const arr = byWorker.get(row.worker_id) || [];
         // dedupe by event+role
