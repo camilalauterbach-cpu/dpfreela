@@ -2728,17 +2728,33 @@ export type Database = {
         Returns: Json
       }
       list_worker_duplicate_candidates: { Args: never; Returns: Json }
-      list_worker_qualifications: {
-        Args: {
-          p_document_type_ids?: string[]
-          p_limit?: number
-          p_offset?: number
-          p_only_relevant?: boolean
-          p_search?: string
-          p_state?: string
-        }
-        Returns: Json
-      }
+      list_worker_qualifications:
+        | {
+            Args: {
+              p_document_type_ids?: string[]
+              p_limit?: number
+              p_offset?: number
+              p_only_relevant?: boolean
+              p_search?: string
+              p_state?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_document_type_ids?: string[]
+              p_event_id?: string
+              p_job_role_id?: string
+              p_limit?: number
+              p_link_group_id?: string
+              p_offset?: number
+              p_only_active_contexts?: boolean
+              p_only_relevant?: boolean
+              p_search?: string
+              p_state?: string
+            }
+            Returns: Json
+          }
       log_compliance_evaluation: {
         Args: {
           p_current_overall: string
@@ -2801,6 +2817,35 @@ export type Database = {
           p_scope: Database["public"]["Enums"]["document_storage_scope"]
         }
         Returns: Json
+      }
+      resolve_effective_document_requirements: {
+        Args: {
+          p_event_id?: string
+          p_link_group_id?: string
+          p_only_active?: boolean
+          p_worker_ids?: string[]
+        }
+        Returns: {
+          allow_waive: boolean
+          category: string
+          code: string
+          context_source: string
+          context_status: string
+          document_type_id: string
+          employment_link_id: string
+          event_id: string
+          event_name: string
+          is_mandatory: boolean
+          job_role_id: string
+          job_role_name: string
+          link_group_id: string
+          link_group_worker_id: string
+          name: string
+          required_by_sources: string[]
+          requirement_resolution_status: string
+          waived_by_sources: string[]
+          worker_id: string
+        }[]
       }
       resolve_worker_merge_chain: {
         Args: { _worker_id: string }
