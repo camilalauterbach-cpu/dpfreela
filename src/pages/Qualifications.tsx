@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, AlertTriangle, XCircle, Circle, MinusCircle, Loader2, Search, Filter, ExternalLink, Download } from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, Circle, MinusCircle, Loader2, Search, Filter, ExternalLink, Download, HelpCircle, AlertOctagon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,7 @@ const STATUS_META: Record<QualStatus, { label: string; tone: string; icon: any }
   expired: { label: "Vencido", tone: "bg-red-500/15 text-red-700 dark:text-red-400 ring-1 ring-red-500/30", icon: XCircle },
   missing: { label: "Ausente", tone: "bg-slate-500/15 text-slate-700 dark:text-slate-300 ring-1 ring-slate-500/30", icon: Circle },
   not_applicable: { label: "Não aplicável", tone: "text-muted-foreground/40", icon: MinusCircle },
+  context_unresolved: { label: "Contexto pendente", tone: "bg-amber-400/15 text-amber-700 dark:text-amber-400 ring-1 ring-amber-400/40", icon: HelpCircle },
 };
 
 const STORAGE_KEY = "dpfreela.qualifications.columns.v1";
@@ -76,7 +77,7 @@ function StatusIcon({ status, size = 18 }: { status: QualStatus; size?: number }
 export default function Qualifications() {
   const [search, setSearch] = useState("");
   const [state, setState] = useState<QualStatus | null>(null);
-  const [onlyRelevant, setOnlyRelevant] = useState(true);
+  const [onlyActiveContexts, setOnlyActiveContexts] = useState(true);
   const [selectedColumnIds, setSelectedColumnIds] = useState<string[]>([]);
   const [selectionReady, setSelectionReady] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -112,7 +113,7 @@ export default function Qualifications() {
     state,
     // Passa exatamente a seleção do usuário (array vazio desabilita a consulta).
     documentTypeIds: selectionReady ? selectedColumnIds : null,
-    onlyRelevant,
+    onlyActiveContexts,
   });
 
   const columns = data?.columns ?? [];
@@ -138,15 +139,19 @@ export default function Qualifications() {
   const clearAll = () => setSelectedColumnIds([]);
 
   const stateCounts = useMemo(() => {
-    const acc = { expired: 0, warning: 0, missing: 0, ok: 0 };
+    const acc = { expired: 0, warning: 0, missing: 0, ok: 0, context_unresolved: 0 };
     items.forEach((r) => {
       acc.expired += r.counters.expired;
       acc.warning += r.counters.warning;
       acc.missing += r.counters.missing;
       acc.ok += r.counters.ok;
+      acc.context_unresolved += r.counters.context_unresolved ?? 0;
     });
     return acc;
   }, [items]);
+
+  const totals = data?.totals;
+  const totalCtxUnresolved = totals?.total_context_unresolved ?? 0;
 
   async function runExport(kind: "csv" | "xlsx") {
     if (selectedColumnIds.length === 0) {
@@ -158,7 +163,7 @@ export default function Qualifications() {
       const matrix = await fetchAllQualificationRows({
         search,
         state,
-        onlyRelevant,
+        onlyRelevant: onlyActiveContexts,
         documentTypeIds: selectedColumnIds,
       });
       if (kind === "csv") await exportQualificationsCsv(matrix);
