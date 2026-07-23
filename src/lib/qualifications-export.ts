@@ -11,6 +11,7 @@ const STATUS_PT: Record<QualStatus, string> = {
   expired: "Vencido",
   missing: "Ausente",
   not_applicable: "Não aplicável",
+  context_unresolved: "Contexto pendente",
 };
 
 export interface QualExportParams {

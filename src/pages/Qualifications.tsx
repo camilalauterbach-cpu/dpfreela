@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, AlertTriangle, XCircle, Circle, MinusCircle, Loader2, Search, Filter, ExternalLink, Download } from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, Circle, MinusCircle, Loader2, Search, Filter, ExternalLink, Download, HelpCircle, AlertOctagon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,7 @@ const STATUS_META: Record<QualStatus, { label: string; tone: string; icon: any }
   expired: { label: "Vencido", tone: "bg-red-500/15 text-red-700 dark:text-red-400 ring-1 ring-red-500/30", icon: XCircle },
   missing: { label: "Ausente", tone: "bg-slate-500/15 text-slate-700 dark:text-slate-300 ring-1 ring-slate-500/30", icon: Circle },
   not_applicable: { label: "Não aplicável", tone: "text-muted-foreground/40", icon: MinusCircle },
+  context_unresolved: { label: "Contexto pendente", tone: "bg-amber-400/15 text-amber-700 dark:text-amber-400 ring-1 ring-amber-400/40", icon: HelpCircle },
 };
 
 const STORAGE_KEY = "dpfreela.qualifications.columns.v1";
@@ -76,7 +77,7 @@ function StatusIcon({ status, size = 18 }: { status: QualStatus; size?: number }
 export default function Qualifications() {
   const [search, setSearch] = useState("");
   const [state, setState] = useState<QualStatus | null>(null);
-  const [onlyRelevant, setOnlyRelevant] = useState(true);
+  const [onlyActiveContexts, setOnlyActiveContexts] = useState(true);
   const [selectedColumnIds, setSelectedColumnIds] = useState<string[]>([]);
   const [selectionReady, setSelectionReady] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -112,7 +113,7 @@ export default function Qualifications() {
     state,
     // Passa exatamente a seleção do usuário (array vazio desabilita a consulta).
     documentTypeIds: selectionReady ? selectedColumnIds : null,
-    onlyRelevant,
+    onlyActiveContexts,
   });
 
   const columns = data?.columns ?? [];
@@ -138,15 +139,19 @@ export default function Qualifications() {
   const clearAll = () => setSelectedColumnIds([]);
 
   const stateCounts = useMemo(() => {
-    const acc = { expired: 0, warning: 0, missing: 0, ok: 0 };
+    const acc = { expired: 0, warning: 0, missing: 0, ok: 0, context_unresolved: 0 };
     items.forEach((r) => {
       acc.expired += r.counters.expired;
       acc.warning += r.counters.warning;
       acc.missing += r.counters.missing;
       acc.ok += r.counters.ok;
+      acc.context_unresolved += r.counters.context_unresolved ?? 0;
     });
     return acc;
   }, [items]);
+
+  const totals = data?.totals;
+  const totalCtxUnresolved = totals?.total_context_unresolved ?? 0;
 
   async function runExport(kind: "csv" | "xlsx") {
     if (selectedColumnIds.length === 0) {
@@ -158,7 +163,7 @@ export default function Qualifications() {
       const matrix = await fetchAllQualificationRows({
         search,
         state,
-        onlyRelevant,
+        onlyRelevant: onlyActiveContexts,
         documentTypeIds: selectedColumnIds,
       });
       if (kind === "csv") await exportQualificationsCsv(matrix);
@@ -227,6 +232,9 @@ export default function Qualifications() {
             <ToggleGroupItem value="ok" className="data-[state=on]:bg-emerald-500/15 data-[state=on]:text-emerald-700">
               Válidos
             </ToggleGroupItem>
+            <ToggleGroupItem value="context_unresolved" className="data-[state=on]:bg-amber-400/15 data-[state=on]:text-amber-700">
+              Contexto pendente {stateCounts.context_unresolved > 0 && <Badge variant="secondary" className="ml-1">{stateCounts.context_unresolved}</Badge>}
+            </ToggleGroupItem>
           </ToggleGroup>
 
           <Popover>
@@ -274,9 +282,9 @@ export default function Qualifications() {
           </Popover>
 
           <div className="flex items-center gap-2 ml-auto">
-            <Switch id="relevant" checked={onlyRelevant} onCheckedChange={setOnlyRelevant} />
-            <Label htmlFor="relevant" className="text-sm cursor-pointer">
-              Apenas com vínculo ativo
+            <Switch id="active-ctx" checked={onlyActiveContexts} onCheckedChange={setOnlyActiveContexts} />
+            <Label htmlFor="active-ctx" className="text-sm cursor-pointer">
+              Apenas trabalhadores com vínculo operacional ativo
             </Label>
           </div>
         </div>
@@ -285,10 +293,25 @@ export default function Qualifications() {
           <span className="inline-flex items-center gap-1"><StatusIcon status="ok" size={14} /> Válido</span>
           <span className="inline-flex items-center gap-1"><StatusIcon status="warning" size={14} /> Vence em ≤ {data?.warning_days ?? 30}d</span>
           <span className="inline-flex items-center gap-1"><StatusIcon status="expired" size={14} /> Vencido</span>
-          <span className="inline-flex items-center gap-1"><StatusIcon status="missing" size={14} /> Ausente (exigido pelo cargo)</span>
+          <span className="inline-flex items-center gap-1"><StatusIcon status="missing" size={14} /> Ausente (exigido)</span>
+          <span className="inline-flex items-center gap-1"><StatusIcon status="context_unresolved" size={14} /> Contexto pendente</span>
           <span className="inline-flex items-center gap-1"><StatusIcon status="not_applicable" size={14} /> Não aplicável</span>
         </div>
       </div>
+
+      {totalCtxUnresolved > 0 && (
+        <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-3 flex items-start gap-2 text-sm">
+          <AlertOctagon className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+          <div className="space-y-0.5">
+            <p className="font-medium text-amber-800 dark:text-amber-300">
+              {totalCtxUnresolved} exigência{totalCtxUnresolved === 1 ? "" : "s"} com contexto pendente
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Existem trabalhadores com cargo/vínculo legado ainda não reconciliado. As exigências dessas pessoas <b>não podem ser classificadas como não aplicáveis</b> — reconcilie o cargo em Configurações → Higiene de cargos ou promova o vínculo formal.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Matrix */}
       <div className="rounded-lg border bg-card overflow-hidden">
@@ -403,6 +426,46 @@ export default function Qualifications() {
                   <span className="text-muted-foreground">Estado:</span>{" "}
                   <span className="font-medium">{STATUS_META[detail.cell.status].label}</span>
                 </div>
+                <div>
+                  <span className="text-muted-foreground">Exigido:</span>{" "}
+                  <span className="font-medium">
+                    {detail.cell.is_required ? "Sim" : detail.cell.status === "context_unresolved" ? "Contexto pendente" : "Não neste contexto"}
+                  </span>
+                </div>
+                {detail.cell.required_by_sources && detail.cell.required_by_sources.length > 0 && (
+                  <div>
+                    <span className="text-muted-foreground">Origem da exigência:</span>
+                    <ul className="mt-1 space-y-0.5 text-xs">
+                      {detail.cell.required_by_sources.map((s) => (
+                        <li key={s} className="font-mono text-muted-foreground">
+                          {s.startsWith("global") ? "Global (obrigatório para todo vínculo ativo)"
+                           : s.startsWith("job_role:") ? "Cargo"
+                           : s.startsWith("event:") ? "Evento"
+                           : s.startsWith("link_override_add:") ? "Override do vínculo (adicionado)"
+                           : s}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {detail.row.contexts && detail.row.contexts.length > 0 && (
+                  <div>
+                    <span className="text-muted-foreground">Contextos do trabalhador:</span>
+                    <ul className="mt-1 space-y-1 text-xs">
+                      {detail.row.contexts.map((c, i) => (
+                        <li key={i} className="rounded border bg-muted/30 px-2 py-1">
+                          <div className="font-medium">{c.event_name ?? "—"}</div>
+                          <div className="text-muted-foreground">
+                            {c.job_role_name ?? "Cargo não reconciliado"}
+                            {c.context_status === "unresolved" && (
+                              <Badge variant="outline" className="ml-1 border-amber-400 text-amber-700">pendente</Badge>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {detail.cell.issue_date && (
                   <div>
                     <span className="text-muted-foreground">Emissão:</span>{" "}
@@ -421,9 +484,14 @@ export default function Qualifications() {
                     <span>{detail.cell.issuer}</span>
                   </div>
                 )}
-                {!detail.cell.is_relevant && detail.cell.status === "not_applicable" && (
+                {detail.cell.status === "not_applicable" && (
                   <p className="text-xs text-muted-foreground mt-2">
-                    Este documento não é exigido pelo cargo/vínculo atual do trabalhador.
+                    O contexto foi resolvido e este documento não é exigido pelo cargo/vínculo atual.
+                  </p>
+                )}
+                {detail.cell.status === "context_unresolved" && (
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-2">
+                    Não foi possível determinar o cargo desta alocação legada. Reconcilie o vínculo antes de classificar a exigência.
                   </p>
                 )}
                 <div className="pt-3 border-t flex flex-wrap gap-2">

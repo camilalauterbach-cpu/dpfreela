@@ -13,11 +13,11 @@
 - Q-014.2 — Follow-up de validade.
 
 ## VALIDATING
-- Q-023 Fases 1+2 — Resolvedor canônico de contextos + requisito global de ASO.
+- Q-022.A / Q-023 Fases 1-5 — Resolvedor canônico de contextos + requisitos, requisito global de ASO, Painel de Qualificações v2 com estado "Contexto pendente".
 
 ## IN_PROGRESS
-- Q-023 Fases 3-8 — Resolvedor de requisitos, reescrita do Painel de Qualificações, Controle SST por escopo, testes.
-- Q-022.A — Composição canônica de requisitos (a ser executada dentro da Fase 3 do Q-023).
+- Q-023 Fase 5 (avançada) — Filtros de Evento/Grupo/Cargo no Painel, célula de duas dimensões (borda de exigência), exportação enriquecida.
+- Q-021.1 — Schema `sst_control_scopes` + RPCs (bloqueado até homologação de Fases 1-5).
 
 ## PAUSED
 - Q-014.1-CLOSEOUT — Pausada pelo P0 (Q-020). Não desfazer.
