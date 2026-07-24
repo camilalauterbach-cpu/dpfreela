@@ -20,6 +20,10 @@
 ## IN_PROGRESS
 - Q-023 Fase 5 (avançada) — Filtros de Evento/Grupo/Cargo no Painel, célula de duas dimensões (borda de exigência), exportação enriquecida.
 - Q-016 — Catálogo canônico de qualificações por `document_type_id` (bloqueia encerramento de Q-023 core).
+- Q-024.A — DESBLOQUEADA (gate global limpo, índice único parcial ativo).
+
+## DONE
+- Q-024.0-DUPLICATE-NR35 — Reconciliação NR-35 do worker `40ea1d66…` por REGRA 1 (explicit supersedes). Prev=`6c7d5b6c` (renewal) → superseded_at=`2026-07-21 14:56:39.46102+00`; Current=`69830e4d` (replacement). Índice `uq_worker_sst_current_worker_document_type` criado. Nenhum arquivo/data alterada; nenhum registro removido.
 
 ## PAUSED
 - Q-014.1-CLOSEOUT — Pausada pelo P0 (Q-020). Não desfazer.
