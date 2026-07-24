@@ -45,7 +45,8 @@ export interface QualContext {
 export interface QualRow {
   worker_id: string;
   worker_name: string;
-  cpf: string | null;
+  cpf?: string | null;
+  cpf_masked?: string | null;
   cells: QualCell[];
   counters: {
     expired: number;
@@ -75,7 +76,8 @@ export interface QualMatrix {
   generated_at: string;
   columns: QualColumn[];
   items: QualRow[];
-  total: number;
+  total?: number;
+  total_workers?: number;
   warning_days: number;
   totals?: QualTotals;
 }
