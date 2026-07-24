@@ -220,6 +220,7 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
           presetDocumentTypeId={drawer.presetDocumentTypeId}
           presetNrCode={drawer.presetNrCode}
           currentByDocumentTypeId={currentByDocumentTypeId}
+          currentRows={rows}
           onRequestRenew={(row) => setDrawer({ mode: "renew", current: row, presetDocumentTypeId: row.document_type_id, presetNrCode: row.nr_code })}
           onRequestReplace={(row) => setDrawer({ mode: "replace", current: row, presetDocumentTypeId: row.document_type_id, presetNrCode: row.nr_code })}
         />
