@@ -163,7 +163,7 @@ export default function Qualifications() {
       const matrix = await fetchAllQualificationRows({
         search,
         state,
-        onlyRelevant: onlyActiveContexts,
+        onlyActiveContexts,
         documentTypeIds: selectedColumnIds,
       });
       if (kind === "csv") await exportQualificationsCsv(matrix);
