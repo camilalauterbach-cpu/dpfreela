@@ -13,7 +13,8 @@
 - Q-014.2 — Follow-up de validade.
 
 ## VALIDATING
-- Q-022.A / Q-023 Fases 1-5 — Resolvedor canônico de contextos + requisitos, requisito global de ASO, Painel de Qualificações v2 com estado "Contexto pendente".
+- Q-022.A-HOTFIX-ASO — Separação semântica `context_status` (atividade operacional) × `context_source` (resolução do cargo). ASO global agora se aplica a TODO contexto operacional ativo, resolvido ou não. **Baseline divergente detectado**: 59 contextos ativos / 56 trabalhadores com ASO (vs. 83/63 do relatório anterior). 24 contextos `unresolved_role` estão em evento com status `completed` (Show da Shakira no RJ) → corretamente classificados como `historical` pelo predicado operacional. Aguarda homologação humana da nova baseline antes de encerrar.
+- Q-022.A / Q-023 core Fases 1-5 — dependem da homologação da nova baseline acima.
 
 ## IN_PROGRESS
 - Q-023 Fase 5 (avançada) — Filtros de Evento/Grupo/Cargo no Painel, célula de duas dimensões (borda de exigência), exportação enriquecida.

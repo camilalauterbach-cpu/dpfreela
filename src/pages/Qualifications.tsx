@@ -457,7 +457,7 @@ export default function Qualifications() {
                           <div className="font-medium">{c.event_name ?? "—"}</div>
                           <div className="text-muted-foreground">
                             {c.job_role_name ?? "Cargo não reconciliado"}
-                            {c.context_status === "unresolved" && (
+                            {c.context_source === "unresolved_role" && (
                               <Badge variant="outline" className="ml-1 border-amber-400 text-amber-700">pendente</Badge>
                             )}
                           </div>
