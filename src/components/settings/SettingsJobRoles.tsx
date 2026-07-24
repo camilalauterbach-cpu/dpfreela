@@ -113,19 +113,10 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
     },
   });
 
-  const docsQ = useQuery({
-    queryKey: ["settings-document-types"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("document_types")
-        .select("id, code, name, category, default_validity_days, is_active")
-        .eq("is_active", true)
-        .in("category", ROLE_DOC_CATEGORIES as unknown as string[])
-        .order("name");
-      if (error) throw error;
-      return (data ?? []) as DocType[];
-    },
-  });
+  // Q-024.A — Fonte única (RPC canônica). includeInactive=true para
+  // exibir tipos inativos ligados a requisitos históricos como "Inativo",
+  // sem permitir seleção em novos requisitos.
+  const docsQ = useWorkerQualificationTypes({ includeInactive: true });
 
   const currentReqsQ = useQuery({
     queryKey: ["settings-job-role-reqs", selectedRoleId],
@@ -149,14 +140,17 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
   }, [currentReqsQ.data]);
 
   const docsById = useMemo(() => {
-    const m = new Map<string, DocType>();
-    (docsQ.data ?? []).forEach((d) => m.set(d.id, d));
+    const m = new Map<string, WorkerQualificationType>();
+    (docsQ.data ?? []).forEach((d) => m.set(d.documentTypeId, d));
     return m;
   }, [docsQ.data]);
 
   const availableToAdd = useMemo(() => {
     const used = new Set(reqs.map((r) => r.document_type_id));
-    return (docsQ.data ?? []).filter((d) => !used.has(d.id));
+    // Only ACTIVE + selectable types can be added as a new requirement.
+    // Inactive types remain visible on existing requirements below but
+    // cannot be introduced into a new one.
+    return (docsQ.data ?? []).filter((d) => d.selectable && d.isActive && !used.has(d.documentTypeId));
   }, [docsQ.data, reqs]);
 
   const slugifyCode = (name: string) =>
