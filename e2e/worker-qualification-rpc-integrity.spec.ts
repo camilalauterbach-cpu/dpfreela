@@ -64,9 +64,25 @@ const RUN_ID = `Q024B-${Date.now().toString(36)}-${Math.random()
   .toString(36)
   .slice(2, 6)}`;
 const WORKER_NAME = `E2E Q024B ${RUN_ID}`;
-const WORKER_CPF = String(
-  10000000000 + Math.floor(Math.random() * 89999999999),
-); // valor sintético, não valida DV
+function generateCpf(): string {
+  const nine: number[] = Array.from({ length: 9 }, () =>
+    Math.floor(Math.random() * 10),
+  );
+  const dv = (base: number[]) => {
+    let sum = 0;
+    for (let i = 0; i < base.length; i++) sum += base[i] * (base.length + 1 - i);
+    const mod = sum % 11;
+    return mod < 2 ? 0 : 11 - mod;
+  };
+  const d1 = dv(nine);
+  const d2 = dv([...nine, d1]);
+  return [...nine, d1, d2].join("");
+}
+const WORKER_CPF = generateCpf();
+const CPF_T8 = generateCpf();
+const CPF_T14 = generateCpf();
+const CPF_T15 = generateCpf();
+const CPF_T16 = generateCpf();
 
 let WORKER_ID = "";
 let apiRequest: APIRequestContext;
@@ -340,7 +356,7 @@ test("T7 create repetido bloqueado", async () => {
 test("T8 additional sem vigente → initial (compat)", async () => {
   // Cria worker temporário isolado só para T8 (mantém invariante do worker principal)
   const tmpId = psql(
-    `insert into public.workers (full_name, cpf) values ('${WORKER_NAME} T8', '${WORKER_CPF.slice(0, -2)}88') returning id`,
+    `insert into public.workers (full_name, cpf) values ('${WORKER_NAME} T8', '${CPF_T8}') returning id`,
   );
   try {
     const payload: RegisterSstRevisionPayload = {
@@ -524,7 +540,7 @@ test("T13 stale_current_qualification quando expected é o antigo", async () => 
 test("T14 concorrência create/create → 1 sucesso + 1 conflito", async () => {
   // seed limpo em worker temporário
   const tmp = psql(
-    `insert into public.workers (full_name, cpf) values ('${WORKER_NAME} T14', '${WORKER_CPF.slice(0, -2)}14') returning id`,
+    `insert into public.workers (full_name, cpf) values ('${WORKER_NAME} T14', '${CPF_T14}') returning id`,
   );
   try {
     const mk = (): RegisterSstRevisionPayload => ({
@@ -564,7 +580,7 @@ test("T14 concorrência create/create → 1 sucesso + 1 conflito", async () => {
 // =========================================================================
 test("T15 concorrência NR06 vs NR18 em worker novo", async () => {
   const tmp = psql(
-    `insert into public.workers (full_name, cpf) values ('${WORKER_NAME} T15', '${WORKER_CPF.slice(0, -2)}15') returning id`,
+    `insert into public.workers (full_name, cpf) values ('${WORKER_NAME} T15', '${CPF_T15}') returning id`,
   );
   try {
     const p06: RegisterSstRevisionPayload = {
@@ -604,7 +620,7 @@ test("T15 concorrência NR06 vs NR18 em worker novo", async () => {
 test("T16 renew/renew concorrentes → 1 sucesso + 1 stale", async () => {
   // seed: worker + NR06 vigente
   const tmp = psql(
-    `insert into public.workers (full_name, cpf) values ('${WORKER_NAME} T16', '${WORKER_CPF.slice(0, -2)}16') returning id`,
+    `insert into public.workers (full_name, cpf) values ('${WORKER_NAME} T16', '${CPF_T16}') returning id`,
   );
   try {
     const seedPayload: RegisterSstRevisionPayload = {
