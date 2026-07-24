@@ -2731,6 +2731,27 @@ export type Database = {
         Returns: Json
       }
       list_worker_duplicate_candidates: { Args: never; Returns: Json }
+      list_worker_qualification_types: {
+        Args: { p_include_inactive?: boolean }
+        Returns: {
+          category: string
+          code: string
+          default_validity_days: number
+          display_order: number
+          document_type_id: string
+          has_expiration: boolean
+          is_active: boolean
+          name: string
+          normalized_code: string
+          search_text: string
+          selectable: boolean
+          storage_flow: string
+          storage_scope: string
+          validity_mode: string
+          validity_unit: string
+          validity_value: number
+        }[]
+      }
       list_worker_qualifications:
         | {
             Args: {

@@ -18,6 +18,10 @@ import { invalidateComplianceCaches } from "@/lib/compliance-cache";
 import { SettingsJobRolesHygiene } from "./SettingsJobRolesHygiene";
 import { JOB_ROLES_CATALOG_KEYS } from "@/hooks/useJobRoles";
 import {
+  useWorkerQualificationTypes,
+  type WorkerQualificationType,
+} from "@/hooks/useWorkerQualificationTypes";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -37,7 +41,6 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface JobRole { id: string; code: string; name: string; is_active: boolean }
-interface DocType { id: string; code: string; name: string; category: string | null; default_validity_days: number | null; is_active: boolean }
 interface Requirement {
   document_type_id: string;
   is_mandatory: boolean;
@@ -48,10 +51,10 @@ interface Requirement {
 
 interface Props { readOnly?: boolean }
 
-// Categorias de documentos que fazem sentido como REQUISITO DE CARGO/FUNÇÃO.
-// Documentos pessoais (RG, CPF, CNH, título eleitor, carteira profissional, CREA, etc.)
-// pertencem ao trabalhador e não devem entrar aqui.
-const ROLE_DOC_CATEGORIES = ["sst_nr", "sst_aso", "training"] as const;
+// Q-024.A — Categorias vêm agora do catálogo canônico (RPC
+// list_worker_qualification_types via useWorkerQualificationTypes).
+// Este componente NÃO define elegibilidade de tipos: apenas consome.
+// TODO(Q-024.D): SstCertificateDrawer deve usar useWorkerQualificationTypes(active).
 const ROLE_DOC_CATEGORY_LABELS: Record<string, string> = {
   sst_nr: "NR",
   sst_aso: "ASO / Saúde",
@@ -110,19 +113,10 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
     },
   });
 
-  const docsQ = useQuery({
-    queryKey: ["settings-document-types"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("document_types")
-        .select("id, code, name, category, default_validity_days, is_active")
-        .eq("is_active", true)
-        .in("category", ROLE_DOC_CATEGORIES as unknown as string[])
-        .order("name");
-      if (error) throw error;
-      return (data ?? []) as DocType[];
-    },
-  });
+  // Q-024.A — Fonte única (RPC canônica). includeInactive=true para
+  // exibir tipos inativos ligados a requisitos históricos como "Inativo",
+  // sem permitir seleção em novos requisitos.
+  const docsQ = useWorkerQualificationTypes({ includeInactive: true });
 
   const currentReqsQ = useQuery({
     queryKey: ["settings-job-role-reqs", selectedRoleId],
@@ -146,14 +140,17 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
   }, [currentReqsQ.data]);
 
   const docsById = useMemo(() => {
-    const m = new Map<string, DocType>();
-    (docsQ.data ?? []).forEach((d) => m.set(d.id, d));
+    const m = new Map<string, WorkerQualificationType>();
+    (docsQ.data ?? []).forEach((d) => m.set(d.documentTypeId, d));
     return m;
   }, [docsQ.data]);
 
   const availableToAdd = useMemo(() => {
     const used = new Set(reqs.map((r) => r.document_type_id));
-    return (docsQ.data ?? []).filter((d) => !used.has(d.id));
+    // Only ACTIVE + selectable types can be added as a new requirement.
+    // Inactive types remain visible on existing requirements below but
+    // cannot be introduced into a new one.
+    return (docsQ.data ?? []).filter((d) => d.selectable && d.isActive && !used.has(d.documentTypeId));
   }, [docsQ.data, reqs]);
 
   const slugifyCode = (name: string) =>
@@ -470,9 +467,12 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
                             />
                           </div>
                           <p className="text-[11px] text-muted-foreground">
-                            {doc?.default_validity_days
-                              ? `Padrão do documento: ${doc.default_validity_days} dias a partir da realização`
+                            {doc?.defaultValidityDays
+                              ? `Padrão do documento: ${doc.defaultValidityDays} dias a partir da realização`
                               : "Validade padrão não configurada"}
+                            {doc && !doc.isActive && (
+                              <span className="ml-2 text-yellow-700 dark:text-yellow-400">(Inativo)</span>
+                            )}
                           </p>
                         </div>
                         <div className="flex items-center gap-1">
@@ -503,10 +503,10 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
                   <div className="flex flex-wrap gap-2">
                     {availableToAdd.map((d) => (
                       <Button
-                        key={d.id}
+                        key={d.documentTypeId}
                         size="sm"
                         variant="outline"
-                        onClick={() => addRequirement(d.id)}
+                        onClick={() => addRequirement(d.documentTypeId)}
                         disabled={readOnly}
                       >
                         <Plus className="h-3 w-3 mr-1" />
