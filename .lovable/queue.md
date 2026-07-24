@@ -20,7 +20,13 @@
 ## IN_PROGRESS
 - Q-023 Fase 5 (avançada) — Filtros de Evento/Grupo/Cargo no Painel, célula de duas dimensões (borda de exigência), exportação enriquecida.
 - Q-016 — Catálogo canônico de qualificações por `document_type_id` (bloqueia encerramento de Q-023 core).
-- Q-024.B — IN_PROGRESS (auditoria do índice único parcial × ordem transacional de `register_sst_revision`).
+
+## VALIDATING
+- Q-024.B — Identidade canônica `worker_id + document_type_id` em `register_sst_revision`: advisory lock canônico; lookup por UUID; UPDATE `superseded_at` da anterior ANTES do INSERT; entrada compatível (`document_type_id`, `nr_code` legado, ambos verificados); `additional_conflicts_with_current`; apenas `sst_nr`; nenhum tipo criado automaticamente. Aguardando validação E2E autenticada.
+
+## BLOCKED
+- Q-024.A-SCOPE = BLOCKED_ADMIN_CLASSIFICATION — 16 tipos elegíveis com `storage_scope` NULL; classificação pelo gate administrativo E-DOC.2.
+- Q-024.C, Q-024.D, Q-024.E, Q-024.F, Q-024.G, Q-024.H — BLOCKED enquanto Q-024.A-SCOPE.
 
 ## DONE
 - Q-024.0-REEVAL — `reevaluate_worker_links` executada com sessão autenticada admin para worker `40ea1d66…`: `links_processed=1`, `transitions_recorded=0`. NR35 vigente permanece `69830e4d…`; `6c7d5b6c…` continua histórico. Nenhuma revisão criada.
