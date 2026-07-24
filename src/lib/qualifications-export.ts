@@ -46,10 +46,18 @@ export async function fetchAllQualificationRows(p: QualExportParams): Promise<Qu
     if (error) throw error;
     const page = data as unknown as QualMatrix;
     if (!first) first = page;
-    all.push(...(page.items || []));
-    const total = page.total ?? all.length;
-    offset += (page.items || []).length;
-    if ((page.items || []).length === 0 || all.length >= total) break;
+    const items = page.items ?? [];
+    all.push(...items);
+    // Aceita tanto `total` quanto `total_workers` (contrato observado da RPC).
+    // Se nenhum estiver presente, encerra ao primeiro page < PAGE.
+    const totalRaw =
+      (page as unknown as { total?: number; total_workers?: number }).total ??
+      (page as unknown as { total?: number; total_workers?: number }).total_workers ??
+      null;
+    offset += items.length;
+    if (items.length === 0) break;
+    if (totalRaw !== null && all.length >= totalRaw) break;
+    if (totalRaw === null && items.length < PAGE) break;
   }
   return { ...(first as QualMatrix), items: all, total: all.length };
 }
@@ -62,12 +70,12 @@ function fmtDateBR(iso: string | null): string {
 }
 
 function neutralizeCsvCell(v: string): string {
-  // Preserva tabulação e CR; neutraliza somente prefixos executáveis.
-  const first = v.length > 0 ? v.charAt(0) : "";
-  if (first === "=" || first === "+" || first === "-" || first === "@") {
-    return "'" + v;
-  }
-  return v;
+  // Neutraliza prefixos executáveis mesmo quando precedidos por espaços,
+  // tabs ou quebras — Excel/Sheets ignoram esse whitespace ao avaliar
+  // fórmulas.
+  const s = v ?? "";
+  if (/^[\s\t\r\n]*[=+\-@]/.test(s)) return "'" + s;
+  return s;
 }
 
 function csvEscape(v: string): string {
@@ -81,7 +89,13 @@ interface BuiltHeader { label: string; getter: (row: QualRow) => string }
 function buildHeaders(matrix: QualMatrix): BuiltHeader[] {
   const heads: BuiltHeader[] = [
     { label: "Trabalhador", getter: (r) => r.worker_name },
-    { label: "CPF", getter: (r) => r.cpf ?? "" },
+    {
+      label: "CPF",
+      getter: (r) => {
+        const rec = r as unknown as { cpf?: string | null; cpf_masked?: string | null };
+        return rec.cpf ?? rec.cpf_masked ?? "";
+      },
+    },
   ];
   for (const col of matrix.columns) {
     const label = col.name;
