@@ -1,4 +1,4 @@
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Page, type Response } from "@playwright/test";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -43,3 +43,4 @@ export const test = base.extend<{ authedPage: Page }>({
 });
 
 export { expect, BASE_URL };
+export type { Page, Response };
