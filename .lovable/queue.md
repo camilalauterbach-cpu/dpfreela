@@ -20,9 +20,20 @@
 ## IN_PROGRESS
 - Q-023 Fase 5 (avançada) — Filtros de Evento/Grupo/Cargo no Painel, célula de duas dimensões (borda de exigência), exportação enriquecida.
 - Q-016 — Catálogo canônico de qualificações por `document_type_id` (bloqueia encerramento de Q-023 core).
-- Q-024.A — DESBLOQUEADA (gate global limpo, índice único parcial ativo).
+- Q-024.B — IN_PROGRESS (auditoria do índice único parcial × ordem transacional de `register_sst_revision`).
 
 ## DONE
+- Q-024.0-REEVAL — `reevaluate_worker_links` executada com sessão autenticada admin para worker `40ea1d66…`: `links_processed=1`, `transitions_recorded=0`. NR35 vigente permanece `69830e4d…`; `6c7d5b6c…` continua histórico. Nenhuma revisão criada.
+- Q-024.A — Catálogo canônico único de tipos elegíveis para qualificação do trabalhador:
+  - RPC `public.list_worker_qualification_types(p_include_inactive)` STABLE + SECURITY DEFINER, `auth.uid()` obrigatório, roles `admin/manager/operator/viewer`, `REVOKE` de `PUBLIC` e `anon`, `GRANT EXECUTE` a `authenticated`.
+  - Hook único `useWorkerQualificationTypes({ includeInactive })` (`src/hooks/useWorkerQualificationTypes.ts`) com normalizador `normalizeQualificationSearchTerm` compartilhado.
+  - `SettingsJobRoles.tsx` refatorado: passa a consumir o hook canônico (`includeInactive=true`); somente tipos ativos+selecionáveis aparecem em "Adicionar documento"; tipos inativos ligados a requisitos históricos são exibidos com marca `(Inativo)`.
+  - Predicado anterior (`from("document_types").eq("is_active",true).in("category",["sst_nr","sst_aso","training"])`) removido; sem `as any` no consumidor.
+  - Gates de integridade verdes: 0 duplicidades de código normalizado, 0 tipos ativos sem code/name, 0 tipos com registros vigentes simultâneos em `worker_sst_qualifications` e `worker_documents`, 0 tipos ativos com `storage_scope='employment_link'`.
+  - `storage_flow` derivado do fluxo real auditado (sst_nr/training → `worker_sst_qualifications`; sst_aso → `worker_documents` — ASO legado 46 registros).
+  - Preservado: NR35 reconciliada, índice `uq_worker_sst_current_worker_document_type`, Rock in Rio = 56, vínculo formal da Amanda; nenhum DML operacional executado.
+  - E2E scaffold: `e2e/worker-qualification-type-catalog.spec.ts`.
+  - TODO(Q-024.D): `SstCertificateDrawer` deve migrar para `useWorkerQualificationTypes({ includeInactive: false })`.
 - Q-024.0-DUPLICATE-NR35 — Reconciliação NR-35 do worker `40ea1d66…` por REGRA 1 (explicit supersedes). Prev=`6c7d5b6c` (renewal) → superseded_at=`2026-07-21 14:56:39.46102+00`; Current=`69830e4d` (replacement). Índice `uq_worker_sst_current_worker_document_type` criado. Nenhum arquivo/data alterada; nenhum registro removido.
 
 ## PAUSED
