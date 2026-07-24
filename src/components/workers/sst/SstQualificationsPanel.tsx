@@ -10,7 +10,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Upload, RefreshCw, Replace, History, Users, MoreHorizontal, GitBranch,
+  Upload, Plus, RefreshCw, Replace, History, Users, MoreHorizontal, GitBranch,
   FileText, ExternalLink, ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -58,7 +58,12 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
   const [linksOpen, setLinksOpen] = useState<{ nr: string; docTypeId: string | null } | null>(null);
   const [timelineOpen, setTimelineOpen] = useState<{ nr: string; docTypeId: string | null } | null>(null);
   const [drawer, setDrawer] = useState<
-    { mode: SstDrawerMode; current: SstCurrentRow | null; presetNrCode: string | null } | null
+    {
+      mode: SstDrawerMode;
+      current: SstCurrentRow | null;
+      presetDocumentTypeId: string | null;
+      presetNrCode: string | null;
+    } | null
   >(null);
 
   const rows = useMemo(() => {
@@ -74,6 +79,17 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
       return a.nr_code.localeCompare(b.nr_code, "pt-BR");
     });
   }, [quals]);
+
+  const currentByDocumentTypeId = useMemo(() => {
+    const s = new Set<string>();
+    for (const q of quals ?? []) {
+      if (q.document_type_id) s.add(q.document_type_id);
+    }
+    return s;
+  }, [quals]);
+
+  const openCreateQualification = () =>
+    setDrawer({ mode: "create", current: null, presetDocumentTypeId: null, presetNrCode: null });
 
   return (
     <div className="space-y-4">
@@ -98,6 +114,23 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
 
       {/* Tabela */}
       <Card>
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b">
+          <div>
+            <p className="text-sm font-medium">Qualificações vigentes</p>
+            <p className="text-xs text-muted-foreground">
+              NRs, ASO e treinamentos ativos deste trabalhador.
+            </p>
+          </div>
+          {canEdit && (
+            <Button
+              size="sm"
+              onClick={openCreateQualification}
+              data-testid="add-qualification-button"
+            >
+              <Plus className="mr-1 h-3 w-3" /> Adicionar qualificação
+            </Button>
+          )}
+        </div>
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-4 space-y-2">
@@ -109,11 +142,11 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
             <div className="p-10 text-center space-y-2">
               <ShieldCheck className="h-8 w-8 mx-auto text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                Nenhuma NR registrada para este trabalhador.
+                Nenhuma qualificação registrada para este trabalhador.
               </p>
               {canEdit && (
-                <Button size="sm" onClick={() => setDrawer({ mode: "create", current: null, presetNrCode: null })}>
-                  <Upload className="mr-1 h-3 w-3" /> Anexar primeiro certificado
+                <Button size="sm" onClick={openCreateQualification}>
+                  <Plus className="mr-1 h-3 w-3" /> Adicionar qualificação
                 </Button>
               )}
             </div>
@@ -134,9 +167,9 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
                     key={q.id}
                     q={q}
                     canEdit={canEdit}
-                    onUpload={() => setDrawer({ mode: "replace", current: q, presetNrCode: q.nr_code })}
-                    onRenew={() => setDrawer({ mode: "renew", current: q, presetNrCode: q.nr_code })}
-                    onReplace={() => setDrawer({ mode: "replace", current: q, presetNrCode: q.nr_code })}
+                    onUpload={() => setDrawer({ mode: "replace", current: q, presetDocumentTypeId: q.document_type_id, presetNrCode: q.nr_code })}
+                    onRenew={() => setDrawer({ mode: "renew", current: q, presetDocumentTypeId: q.document_type_id, presetNrCode: q.nr_code })}
+                    onReplace={() => setDrawer({ mode: "replace", current: q, presetDocumentTypeId: q.document_type_id, presetNrCode: q.nr_code })}
                     onHistory={() => setHistoryOpen({ nr: q.nr_code })}
                     onLinks={() => setLinksOpen({ nr: q.nr_code, docTypeId: q.document_type_id })}
                     onTimeline={() => setTimelineOpen({ nr: q.nr_code, docTypeId: q.document_type_id })}
@@ -184,7 +217,12 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
           workerId={workerId}
           workerName={workerName}
           current={drawer.current}
+          presetDocumentTypeId={drawer.presetDocumentTypeId}
           presetNrCode={drawer.presetNrCode}
+          currentByDocumentTypeId={currentByDocumentTypeId}
+          currentRows={rows}
+          onRequestRenew={(row) => setDrawer({ mode: "renew", current: row, presetDocumentTypeId: row.document_type_id, presetNrCode: row.nr_code })}
+          onRequestReplace={(row) => setDrawer({ mode: "replace", current: row, presetDocumentTypeId: row.document_type_id, presetNrCode: row.nr_code })}
         />
       )}
     </div>
