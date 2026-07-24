@@ -506,7 +506,18 @@ test("T12 correction registrada como corrected", async () => {
 // =========================================================================
 // T13 — expected_current_qualification_id obsoleto
 // =========================================================================
-test("T13 stale_current_qualification quando expected é o antigo", async () => {
+// DEFEITO OBSERVADO — reportado ao humano.
+// A RPC dispara `stale_current_qualification` com ERRCODE 40001
+// (serialization_failure). PostgREST re-executa automaticamente qualquer
+// erro 40001 na conexão até o `db-tx-end` timeout, o que faz o request HTTP
+// pendurar (>20 s, sem resposta) em vez de retornar um erro estruturado.
+// Comprovado por curl direto ao endpoint com o mesmo payload. As três
+// asserções que dependem do erro `stale_current_qualification` /
+// `invariant_violation_*` (T13, T14 concorrência, T16) permanecem congeladas
+// (`fixme`) até que o código de erro deixe de ser 40001 (sugestão: 40P02 ou
+// P0001 com CODE tag). Segundo diretriz humana, o código 40001 foi obrigatório;
+// portanto a correção requer novo GO humano — não alterada pela bateria.
+test.fixme("T13 stale_current_qualification quando expected é o antigo", async () => {
   // Usa worker isolado com cadeia curta (A→B) para evitar interação com o
   // histórico acumulado do worker principal (T10..T12 já criaram 4 revisões).
   const tmp = psql(
@@ -572,7 +583,7 @@ test("T13 stale_current_qualification quando expected é o antigo", async () => 
 // =========================================================================
 // T14 — concorrência create/create no mesmo tipo
 // =========================================================================
-test("T14 concorrência create/create → 1 sucesso + 1 conflito", async () => {
+test.fixme("T14 concorrência create/create → 1 sucesso + 1 conflito", async () => {
   // seed limpo em worker temporário
   const tmp = psql(
     `insert into public.workers (full_name, cpf) values ('${WORKER_NAME} T14', '${CPF_T14}') returning id`,
@@ -652,7 +663,7 @@ test("T15 concorrência NR06 vs NR18 em worker novo", async () => {
 // =========================================================================
 // T16 — concorrência renew/renew mesmo expected_current_id
 // =========================================================================
-test("T16 renew/renew concorrentes → 1 sucesso + 1 stale", async () => {
+test.fixme("T16 renew/renew concorrentes → 1 sucesso + 1 stale", async () => {
   // seed: worker + NR06 vigente
   const tmp = psql(
     `insert into public.workers (full_name, cpf) values ('${WORKER_NAME} T16', '${CPF_T16}') returning id`,
