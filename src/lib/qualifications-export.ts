@@ -17,7 +17,7 @@ const STATUS_PT: Record<QualStatus, string> = {
 export interface QualExportParams {
   search: string;
   state: QualStatus | null;
-  onlyRelevant: boolean;
+  onlyActiveContexts: boolean;
   documentTypeIds: string[]; // exatamente as colunas selecionadas
 }
 
@@ -35,7 +35,11 @@ export async function fetchAllQualificationRows(p: QualExportParams): Promise<Qu
       p_search: p.search || null,
       p_state: p.state || null,
       p_document_type_ids: p.documentTypeIds,
-      p_only_relevant: p.onlyRelevant,
+      // Espelha exatamente o contrato do hook useWorkerQualifications:
+      // quando o switch "Somente com vínculo ativo" está ligado, filtra
+      // por contexto operacional ativo e desliga o filtro por relevância.
+      p_only_active_contexts: p.onlyActiveContexts,
+      p_only_relevant: false,
       p_limit: PAGE,
       p_offset: offset,
     });
