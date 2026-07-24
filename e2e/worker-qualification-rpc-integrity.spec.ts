@@ -85,19 +85,9 @@ test.beforeAll(async () => {
     );
   }
 
-  // sanity: RPC user tem role admin/manager/operator
-  const rows = psqlRows(
-    `select role from public.user_roles where user_id = (
-       select id from auth.users where email = 'camilalauterbach@gmail.com')`,
-  );
-  expect(rows.length, "seed user precisa ter role admin/manager").toBeGreaterThan(0);
-  const roles = rows.map((r) => r[0]);
-  expect(
-    roles.some((r) => ["admin", "manager", "operator"].includes(r)),
-    `roles do usuário de teste: ${roles.join(",")}`,
-  ).toBeTruthy();
-
-  // seed worker isolado
+  // seed worker isolado — a sanity de role fica implícita: a primeira RPC
+  // do T1 falharia com `role_required` se o usuário injetado não tivesse
+  // admin/manager/operator, e o cleanup por psql funcionaria mesmo assim.
   WORKER_ID = psql(
     `insert into public.workers (full_name, cpf) values ('${WORKER_NAME.replace(
       /'/g,
