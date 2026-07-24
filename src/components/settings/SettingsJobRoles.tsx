@@ -467,9 +467,12 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
                             />
                           </div>
                           <p className="text-[11px] text-muted-foreground">
-                            {doc?.default_validity_days
-                              ? `Padrão do documento: ${doc.default_validity_days} dias a partir da realização`
+                            {doc?.defaultValidityDays
+                              ? `Padrão do documento: ${doc.defaultValidityDays} dias a partir da realização`
                               : "Validade padrão não configurada"}
+                            {doc && !doc.isActive && (
+                              <span className="ml-2 text-yellow-700 dark:text-yellow-400">(Inativo)</span>
+                            )}
                           </p>
                         </div>
                         <div className="flex items-center gap-1">
@@ -500,10 +503,10 @@ export function SettingsJobRoles({ readOnly = false }: Props) {
                   <div className="flex flex-wrap gap-2">
                     {availableToAdd.map((d) => (
                       <Button
-                        key={d.id}
+                        key={d.documentTypeId}
                         size="sm"
                         variant="outline"
-                        onClick={() => addRequirement(d.id)}
+                        onClick={() => addRequirement(d.documentTypeId)}
                         disabled={readOnly}
                       >
                         <Plus className="h-3 w-3 mr-1" />
