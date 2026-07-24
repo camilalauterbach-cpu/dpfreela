@@ -507,36 +507,66 @@ test("T12 correction registrada como corrected", async () => {
 // T13 — expected_current_qualification_id obsoleto
 // =========================================================================
 test("T13 stale_current_qualification quando expected é o antigo", async () => {
-  // pega o CURRENT B e a revisão anterior A
-  const rows = psqlRows(`
-    select id::text, case when superseded_at is null then 'cur' else 'old' end
-      from public.worker_sst_qualifications
-     where worker_id='${WORKER_ID}' and document_type_id='${NR06_ID}'
-     order by created_at
-  `);
-  const a = rows.find((r) => r[1] === "old")?.[0];
-  const b = rows.find((r) => r[1] === "cur")?.[0];
-  expect(a).toBeTruthy();
-  expect(b).toBeTruthy();
-
-  const before = totalRows(NR06_ID);
-  const payload: RegisterSstRevisionPayload = {
-    worker_id: WORKER_ID,
-    document_type_id: NR06_ID,
-    operation: "renewal",
-    expected_current_qualification_id: a, // stale
-    issued_at: isoToday(3),
-    expires_at: isoToday(365),
-    validity_status: "has_expiry",
-  };
-  const out = await callRegisterSstRevision(apiRequest, payload);
-  expectErr(out, payload, "stale_current_qualification");
-  // B continua vigente
-  const curNow = psql(
-    `select id from public.worker_sst_qualifications where worker_id='${WORKER_ID}' and document_type_id='${NR06_ID}' and superseded_at is null`,
+  // Usa worker isolado com cadeia curta (A→B) para evitar interação com o
+  // histórico acumulado do worker principal (T10..T12 já criaram 4 revisões).
+  const tmp = psql(
+    `insert into public.workers (full_name, cpf) values ('${WORKER_NAME} T13', '${generateCpf()}') returning id`,
   );
-  expect(curNow).toBe(b);
-  expect(totalRows(NR06_ID)).toBe(before);
+  try {
+    const p1: RegisterSstRevisionPayload = {
+      worker_id: tmp,
+      document_type_id: NR06_ID,
+      operation: "initial",
+      issued_at: isoToday(-2),
+      expires_at: isoToday(365),
+      validity_status: "has_expiry",
+    };
+    const s1 = expectOk(await callRegisterSstRevision(apiRequest, p1), p1);
+    const a = s1.qualification_id;
+
+    const p2: RegisterSstRevisionPayload = {
+      worker_id: tmp,
+      document_type_id: NR06_ID,
+      operation: "renewal",
+      expected_current_qualification_id: a,
+      issued_at: isoToday(-1),
+      expires_at: isoToday(365),
+      validity_status: "has_expiry",
+    };
+    const s2 = expectOk(await callRegisterSstRevision(apiRequest, p2), p2);
+    const b = s2.qualification_id;
+
+    // agora um renewal apontando o antigo A → stale
+    const p3: RegisterSstRevisionPayload = {
+      worker_id: tmp,
+      document_type_id: NR06_ID,
+      operation: "renewal",
+      expected_current_qualification_id: a,
+      issued_at: isoToday(),
+      expires_at: isoToday(365),
+      validity_status: "has_expiry",
+    };
+    const out = await callRegisterSstRevision(apiRequest, p3);
+    expectErr(out, p3, "stale_current_qualification");
+
+    // B continua vigente e nada foi criado
+    const curNow = psql(
+      `select id from public.worker_sst_qualifications where worker_id='${tmp}' and document_type_id='${NR06_ID}' and superseded_at is null`,
+    );
+    expect(curNow).toBe(b);
+    const total = Number(
+      psql(
+        `select count(*) from public.worker_sst_qualifications where worker_id='${tmp}' and document_type_id='${NR06_ID}'`,
+      ),
+    );
+    expect(total).toBe(2);
+  } finally {
+    psqlSafe(
+      `delete from public.change_logs where table_name='worker_sst_qualifications' and record_id in (select id from public.worker_sst_qualifications where worker_id='${tmp}')`,
+    );
+    psqlSafe(`delete from public.worker_sst_qualifications where worker_id='${tmp}'`);
+    psqlSafe(`delete from public.workers where id='${tmp}'`);
+  }
 });
 
 // =========================================================================
