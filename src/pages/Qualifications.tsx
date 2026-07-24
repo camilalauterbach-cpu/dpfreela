@@ -210,6 +210,7 @@ export default function Qualifications() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar trabalhador por nome ou CPF"
               className="pl-9"
+              data-testid="qualifications-search"
             />
           </div>
 
@@ -282,7 +283,12 @@ export default function Qualifications() {
           </Popover>
 
           <div className="flex items-center gap-2 ml-auto">
-            <Switch id="active-ctx" checked={onlyActiveContexts} onCheckedChange={setOnlyActiveContexts} />
+            <Switch
+              id="active-ctx"
+              checked={onlyActiveContexts}
+              onCheckedChange={setOnlyActiveContexts}
+              data-testid="qualifications-active-only"
+            />
             <Label htmlFor="active-ctx" className="text-sm cursor-pointer">
               Apenas trabalhadores com vínculo operacional ativo
             </Label>
@@ -361,8 +367,16 @@ export default function Qualifications() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((row) => (
-                  <tr key={row.worker_id} className="hover:bg-muted/30">
+                {items.map((row) => {
+                  const contextStatus =
+                    (row.n_active_contexts ?? 0) > 0 ? "active" : "historical";
+                  return (
+                  <tr
+                    key={row.worker_id}
+                    className="hover:bg-muted/30"
+                    data-testid={`qualification-worker-${row.worker_id}`}
+                    data-context-status={contextStatus}
+                  >
                     <td className="sticky left-0 z-10 bg-card group-hover:bg-muted/30 px-3 py-2 border-b">
                       <Link
                         to={`/workers/${row.worker_id}`}
@@ -375,11 +389,22 @@ export default function Qualifications() {
                         {row.counters.warning > 0 && <span className="text-amber-600">{row.counters.warning} vencendo</span>}
                         {row.counters.missing > 0 && <span className="text-slate-600">{row.counters.missing} ausentes</span>}
                       </div>
+                      {row.contexts && row.contexts.length > 0 && (
+                        <div className="mt-0.5 text-[10px] text-muted-foreground">
+                          {row.contexts.map((c) => c.event_name).filter(Boolean).join(" · ")}
+                        </div>
+                      )}
                     </td>
                     {row.cells.map((cell) => {
                       const col = columns.find((c) => c.document_type_id === cell.document_type_id)!;
                       return (
-                        <td key={cell.document_type_id} className="border-b text-center p-1">
+                        <td
+                          key={cell.document_type_id}
+                          className="border-b text-center p-1"
+                          data-testid={`qualification-cell-${row.worker_id}-${cell.document_type_id}`}
+                          data-required={cell.is_required ? "true" : "false"}
+                          data-document-status={cell.status}
+                        >
                           <button
                             type="button"
                             className="inline-flex items-center justify-center hover:scale-110 transition-transform"
@@ -392,7 +417,8 @@ export default function Qualifications() {
                       );
                     })}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
