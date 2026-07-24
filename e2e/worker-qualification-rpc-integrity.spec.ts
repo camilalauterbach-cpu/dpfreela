@@ -462,7 +462,7 @@ test("T11 replacement preserva cadeia", async () => {
     document_type_id: NR06_ID,
     operation: "replacement",
     expected_current_qualification_id: cur,
-    issued_at: isoToday(),
+    issued_at: isoToday(1),
     expires_at: isoToday(365),
     validity_status: "has_expiry",
     revision_reason: "erro no anterior",
@@ -488,7 +488,7 @@ test("T12 correction registrada como corrected", async () => {
     document_type_id: NR06_ID,
     operation: "correction",
     expected_current_qualification_id: cur,
-    issued_at: isoToday(),
+    issued_at: isoToday(2),
     expires_at: isoToday(365),
     validity_status: "has_expiry",
     revision_reason: "typo na data",
@@ -525,7 +525,7 @@ test("T13 stale_current_qualification quando expected é o antigo", async () => 
     document_type_id: NR06_ID,
     operation: "renewal",
     expected_current_qualification_id: a, // stale
-    issued_at: isoToday(),
+    issued_at: isoToday(3),
     expires_at: isoToday(365),
     validity_status: "has_expiry",
   };
