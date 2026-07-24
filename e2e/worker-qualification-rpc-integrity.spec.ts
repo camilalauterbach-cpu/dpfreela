@@ -44,10 +44,18 @@ loadDotEnv();
 
 // ---- psql helpers ---------------------------------------------------------
 function psql(sql: string): string {
-  return execFileSync("psql", ["-tAc", sql], {
+  const raw = execFileSync("psql", ["-v", "ON_ERROR_STOP=1", "-tAqc", sql], {
     encoding: "utf8",
     env: process.env,
   }).trim();
+  // Alguns comandos (INSERT ... RETURNING) emitem tag de comando "INSERT 0 1"
+  // após a linha de retorno. Removemos essas linhas para manter o contrato:
+  // valor puro na primeira/última linha útil.
+  return raw
+    .split("\n")
+    .filter((l) => !/^(INSERT|UPDATE|DELETE|SELECT|WITH)\s+\d/.test(l))
+    .join("\n")
+    .trim();
 }
 function psqlRows(sql: string): string[][] {
   const out = psql(sql);
