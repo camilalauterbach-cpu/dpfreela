@@ -18,6 +18,10 @@ import { invalidateComplianceCaches } from "@/lib/compliance-cache";
 import { SettingsJobRolesHygiene } from "./SettingsJobRolesHygiene";
 import { JOB_ROLES_CATALOG_KEYS } from "@/hooks/useJobRoles";
 import {
+  useWorkerQualificationTypes,
+  type WorkerQualificationType,
+} from "@/hooks/useWorkerQualificationTypes";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -37,7 +41,6 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface JobRole { id: string; code: string; name: string; is_active: boolean }
-interface DocType { id: string; code: string; name: string; category: string | null; default_validity_days: number | null; is_active: boolean }
 interface Requirement {
   document_type_id: string;
   is_mandatory: boolean;
@@ -48,10 +51,10 @@ interface Requirement {
 
 interface Props { readOnly?: boolean }
 
-// Categorias de documentos que fazem sentido como REQUISITO DE CARGO/FUNÇÃO.
-// Documentos pessoais (RG, CPF, CNH, título eleitor, carteira profissional, CREA, etc.)
-// pertencem ao trabalhador e não devem entrar aqui.
-const ROLE_DOC_CATEGORIES = ["sst_nr", "sst_aso", "training"] as const;
+// Q-024.A — Categorias vêm agora do catálogo canônico (RPC
+// list_worker_qualification_types via useWorkerQualificationTypes).
+// Este componente NÃO define elegibilidade de tipos: apenas consome.
+// TODO(Q-024.D): SstCertificateDrawer deve usar useWorkerQualificationTypes(active).
 const ROLE_DOC_CATEGORY_LABELS: Record<string, string> = {
   sst_nr: "NR",
   sst_aso: "ASO / Saúde",
