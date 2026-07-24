@@ -1,6 +1,8 @@
-// E-SST.2.C — Drawer único para envio de certificado SST.
-// Modos: create | renew | replace. O fluxo é único:
-//   Upload Storage → register_sst_revision → reevaluate_worker_links → invalidate.
+// Q-024-D-UI-MULTIPLE — Drawer único para envio de certificado SST/qualificação.
+// Modos: create | renew | replace. Identidade CANÔNICA por document_type_id
+// (catálogo mestre `useWorkerQualificationTypes`). Nunca aceita input livre de NR.
+// Fluxo: Upload Storage → register_sst_revision (com document_type_id)
+//         → reevaluate_worker_links → invalidate caches.
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,15 +14,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { FileText, Upload, Loader2, X } from "lucide-react";
+import { FileText, Upload, Loader2, X, AlertTriangle, RefreshCw, Replace } from "lucide-react";
 import { invalidateSstCaches, type SstCurrentRow } from "@/hooks/useSstQualifications";
 import { invalidateComplianceCaches } from "@/lib/compliance-cache";
 import {
   validateUpload, getSafeContentType, ALLOWED_FILE_EXTENSIONS,
 } from "@/lib/upload-validation";
-import { normalizeNr } from "@/lib/sst/nr-inference";
 import { computeCertificateExpiry } from "@/lib/sst/validity";
-import { useQuery } from "@tanstack/react-query";
+import {
+  useWorkerQualificationTypes,
+  type WorkerQualificationType,
+} from "@/hooks/useWorkerQualificationTypes";
+import { QualificationDocumentTypeCombobox } from "./QualificationDocumentTypeCombobox";
 
 export type SstDrawerMode = "create" | "renew" | "replace";
 
@@ -32,8 +37,17 @@ interface Props {
   workerName: string;
   /** Obrigatório em renew/replace; opcional em create (row com NR conhecida) */
   current?: SstCurrentRow | null;
-  /** NR pré-selecionada em create (quando disparado a partir de uma linha) */
+  /** document_type_id pré-selecionado (renew/replace, ou create a partir de row) */
+  presetDocumentTypeId?: string | null;
+  /** Compat: NR pré-selecionada (legado — resolvido para document_type_id) */
   presetNrCode?: string | null;
+  /** Tipos já vigentes do trabalhador — exibidos como "Já cadastrada". */
+  currentByDocumentTypeId?: Set<string>;
+  /** Quando o usuário decide renovar/substituir um tipo já cadastrado. */
+  onRequestRenew?: (row: SstCurrentRow) => void;
+  onRequestReplace?: (row: SstCurrentRow) => void;
+  /** Qualificações vigentes (para localizar a linha ao oferecer renew/replace). */
+  currentRows?: SstCurrentRow[];
 }
 
 function fmtDate(iso: string | null | undefined) {
@@ -42,24 +56,26 @@ function fmtDate(iso: string | null | undefined) {
 }
 
 const TITLES: Record<SstDrawerMode, string> = {
-  create: "Anexar certificado",
+  create: "Adicionar qualificação",
   renew: "Renovar certificado",
   replace: "Substituir certificado",
 };
 
 const DESCRIPTIONS: Record<SstDrawerMode, string> = {
-  create: "Registrar um novo certificado NR para este trabalhador.",
+  create: "Registrar uma nova NR, ASO ou treinamento para este trabalhador.",
   renew: "Nova revisão na mesma cadeia — a anterior vira histórico.",
   replace: "Encerra a atual e cria nova revisão. O histórico é preservado.",
 };
 
 export function SstCertificateDrawer({
-  open, onOpenChange, mode, workerId, workerName, current, presetNrCode,
+  open, onOpenChange, mode, workerId, workerName, current,
+  presetDocumentTypeId, presetNrCode, currentByDocumentTypeId,
+  onRequestRenew, onRequestReplace, currentRows,
 }: Props) {
   const qc = useQueryClient();
 
   const [file, setFile] = useState<File | null>(null);
-  const [nrCode, setNrCode] = useState("");
+  const [selectedDocumentTypeId, setSelectedDocumentTypeId] = useState<string | null>(null);
   const [trainingType, setTrainingType] = useState("");
   const [issuedAt, setIssuedAt] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
@@ -73,36 +89,41 @@ export function SstCertificateDrawer({
   const [notes, setNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [keepOpenAfterSave, setKeepOpenAfterSave] = useState(false);
 
-  const nrLocked = mode !== "create" || !!presetNrCode;
+  const typeLocked = mode !== "create";
 
-  // Catálogo de NR/treinamento: usamos a validade padrão do document_type.
-  const catalogQ = useQuery({
-    queryKey: ["sst-doc-catalog"],
-    staleTime: 300_000,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("document_types")
-        .select("code, category, default_validity_days")
-        .in("category", ["sst_nr", "training", "sst_aso"]);
-      if (error) throw error;
-      return (data ?? []) as { code: string; category: string; default_validity_days: number | null }[];
-    },
-  });
+  // Catálogo canônico (Q-024.A) — fonte única de tipos elegíveis.
+  const { data: types, isLoading: loadingTypes } = useWorkerQualificationTypes({ includeInactive: false });
+  const typesById = useMemo(() => {
+    const m = new Map<string, WorkerQualificationType>();
+    for (const t of types ?? []) m.set(t.documentTypeId, t);
+    return m;
+  }, [types]);
+  const selectedType: WorkerQualificationType | null =
+    (selectedDocumentTypeId && typesById.get(selectedDocumentTypeId)) || null;
+  const defaultValidityDays = selectedType?.defaultValidityDays ?? null;
 
-  const normalizedNr = normalizeNr(nrCode) || nrCode.trim().toUpperCase();
-  const catalogEntry = (catalogQ.data ?? []).find((d) => d.code === normalizedNr);
-  const defaultValidityDays = catalogEntry?.default_validity_days ?? null;
+  // Resolver presetNrCode legado → document_type_id via catálogo canônico.
+  const resolvePresetId = (): string | null => {
+    if (presetDocumentTypeId) return presetDocumentTypeId;
+    if (!presetNrCode) return null;
+    const upper = presetNrCode.trim().toUpperCase();
+    const found = (types ?? []).find(
+      (t) => t.code.toUpperCase() === upper || t.normalizedCode === upper.toLowerCase().replace(/\s+/g, ""),
+    );
+    return found?.documentTypeId ?? null;
+  };
 
   useEffect(() => {
     if (!open) return;
-    // Pré-carregamento por modo
     setFile(null);
     setNotes("");
     setLastError(null);
     setExpiryTouched(false);
+    setKeepOpenAfterSave(false);
     if (mode === "create") {
-      setNrCode(presetNrCode || "");
+      setSelectedDocumentTypeId(resolvePresetId());
       setTrainingType("");
       setIssuedAt("");
       setExpiresAt("");
@@ -111,7 +132,7 @@ export function SstCertificateDrawer({
       setProvider("");
       setInstructor("");
     } else if (current) {
-      setNrCode(current.nr_code);
+      setSelectedDocumentTypeId(current.document_type_id ?? resolvePresetId());
       setTrainingType(current.training_type || "");
       setIssuedAt("");
       setExpiresAt("");
@@ -120,7 +141,8 @@ export function SstCertificateDrawer({
       setProvider(current.provider_name || "");
       setInstructor(current.instructor_name || "");
     }
-  }, [open, mode, current, presetNrCode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, mode, current, presetDocumentTypeId, presetNrCode, types]);
 
   // Cálculo automático do vencimento: só se o usuário não tiver editado.
   useEffect(() => {
@@ -143,11 +165,29 @@ export function SstCertificateDrawer({
 
   const today = new Date().toISOString().slice(0, 10);
 
+  const alreadyRegistered =
+    mode === "create" && selectedDocumentTypeId
+      ? currentByDocumentTypeId?.has(selectedDocumentTypeId) ?? false
+      : false;
+  const existingRow: SstCurrentRow | null = alreadyRegistered && currentRows
+    ? currentRows.find((r) => r.document_type_id === selectedDocumentTypeId) ?? null
+    : null;
+
+  const storageFlow = selectedType?.storageFlow ?? null;
+  const flowBlocked = storageFlow === "worker_documents" || storageFlow === "unresolved";
+
   const errors = useMemo(() => {
     const errs: string[] = [];
+    if (!selectedDocumentTypeId) errs.push("Selecione o tipo (NR, ASO ou treinamento).");
+    if (selectedType && !selectedType.isActive) errs.push("Tipo selecionado está inativo.");
+    if (mode === "create" && alreadyRegistered) {
+      errs.push("Este tipo já possui uma qualificação vigente. Use Renovar ou Substituir.");
+    }
+    if (flowBlocked) {
+      // Bloqueado antes de validar arquivo — evita ruído de mensagens.
+      return errs;
+    }
     if (!file) errs.push("Selecione o arquivo do certificado.");
-    if (!nrCode.trim()) errs.push("Informe a NR.");
-    else if (!normalizeNr(nrCode)) errs.push("Formato de NR inválido (use NRxx).");
     if (!issuedAt) errs.push("Informe a data de realização/conclusão.");
     else if (issuedAt > today) errs.push("Realização não pode ser futura.");
     if (hasExpiry) {
@@ -158,14 +198,18 @@ export function SstCertificateDrawer({
         errs.push("Validade deve ser posterior a hoje.");
     }
     return errs;
-  }, [file, nrCode, issuedAt, expiresAt, hasExpiry, today]);
+  }, [
+    file, selectedDocumentTypeId, selectedType, mode, alreadyRegistered, flowBlocked,
+    issuedAt, expiresAt, hasExpiry, today,
+  ]);
 
-  const canSubmit = errors.length === 0 && !uploading;
+  const canSubmit = errors.length === 0 && !uploading && !flowBlocked;
 
   const submit = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error("no_file");
-      const normalized = normalizeNr(nrCode) || nrCode.trim().toUpperCase();
+      if (!selectedType) throw new Error("no_type_selected");
+      const normalized = selectedType.code;
       const validationError = validateUpload(file);
       if (validationError) throw new Error(validationError);
 
@@ -196,9 +240,14 @@ export function SstCertificateDrawer({
 
       const payload: Record<string, unknown> = {
         worker_id: workerId,
+        // Identidade canônica (Q-024.B). Mantemos `nr_code` como legado no payload
+        // para compatibilidade da RPC, mas a fonte de verdade é o UUID.
+        document_type_id: selectedType.documentTypeId,
         nr_code: normalized,
         operation,
         previous_qualification_id:
+          (mode === "renew" || mode === "replace") ? current?.id ?? null : null,
+        expected_current_qualification_id:
           (mode === "renew" || mode === "replace") ? current?.id ?? null : null,
         training_type: trainingType.trim() || null,
         issued_at: issuedAt,
@@ -247,7 +296,24 @@ export function SstCertificateDrawer({
         ? ` ${res.linksProcessed} vínculo${res.linksProcessed === 1 ? "" : "s"} reavaliado${res.linksProcessed === 1 ? "" : "s"} automaticamente.`
         : "";
       toast.success(`${res.normalized} ${verb} com sucesso.${linkMsg}`);
-      onOpenChange(false);
+
+      if (mode === "create" && keepOpenAfterSave) {
+        // "Salvar e adicionar outra": limpa formulário e mantém drawer aberto.
+        setSelectedDocumentTypeId(null);
+        setFile(null);
+        setTrainingType("");
+        setIssuedAt("");
+        setExpiresAt("");
+        setHasExpiry(true);
+        setExpiryTouched(false);
+        setWorkload("");
+        setProvider("");
+        setInstructor("");
+        setNotes("");
+        setKeepOpenAfterSave(false);
+      } else {
+        onOpenChange(false);
+      }
     },
     onError: (e: any) => {
       setUploading(false);
@@ -272,9 +338,10 @@ export function SstCertificateDrawer({
         onEscapeKeyDown={(e) => { if (pending) e.preventDefault(); }}
         onPointerDownOutside={(e) => { if (pending) e.preventDefault(); }}
         onInteractOutside={(e) => { if (pending) e.preventDefault(); }}
+        data-testid="sst-certificate-drawer"
       >
         <SheetHeader>
-          <SheetTitle>{TITLES[mode]}{nrCode ? ` — ${nrCode}` : ""}</SheetTitle>
+          <SheetTitle>{TITLES[mode]}{selectedType ? ` — ${selectedType.code}` : ""}</SheetTitle>
           <SheetDescription>
             {workerName} • {DESCRIPTIONS[mode]}
           </SheetDescription>
@@ -303,8 +370,92 @@ export function SstCertificateDrawer({
         )}
 
         <div className="space-y-4 mt-4">
-          {/* Upload */}
+          {/* Seletor canônico de tipo (NR/ASO/Treinamento). */}
           <div>
+            <Label>Tipo *</Label>
+            <QualificationDocumentTypeCombobox
+              value={selectedDocumentTypeId}
+              onChange={(id) => setSelectedDocumentTypeId(id)}
+              currentByDocumentTypeId={currentByDocumentTypeId}
+              disabled={typeLocked || pending || loadingTypes}
+              invalid={!selectedDocumentTypeId}
+            />
+            {selectedType && (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {selectedType.name} • Categoria:{" "}
+                {selectedType.category === "sst_nr" ? "NR" :
+                 selectedType.category === "sst_aso" ? "ASO" : "Treinamento"}
+              </p>
+            )}
+          </div>
+
+          {/* Alerta: tipo já cadastrado (create). */}
+          {mode === "create" && alreadyRegistered && existingRow && (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <div className="font-medium text-amber-700 dark:text-amber-400">
+                    Este tipo já está cadastrado
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Vigente até {fmtDate(existingRow.expires_at)}. Para atualizar, use
+                    Renovar ou Substituir — não é possível criar uma segunda revisão
+                    vigente do mesmo tipo.
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {onRequestRenew && (
+                  <Button size="sm" variant="outline"
+                    onClick={() => onRequestRenew(existingRow)}>
+                    <RefreshCw className="h-3 w-3 mr-1" /> Renovar
+                  </Button>
+                )}
+                {onRequestReplace && (
+                  <Button size="sm" variant="outline"
+                    onClick={() => onRequestReplace(existingRow)}>
+                    <Replace className="h-3 w-3 mr-1" /> Substituir
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Fluxo de armazenamento não-worker_sst_qualifications. */}
+          {flowBlocked && (
+            <div className="rounded-md border border-blue-500/40 bg-blue-500/5 p-3 text-sm">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+                <div className="min-w-0 text-xs">
+                  {storageFlow === "worker_documents" ? (
+                    <>
+                      <div className="font-medium text-blue-700 dark:text-blue-400">
+                        Este tipo deve ser cadastrado como documento do trabalhador
+                      </div>
+                      <div className="text-muted-foreground">
+                        Use a aba <strong>Documentos</strong> para anexar o ASO. Ele não é
+                        gravado no registro de NRs para preservar a fonte única de dados.
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="font-medium text-blue-700 dark:text-blue-400">
+                        Fluxo de armazenamento ainda não configurado
+                      </div>
+                      <div className="text-muted-foreground">
+                        Este tipo aparece no catálogo mas ainda não tem escopo definido.
+                        Solicite a configuração ao administrador.
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Upload */}
+          <div className={flowBlocked ? "opacity-50 pointer-events-none" : ""}>
             <Label>Arquivo do certificado *</Label>
             {!file ? (
               <label
@@ -347,16 +498,7 @@ export function SstCertificateDrawer({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>NR *</Label>
-              <Input
-                value={nrCode}
-                onChange={(e) => setNrCode(e.target.value)}
-                placeholder="Ex.: NR35"
-                disabled={nrLocked}
-              />
-            </div>
+          <div className={"grid grid-cols-2 gap-3 " + (flowBlocked ? "opacity-50 pointer-events-none" : "")}>
             <div>
               <Label>Tipo</Label>
               <Input
@@ -407,7 +549,7 @@ export function SstCertificateDrawer({
                       </>
                     ) : !defaultValidityDays ? (
                       <span className="text-amber-700 dark:text-amber-400">
-                        Esta NR não possui validade padrão configurada. Informe o vencimento manualmente.
+                        Este tipo não possui validade padrão configurada. Informe o vencimento manualmente.
                       </span>
                     ) : null}
                   </p>
@@ -458,16 +600,31 @@ export function SstCertificateDrawer({
           )}
         </div>
 
-        <SheetFooter className="mt-6 gap-2 sm:justify-end">
+        <SheetFooter className="mt-6 gap-2 sm:justify-end flex-wrap">
           <Button
             variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}
           >
             Cancelar
           </Button>
-          <Button onClick={() => submit.mutate()} disabled={!canSubmit}>
+          {mode === "create" && (
+            <Button
+              variant="outline"
+              onClick={() => { setKeepOpenAfterSave(true); submit.mutate(); }}
+              disabled={!canSubmit}
+              data-testid="save-and-add-another"
+            >
+              {pending && keepOpenAfterSave && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar e adicionar outra
+            </Button>
+          )}
+          <Button
+            onClick={() => { setKeepOpenAfterSave(false); submit.mutate(); }}
+            disabled={!canSubmit}
+            data-testid="save-qualification"
+          >
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {uploading ? "Enviando arquivo…" : submit.isPending ? "Registrando…" :
-              mode === "renew" ? "Renovar" : mode === "replace" ? "Substituir" : "Registrar"}
+              mode === "renew" ? "Renovar" : mode === "replace" ? "Substituir" : "Salvar"}
           </Button>
         </SheetFooter>
       </SheetContent>
