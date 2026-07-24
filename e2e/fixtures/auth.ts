@@ -18,17 +18,34 @@ export async function restoreSupabaseSession(page: Page) {
   const sessionJson = process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON;
   const cookiesJson = process.env.LOVABLE_BROWSER_SUPABASE_COOKIES_JSON;
 
-  if (cookiesJson) {
-    const cookies = JSON.parse(cookiesJson).map((c: any) => ({ ...c, url: BASE_URL }));
-    await page.context().addCookies(cookies);
-  }
-  await page.goto(BASE_URL);
+  // Install the Supabase session BEFORE the first navigation so the JS
+  // client boots already authenticated on the very first render. Using
+  // addInitScript avoids the "first page loads as anonymous, then we
+  // stuff localStorage" race that forced a reload previously.
   if (storageKey && sessionJson) {
-    await page.evaluate(
-      ([k, v]) => window.localStorage.setItem(k, v),
-      [storageKey, sessionJson] as const,
+    await page.addInitScript(
+      ({ key, value }) => {
+        try {
+          window.localStorage.setItem(key, value);
+        } catch {
+          /* storage may be unavailable on about:blank */
+        }
+      },
+      { key: storageKey, value: sessionJson },
     );
   }
+
+  if (cookiesJson) {
+    const baseOrigin = new URL(BASE_URL).origin;
+    const parsed = JSON.parse(cookiesJson) as Array<Record<string, any>>;
+    const cookies = parsed.map((cookie) => {
+      if (cookie.domain) return cookie;
+      return { ...cookie, url: cookie.url ?? baseOrigin };
+    });
+    await page.context().addCookies(cookies as any);
+  }
+
+  await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
 }
 
 export const test = base.extend<{ authedPage: Page }>({
