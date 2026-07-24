@@ -1,5 +1,4 @@
-import { test, expect } from "@playwright/test";
-import { withInjectedAuth } from "./fixtures/auth";
+import { test, expect } from "./fixtures/auth";
 
 /**
  * Q-024.A — Canonical catalog E2E.
@@ -15,9 +14,7 @@ import { withInjectedAuth } from "./fixtures/auth";
  */
 
 test.describe("Q-024.A — canonical worker qualification catalog", () => {
-  test("Settings → Roles calls list_worker_qualification_types", async ({ page }) => {
-    await withInjectedAuth(page);
-
+  test("Settings → Roles calls list_worker_qualification_types", async ({ authedPage: page }) => {
     let rpcHits = 0;
     let rpcPayload: unknown = null;
     page.on("response", async (resp) => {
