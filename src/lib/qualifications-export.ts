@@ -81,7 +81,7 @@ function fmtDateBR(iso: string | null): string {
   return `${d}/${m}/${y}`;
 }
 
-function neutralizeCsvCell(v: string): string {
+export function neutralizeCsvCell(v: string): string {
   // Neutraliza prefixos executáveis mesmo quando precedidos por espaços,
   // tabs ou quebras — Excel/Sheets ignoram esse whitespace ao avaliar
   // fórmulas.
