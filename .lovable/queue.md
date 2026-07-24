@@ -22,6 +22,18 @@
 - Q-016 — Catálogo canônico de qualificações por `document_type_id` (bloqueia encerramento de Q-023 core).
 
 ## VALIDATING
+- Q-024-D-UI-MULTIPLE — Ficha do trabalhador permite múltiplas qualificações vigentes:
+  - `SstQualificationsPanel`: toolbar permanente "Adicionar qualificação" (sempre visível para admin/manager/operator, com 0/1/N linhas). Empty state atualizado para "Nenhuma qualificação registrada".
+  - `SstCertificateDrawer`: input livre de NR removido. Passa a consumir `useWorkerQualificationTypes({ includeInactive: false })` via novo `QualificationDocumentTypeCombobox` (busca por código/nome, sem criação inline, sem inativos).
+  - Payload envia `document_type_id` (identidade canônica Q-024.B) + `nr_code` legado; `expected_current_qualification_id` em renew/replace.
+  - Roteamento por `storageFlow`: `worker_sst_qualifications` prossegue; `worker_documents` (ASO) bloqueia com CTA para aba Documentos; `unresolved` desabilita.
+  - Detecção de tipo já vigente em `create`: badge "Já cadastrada" no combobox + alerta com atalhos Renovar/Substituir. Impede duplo current do mesmo `document_type_id`.
+  - Botão "Salvar e adicionar outra" limpa o formulário, mantém drawer aberto e permite cadastrar múltiplos tipos em sequência.
+  - `presetNrCode` legado resolvido para `document_type_id` via catálogo canônico (compat com `SstPendencies`).
+  - Testes unitários (`SstQualificationsPanel.test.tsx`): botão presente com rows = [], [NR18] e [NR18, NR35] — 3/3 verdes. Regressão do defeito coberta.
+  - Aguardando E2E autenticado `worker-add-multiple-qualifications-ui.spec.ts` na sessão do admin.
+
+## VALIDATING
 - Q-024.B — Identidade canônica `worker_id + document_type_id` em `register_sst_revision`: advisory lock canônico; lookup por UUID; UPDATE `superseded_at` da anterior ANTES do INSERT; entrada compatível (`document_type_id`, `nr_code` legado, ambos verificados); `additional_conflicts_with_current`; apenas `sst_nr`; nenhum tipo criado automaticamente. Aguardando validação E2E autenticada.
 
 ## BLOCKED
