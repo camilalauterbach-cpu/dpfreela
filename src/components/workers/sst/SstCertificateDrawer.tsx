@@ -130,6 +130,7 @@ export function SstCertificateDrawer({
   const [file, setFile] = useState<File | null>(null);
   const [selectedDocumentTypeId, setSelectedDocumentTypeId] = useState<string | null>(null);
   const [trainingType, setTrainingType] = useState("");
+  const [trainingTypeOther, setTrainingTypeOther] = useState("");
   const [issuedAt, setIssuedAt] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [hasExpiry, setHasExpiry] = useState(true);
@@ -175,6 +176,7 @@ export function SstCertificateDrawer({
     if (mode === "create") {
       setSelectedDocumentTypeId(resolvePresetId());
       setTrainingType("");
+      setTrainingTypeOther("");
       setIssuedAt("");
       setExpiresAt("");
       setHasExpiry(true);
@@ -381,6 +383,7 @@ export function SstCertificateDrawer({
         setSelectedDocumentTypeId(null);
         setFile(null);
         setTrainingType("");
+        setTrainingTypeOther("");
         setIssuedAt("");
         setExpiresAt("");
         setHasExpiry(true);
