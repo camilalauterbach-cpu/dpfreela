@@ -197,3 +197,4 @@ describe.skip("SstCertificateDrawer — legacy shape", () => {
   it("noop", () => {
     expect(true).toBe(true);
   });
+});
