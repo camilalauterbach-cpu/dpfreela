@@ -5,6 +5,7 @@
 //         → reevaluate_worker_links → invalidate caches.
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { captureRpcFailure, copyRpcFailure, type RpcFailureBundle } from "@/lib/rpc-diagnostics";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
