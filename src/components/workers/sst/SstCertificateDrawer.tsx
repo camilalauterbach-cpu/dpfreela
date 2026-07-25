@@ -303,7 +303,10 @@ export function SstCertificateDrawer({
           (mode === "renew" || mode === "replace") ? current?.id ?? null : null,
         expected_current_qualification_id:
           (mode === "renew" || mode === "replace") ? current?.id ?? null : null,
-        training_type: trainingType.trim() || null,
+        training_type:
+          trainingType === "Outro"
+            ? (trainingTypeOther.trim() || null)
+            : (trainingType.trim() || null),
         issued_at: issuedAt,
         expires_at: hasExpiry ? expiresAt : null,
         validity_status: hasExpiry ? "has_expiry" : "no_expiry",
