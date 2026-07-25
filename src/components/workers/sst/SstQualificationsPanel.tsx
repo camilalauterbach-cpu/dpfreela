@@ -97,7 +97,7 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
     },
     onSuccess: () => {
       invalidateSstCaches(qc);
-      invalidateComplianceCaches(qc, { workerId, eventSource: "delete_sst_revision" });
+      invalidateComplianceCaches(qc, { workerId, eventSource: "admin_update" });
       qc.invalidateQueries({ queryKey: ["worker-sst-current", workerId] });
       qc.invalidateQueries({ queryKey: ["worker-sst-summary", workerId] });
       qc.invalidateQueries({ queryKey: ["worker-sst-history", workerId] });
