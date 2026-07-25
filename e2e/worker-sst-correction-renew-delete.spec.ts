@@ -140,6 +140,16 @@ async function fillDrawerCommon(
   }
 }
 
+async function selectQualificationType(page: Page, drawer: ReturnType<Page["getByTestId"]>, matcher: RegExp) {
+  await drawer.getByTestId("qualification-type-combobox").click();
+  const option = page
+    .locator('[data-testid^="qualification-type-option-"]')
+    .filter({ hasText: matcher })
+    .first();
+  await option.waitFor({ state: "visible", timeout: 15_000 });
+  await option.click();
+}
+
 test("Cadastra NR35 inicial via UI (seed do fluxo)", async ({ authedPage: page }) => {
   test.setTimeout(90_000);
   await openSstTab(page);
@@ -148,8 +158,7 @@ test("Cadastra NR35 inicial via UI (seed do fluxo)", async ({ authedPage: page }
   const drawer = page.getByTestId("sst-certificate-drawer");
   await expect(drawer).toBeVisible();
 
-  await drawer.getByTestId("qualification-type-combobox").click();
-  await page.getByTestId("qualification-type-option-NR35").click();
+  await selectQualificationType(page, drawer, /NR\s*-?\s*35/i);
 
   await fillDrawerCommon(page, drawer, {
     issued: SEED_ISSUED,
@@ -299,8 +308,7 @@ test("Treinamento Interno: cria uma vez; segunda tentativa é bloqueada sem dupl
   let drawer = page.getByTestId("sst-certificate-drawer");
   await expect(drawer).toBeVisible();
 
-  await drawer.getByTestId("qualification-type-combobox").click();
-  await page.getByTestId(`qualification-type-option-${TREINAMENTO_INT_TESTID_SUFFIX}`).click();
+  await selectQualificationType(page, drawer, /Treinamento\s+Interno/i);
 
   await drawer.getByTestId("training-type-select").selectOption("Inicial");
   await fillDrawerCommon(page, drawer, {
@@ -327,8 +335,7 @@ test("Treinamento Interno: cria uma vez; segunda tentativa é bloqueada sem dupl
   drawer = page.getByTestId("sst-certificate-drawer");
   await expect(drawer).toBeVisible();
 
-  await drawer.getByTestId("qualification-type-combobox").click();
-  await page.getByTestId(`qualification-type-option-${TREINAMENTO_INT_TESTID_SUFFIX}`).click();
+  await selectQualificationType(page, drawer, /Treinamento\s+Interno/i);
   await drawer.getByTestId("training-type-select").selectOption("Inicial");
   await fillDrawerCommon(page, drawer, {
     issued: "2025-04-10",
