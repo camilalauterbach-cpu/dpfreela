@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +27,7 @@ import {
 import { BankDataForm } from "./BankDataForm";
 import { validateUpload, ALLOWED_FILE_EXTENSIONS, getSafeContentType } from "@/lib/upload-validation";
 import { invalidateComplianceCaches } from "@/lib/compliance-cache";
+import { WorkerDocumentRevisionPanel } from "./WorkerDocumentRevisionPanel";
 
 interface Props {
   workerId: string;
@@ -54,6 +56,14 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const canEdit = hasAnyRole(["admin", "manager", "operator"]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusedDocumentTypeId = searchParams.get("document_type_id");
+
+  const clearFocusedDocType = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("document_type_id");
+    setSearchParams(next, { replace: true });
+  };
 
   const { data: docs, isLoading } = useQuery({
     queryKey: ["worker-documents", workerId],
@@ -580,6 +590,13 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
 
   return (
     <div className="space-y-6">
+      {focusedDocumentTypeId && (
+        <WorkerDocumentRevisionPanel
+          workerId={workerId}
+          documentTypeId={focusedDocumentTypeId}
+          onClose={clearFocusedDocType}
+        />
+      )}
       <div>
         <h3 className="text-sm font-semibold text-foreground mb-3">Documentos obrigatórios</h3>
         <div className="grid gap-3 sm:grid-cols-2">
