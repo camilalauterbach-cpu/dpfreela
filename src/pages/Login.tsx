@@ -85,19 +85,12 @@ export default function Login() {
       });
 
       if (error) {
-        toast({
-          title: "Erro ao entrar",
-          description: error.message,
-          variant: "destructive",
-        });
+        const { title, description } = getLoginErrorMessage(error);
+        toast({ title, description, variant: "destructive" });
       }
-    } catch {
-      toast({
-        title: "Serviço indisponível",
-        description:
-          "Não foi possível concluir o login. Verifique sua conexão e tente novamente.",
-        variant: "destructive",
-      });
+    } catch (err) {
+      const { title, description } = getLoginErrorMessage(err);
+      toast({ title, description, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
