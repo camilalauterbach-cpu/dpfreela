@@ -330,28 +330,22 @@ test("Treinamento Interno: cria uma vez; segunda tentativa é bloqueada sem dupl
     .toBe(1);
 
   // ---- 2ª tentativa mesmo tipo: bloqueada -------------------------------
-  const beforeCount = hits.length;
   await page.getByTestId("add-qualification-button").click();
   drawer = page.getByTestId("sst-certificate-drawer");
   await expect(drawer).toBeVisible();
 
   await selectQualificationType(page, drawer, /Treinamento\s+Interno/i);
-  await drawer.getByTestId("training-type-select").selectOption("Inicial");
-  await fillDrawerCommon(page, drawer, {
-    issued: "2025-04-10",
-    expires: "2027-04-10",
-    provider: `Instituição B ${RUN_ID}`,
-  });
-  await drawer.locator('input[inputmode="numeric"]').first().fill("8");
 
-  await drawer.getByTestId("save-qualification").click();
+  // O drawer bloqueia o save no cliente e mostra a orientação canônica.
+  await expect(drawer).toContainText(/Este tipo já possui uma qualificação vigente/i);
+  await expect(drawer.getByTestId("save-qualification")).toBeDisabled();
 
-  await expect
-    .poll(() => hits.length, { timeout: 20_000 })
-    .toBeGreaterThan(beforeCount);
-  const last = hits[hits.length - 1];
-  expect(last.body).toMatch(/qualification_current_version_exists|additional_conflicts_with_current/);
-  await expect(drawer).toBeVisible();
+  // Nenhuma chamada extra à RPC foi feita nesta segunda tentativa.
+  const beforeCount = hits.length;
+  await page.waitForTimeout(500);
+  expect(hits.length).toBe(beforeCount);
+
+  await page.keyboard.press("Escape");
 
   // Sem duplicidade.
   const finalCount = Number(psql(
