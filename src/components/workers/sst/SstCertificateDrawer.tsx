@@ -30,6 +30,50 @@ import { QualificationDocumentTypeCombobox } from "./QualificationDocumentTypeCo
 
 export type SstDrawerMode = "create" | "renew" | "replace";
 
+// Q-024-D-TRAINING-FIX §7 — mapeamento de erros técnicos → texto claro.
+const RPC_ERROR_MESSAGES: Record<string, string> = {
+  invalid_nr_code_format:
+    "Este tipo documental foi tratado incorretamente como NR.",
+  training_document_type_id_required:
+    "Selecione o treinamento no catálogo.",
+  qualification_storage_flow_not_supported:
+    "Este tipo deve ser cadastrado em outro fluxo documental.",
+  unknown_document_type:
+    "O tipo selecionado não foi encontrado no catálogo.",
+  document_type_code_mismatch:
+    "O tipo selecionado não corresponde ao código informado.",
+  document_type_inactive:
+    "Este tipo documental está inativo no catálogo.",
+  qualification_current_version_exists:
+    "Já existe versão vigente deste tipo. Use Renovar ou Substituir.",
+  additional_conflicts_with_current:
+    "Já existe versão vigente deste tipo. Use Renovar ou Substituir.",
+  no_current_qualification_to_revise:
+    "Nenhuma versão vigente encontrada para revisar.",
+  stale_current_qualification:
+    "A versão vigente mudou desde a última leitura. Recarregue e tente novamente.",
+  invariant_violation_multiple_current_qualifications:
+    "Conflito de integridade: mais de uma versão vigente. Contate o administrador.",
+  invalid_expiry:
+    "Data de validade inválida — deve ser posterior à realização.",
+};
+
+function mapRpcError(raw: string): string {
+  for (const [code, text] of Object.entries(RPC_ERROR_MESSAGES)) {
+    if (raw.includes(code)) return text;
+  }
+  return raw;
+}
+
+// Q-024-D-TRAINING-FIX §6 — opções controladas de `training_type`.
+const TRAINING_TYPE_OPTIONS = [
+  "Inicial",
+  "Reciclagem",
+  "Atualização",
+  "Complementar",
+  "Outro",
+] as const;
+
 // Q-024-D-UI-MULTIPLE — variável da mutation com a intenção do usuário.
 // Não depende de state atualizado assincronamente antes de submit.mutate().
 export interface SubmitVars {
