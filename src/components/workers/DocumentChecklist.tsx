@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -88,6 +88,19 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
   const resolveTypeForCategory = (category: string) => {
     return typesByCategory?.get(category.toLowerCase()) ?? null;
   };
+
+  // Reverse lookup: focused document_type_id → category (used to scroll,
+  // highlight and auto-open the file picker for the correct card).
+  const focusedCategory = useMemo(() => {
+    if (!focusedDocumentTypeId || !typesByCategory) return null;
+    for (const [code, row] of typesByCategory.entries()) {
+      if (row.id === focusedDocumentTypeId) return code;
+    }
+    return null;
+  }, [focusedDocumentTypeId, typesByCategory]);
+
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const focusHandledRef = useRef<string | null>(null);
 
   const { data: docs, isLoading } = useQuery({
     queryKey: ["worker-documents", workerId],
@@ -183,6 +196,34 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
   const [showBankForm, setShowBankForm] = useState(false);
   const [bankReplaceAction, setBankReplaceAction] = useState<"upload" | "form" | null>(null);
   const [deleteConfirmDoc, setDeleteConfirmDoc] = useState<any | null>(null);
+
+  // When arriving with ?document_type_id=…, scroll to the card, ring-highlight
+  // it and open the file picker so the user reaches the action in one click.
+  useEffect(() => {
+    if (!focusedDocumentTypeId || !focusedCategory) return;
+    if (focusHandledRef.current === focusedDocumentTypeId) return;
+    focusHandledRef.current = focusedDocumentTypeId;
+
+    const el = cardRefs.current[focusedCategory];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-primary", "ring-offset-2");
+      window.setTimeout(() => {
+        el.classList.remove("ring-2", "ring-primary", "ring-offset-2");
+      }, 2500);
+    }
+
+    if (canEdit && focusedCategory !== "bank_document") {
+      // Small delay so the scroll animation is visible before the OS picker opens.
+      window.setTimeout(() => handleFileSelect(focusedCategory), 350);
+    }
+
+    // Consume the query param once acted upon.
+    const next = new URLSearchParams(searchParams);
+    next.delete("document_type_id");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedDocumentTypeId, focusedCategory, canEdit]);
 
   const uploadMutation = useMutation({
    mutationFn: async ({ category, file, alwaysInsert }: { category: string; file: File; alwaysInsert?: boolean }) => {
@@ -405,7 +446,12 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     const attachments = isRg ? (rgFiles ?? []) : [];
 
     return (
-      <Card key={category} className="overflow-hidden">
+      <Card
+        key={category}
+        ref={(el) => { cardRefs.current[category] = el as unknown as HTMLDivElement | null; }}
+        data-category={category}
+        className="overflow-hidden transition-shadow"
+      >
         <CardContent className="p-4 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -450,7 +496,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
                   ) : (
                     <Upload className="mr-1 h-3 w-3" />
                   )}
-                  {doc ? "Substituir" : "Enviar"}
+                  {doc ? "Atualizar" : "Anexar"}
                 </Button>
                 {doc && status !== "approved" && (
                   <Select
@@ -780,7 +826,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
 
   return (
     <div className="space-y-6">
-      {focusedDocumentTypeId && (
+      {focusedDocumentTypeId && !focusedCategory && (
         <WorkerDocumentRevisionPanel
           workerId={workerId}
           documentTypeId={focusedDocumentTypeId}

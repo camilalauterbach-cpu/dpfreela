@@ -219,7 +219,7 @@ export function WorkerCompletionChecklist({ workerId }: { workerId: string }) {
                         onClick={() => openDocumentTab(m.document_type_id)}
                       >
                         <Upload className="mr-1 h-3 w-3" />
-                        {m.reason === "ausente" ? "Anexar documento" : "Atualizar documento"}
+                        Anexar/atualizar documento
                       </Button>
                     </div>
                   </AccordionContent>
