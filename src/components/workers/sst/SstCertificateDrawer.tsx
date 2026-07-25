@@ -834,17 +834,43 @@ export function SstCertificateDrawer({
           )}
 
           {lastError && !pending && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive flex items-start justify-between gap-2">
-              <span className="min-w-0">{lastError}</span>
-              <Button
-                size="sm" variant="outline"
-                className="h-7 text-xs shrink-0"
-                onClick={() => submit.mutate({ continueAdding: false })}
-                disabled={errors.length > 0}
-              >
-                Tentar novamente
-              </Button>
-            </div>
+            (() => {
+              const sameDatesConflict =
+                mode === "renew" &&
+                /Substituir/i.test(lastError) &&
+                !!current &&
+                !!onRequestReplace;
+              return (
+                <div
+                  className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive flex items-start justify-between gap-2"
+                  data-testid="sst-drawer-error"
+                >
+                  <span className="min-w-0">{lastError}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {sameDatesConflict && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-7 text-xs"
+                        data-testid="sst-drawer-switch-to-replace"
+                        onClick={() => onRequestReplace!(current!)}
+                      >
+                        <Replace className="h-3 w-3 mr-1" /> Ir para Substituir
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={() => submit.mutate({ continueAdding: false })}
+                      disabled={errors.length > 0}
+                    >
+                      Tentar novamente
+                    </Button>
+                  </div>
+                </div>
+              );
+            })()
           )}
         </div>
 
