@@ -18,8 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Search, Copy } from "lucide-react";
+import { Loader2, Search, Copy, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { neutralizeCsvCell } from "@/lib/qualifications-export";
 
 interface LogRow {
   id: string;
@@ -121,6 +122,84 @@ export default function RevisionLogs() {
     toast({ title: "Copiado", description: "Payload copiado para a área de transferência." });
   };
 
+  const exportCsv = () => {
+    if (!selectedWorker || !documentTypeId) return;
+    const rows = logsQ.data ?? [];
+    if (rows.length === 0) {
+      toast({ title: "Sem dados", description: "Nenhum evento para exportar." });
+      return;
+    }
+
+    const header = [
+      "trace_id",
+      "revision_id",
+      "worker_id",
+      "document_type_id",
+      "event_count",
+      "lock_acquired_at",
+      "lock_released_at",
+      "lock_duration_ms",
+      "idempotent_hit",
+      "revision_created_at",
+      "revision_superseded_at",
+      "actions",
+    ];
+
+    const lines: string[] = [header.join(",")];
+
+    for (const [traceId, group] of grouped) {
+      const sorted = group.slice().sort((a, b) => a.created_at.localeCompare(b.created_at));
+      const first = sorted[0];
+      const revisionId =
+        sorted.find((r) => r.new_data?.revision_id)?.new_data?.revision_id ??
+        first?.record_id ??
+        "";
+      const lockAcq = sorted.find((r) => r.action === "revision.lock_acquired");
+      const lockRel = sorted.find((r) => r.action === "revision.lock_released");
+      const idem = sorted.find((r) => r.action === "revision.idempotent_hit");
+      const created = sorted.find((r) => r.action === "revision.created");
+      const superseded = sorted.find((r) => r.action === "revision.superseded");
+      const duration = lockRel?.new_data?.duration_ms;
+      const actions = sorted.map((r) => r.action).join("|");
+
+      const fields = [
+        traceId,
+        String(revisionId ?? ""),
+        selectedWorker.id,
+        documentTypeId,
+        String(sorted.length),
+        lockAcq?.created_at ?? "",
+        lockRel?.created_at ?? "",
+        typeof duration === "number" ? String(duration) : "",
+        idem ? "yes" : "no",
+        created?.created_at ?? "",
+        superseded?.created_at ?? "",
+        actions,
+      ];
+
+      lines.push(
+        fields
+          .map((v) => {
+            const safe = neutralizeCsvCell(v ?? "");
+            return `"${String(safe).replace(/"/g, '""')}"`;
+          })
+          .join(","),
+      );
+    }
+
+    const csv = "\uFEFF" + lines.join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    a.href = url;
+    a.download = `revision-logs_${selectedWorker.id.slice(0, 8)}_${stamp}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-4 max-w-6xl">
       <div>
@@ -205,9 +284,20 @@ export default function RevisionLogs() {
             <CardTitle className="text-base">
               Eventos {logsQ.data ? `(${logsQ.data.length})` : ""}
             </CardTitle>
-            <Button variant="outline" size="sm" onClick={() => logsQ.refetch()}>
-              Atualizar
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportCsv}
+                disabled={!(logsQ.data && logsQ.data.length > 0)}
+              >
+                <Download className="h-3 w-3 mr-1" />
+                Exportar CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => logsQ.refetch()}>
+                Atualizar
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {logsQ.isLoading ? (
