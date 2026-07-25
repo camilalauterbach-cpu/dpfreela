@@ -139,7 +139,13 @@ describe("SstCertificateDrawer — persistência de treinamento com identidade c
 
     // Submete
     const save = await screen.findByTestId("save-qualification");
-    await waitFor(() => expect((save as HTMLButtonElement).disabled).toBe(false));
+    await waitFor(() => {
+      if ((save as HTMLButtonElement).disabled) {
+        const list = document.querySelectorAll("ul li");
+        const errs = Array.from(list).map((l) => l.textContent).join("\n");
+        throw new Error("Save still disabled. Errors:\n" + errs);
+      }
+    }, { timeout: 2000 });
     fireEvent.click(save);
 
     await waitFor(() =>
