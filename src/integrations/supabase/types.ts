@@ -1762,64 +1762,94 @@ export type Database = {
         Row: {
           category: string | null
           created_at: string
+          created_by: string | null
           deleted_at: string | null
           document_number: string | null
           document_type: string
           document_type_id: string | null
           expiry_date: string | null
+          expiry_override_reason: string | null
+          expiry_source: string | null
           file_name: string | null
           file_path: string | null
           file_size: number | null
           id: string
+          idempotency_key: string | null
           is_current: boolean
           issue_date: string | null
           issuing_authority: string | null
           mime_type: string | null
           notes: string | null
+          revision_managed: boolean
+          revision_reason: string | null
+          revision_type: string | null
           status: string
+          superseded_at: string | null
+          supersedes_id: string | null
           updated_at: string
+          validity_rule_snapshot: Json | null
           worker_id: string
         }
         Insert: {
           category?: string | null
           created_at?: string
+          created_by?: string | null
           deleted_at?: string | null
           document_number?: string | null
           document_type: string
           document_type_id?: string | null
           expiry_date?: string | null
+          expiry_override_reason?: string | null
+          expiry_source?: string | null
           file_name?: string | null
           file_path?: string | null
           file_size?: number | null
           id?: string
+          idempotency_key?: string | null
           is_current?: boolean
           issue_date?: string | null
           issuing_authority?: string | null
           mime_type?: string | null
           notes?: string | null
+          revision_managed?: boolean
+          revision_reason?: string | null
+          revision_type?: string | null
           status?: string
+          superseded_at?: string | null
+          supersedes_id?: string | null
           updated_at?: string
+          validity_rule_snapshot?: Json | null
           worker_id: string
         }
         Update: {
           category?: string | null
           created_at?: string
+          created_by?: string | null
           deleted_at?: string | null
           document_number?: string | null
           document_type?: string
           document_type_id?: string | null
           expiry_date?: string | null
+          expiry_override_reason?: string | null
+          expiry_source?: string | null
           file_name?: string | null
           file_path?: string | null
           file_size?: number | null
           id?: string
+          idempotency_key?: string | null
           is_current?: boolean
           issue_date?: string | null
           issuing_authority?: string | null
           mime_type?: string | null
           notes?: string | null
+          revision_managed?: boolean
+          revision_reason?: string | null
+          revision_type?: string | null
           status?: string
+          superseded_at?: string | null
+          supersedes_id?: string | null
           updated_at?: string
+          validity_rule_snapshot?: Json | null
           worker_id?: string
         }
         Relationships: [
@@ -1828,6 +1858,13 @@ export type Database = {
             columns: ["document_type_id"]
             isOneToOne: false
             referencedRelation: "document_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_documents_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "worker_documents"
             referencedColumns: ["id"]
           },
           {
@@ -2813,47 +2850,8 @@ export type Database = {
       }
       register_sst_revision: { Args: { payload: Json }; Returns: Json }
       register_worker_document_revision: {
-        Args: {
-          p_document_number?: string
-          p_document_type_id: string
-          p_expiry_date?: string
-          p_file_name?: string
-          p_file_path?: string
-          p_file_size?: number
-          p_issue_date?: string
-          p_issuing_authority?: string
-          p_mime_type?: string
-          p_notes?: string
-          p_status?: string
-          p_worker_id: string
-        }
-        Returns: {
-          category: string | null
-          created_at: string
-          deleted_at: string | null
-          document_number: string | null
-          document_type: string
-          document_type_id: string | null
-          expiry_date: string | null
-          file_name: string | null
-          file_path: string | null
-          file_size: number | null
-          id: string
-          is_current: boolean
-          issue_date: string | null
-          issuing_authority: string | null
-          mime_type: string | null
-          notes: string | null
-          status: string
-          updated_at: string
-          worker_id: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "worker_documents"
-          isOneToOne: true
-          isSetofReturn: false
-        }
+        Args: { p_payload: Json }
+        Returns: Json
       }
       release_public_invite: {
         Args: { _error_code: string; _invite_id: string; _nonce: string }
@@ -2971,6 +2969,46 @@ export type Database = {
           p_required_until?: string
         }
         Returns: Json
+      }
+      set_worker_document_review_status: {
+        Args: { p_document_id: string; p_reason?: string; p_status: string }
+        Returns: {
+          category: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          document_number: string | null
+          document_type: string
+          document_type_id: string | null
+          expiry_date: string | null
+          expiry_override_reason: string | null
+          expiry_source: string | null
+          file_name: string | null
+          file_path: string | null
+          file_size: number | null
+          id: string
+          idempotency_key: string | null
+          is_current: boolean
+          issue_date: string | null
+          issuing_authority: string | null
+          mime_type: string | null
+          notes: string | null
+          revision_managed: boolean
+          revision_reason: string | null
+          revision_type: string | null
+          status: string
+          superseded_at: string | null
+          supersedes_id: string | null
+          updated_at: string
+          validity_rule_snapshot: Json | null
+          worker_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "worker_documents"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
