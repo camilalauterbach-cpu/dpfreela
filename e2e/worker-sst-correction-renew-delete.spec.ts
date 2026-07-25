@@ -77,6 +77,7 @@ function generateCpf(): string {
 
 let WORKER_ID = "";
 let SEED_QUAL_ID = "";
+let SUBSTITUTED_ONCE = false;
 
 interface RpcHit { url: string; payload: any; status: number; body: string }
 
@@ -105,18 +106,6 @@ test.beforeAll(() => {
     `insert into public.workers (full_name, cpf) values ('${WORKER_NAME.replace(/'/g, "''")}', '${cpf}') returning id`,
   );
   expect(WORKER_ID).toMatch(/^[0-9a-f-]{36}$/);
-
-  // Seed uma qualificação NR35 vigente com datas conhecidas.
-  SEED_QUAL_ID = psql(`
-    insert into public.worker_sst_qualifications
-      (worker_id, nr_code, document_type_id, issued_at, expires_at,
-       validity_status, source_type, revision_type, document_status, document_url)
-    values
-      ('${WORKER_ID}', 'NR35', '${NR35_TYPE_ID}', '${SEED_ISSUED}', '${SEED_EXPIRES}',
-       'has_expiry', 'manual', 'initial', 'ok', 'sst/${WORKER_ID}/NR35/seed.pdf')
-    returning id
-  `);
-  expect(SEED_QUAL_ID).toMatch(/^[0-9a-f-]{36}$/);
 });
 
 test.afterAll(() => {
@@ -150,6 +139,34 @@ async function fillDrawerCommon(
     if (await providerInput.count()) await providerInput.fill(opts.provider);
   }
 }
+
+test("Cadastra NR35 inicial via UI (seed do fluxo)", async ({ authedPage: page }) => {
+  test.setTimeout(90_000);
+  await openSstTab(page);
+
+  await page.getByTestId("add-qualification-button").click();
+  const drawer = page.getByTestId("sst-certificate-drawer");
+  await expect(drawer).toBeVisible();
+
+  await drawer.getByTestId("qualification-type-combobox").click();
+  await page.getByTestId("qualification-type-option-NR35").click();
+
+  await fillDrawerCommon(page, drawer, {
+    issued: SEED_ISSUED,
+    expires: SEED_EXPIRES,
+    provider: `Seed ${RUN_ID}`,
+  });
+
+  await drawer.getByTestId("save-qualification").click();
+  await expect(drawer).toBeHidden({ timeout: 20_000 });
+
+  SEED_QUAL_ID = psql(
+    `select id from public.worker_sst_qualifications
+       where worker_id='${WORKER_ID}' and document_type_id='${NR35_TYPE_ID}'
+         and deleted_at is null and superseded_at is null`,
+  );
+  expect(SEED_QUAL_ID).toMatch(/^[0-9a-f-]{36}$/);
+});
 
 test("Substituir NR35 executa correction (UPDATE in-place, mesmo id, sem duplicar)", async ({ authedPage: page }) => {
   test.setTimeout(90_000);
