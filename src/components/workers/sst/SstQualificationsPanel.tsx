@@ -254,10 +254,10 @@ function statusToBadge(s: UnifiedQualificationRow["status"]): SstOverallStatus {
   if (s === "expired") return "expired";
   if (s === "warning") return "expiring";
   if (s === "valid") return "valid";
-  if (s === "rejected") return "revoked";
-  if (s === "missing_file") return "missing_doc";
-  // pending / validity_unknown → tratamos como pendente de documento
-  return "missing_doc";
+  if (s === "rejected") return "pending";
+  if (s === "missing_file") return "no_document";
+  // pending / validity_unknown → tratamos como pendente
+  return "pending";
 }
 
 function categoryLabel(c: UnifiedQualificationRow["category"]): string {
