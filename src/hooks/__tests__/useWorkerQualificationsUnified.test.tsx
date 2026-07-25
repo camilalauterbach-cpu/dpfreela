@@ -7,8 +7,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 
 // ---- Mocks -----------------------------------------------------------------
-const sstRows = vi.fn<[], any[]>(() => []);
-const docRows = vi.fn<[], any[]>(() => []);
+const sstRows: { current: any[] } = { current: [] };
+const docRows: { current: any[] } = { current: [] };
 
 vi.mock("@/integrations/supabase/client", () => {
   const build = (table: string) => {
@@ -21,9 +21,9 @@ vi.mock("@/integrations/supabase/client", () => {
       order: () => chain,
       then: (resolve: any) =>
         Promise.resolve(
-          table === "worker_sst_qualifications_current"
-            ? { data: sstRows(), error: null }
-            : { data: docRows(), error: null },
+        table === "worker_sst_qualifications_current"
+            ? { data: sstRows.current, error: null }
+            : { data: docRows.current, error: null },
         ).then(resolve),
     };
     return chain;
@@ -85,15 +85,13 @@ function wrapper() {
 }
 
 beforeEach(() => {
-  sstRows.mockReset();
-  docRows.mockReset();
-  sstRows.mockReturnValue([]);
-  docRows.mockReturnValue([]);
+  sstRows.current = [];
+  docRows.current = [];
 });
 
 describe("useWorkerQualificationsUnified", () => {
   it("classifica SST sem expires_at e sem validity=no_expiry como validity_unknown", async () => {
-    sstRows.mockReturnValue([
+    sstRows.current = [
       {
         id: "sst-1",
         worker_id: "w-1",
@@ -106,7 +104,7 @@ describe("useWorkerQualificationsUnified", () => {
         document_url: "sst/w-1/NR18/x.pdf",
         expiration_status: null,
       },
-    ]);
+    ];
     const { result } = renderHook(() => useWorkerQualificationsUnified("w-1"), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.data).toHaveLength(1);
@@ -116,7 +114,7 @@ describe("useWorkerQualificationsUnified", () => {
   });
 
   it("classifica worker_documents sem datas como validity_unknown", async () => {
-    docRows.mockReturnValue([
+    docRows.current = [
       {
         id: "doc-1",
         worker_id: "w-1",
@@ -126,7 +124,7 @@ describe("useWorkerQualificationsUnified", () => {
         issue_date: null,
         expiry_date: null,
       },
-    ]);
+    ];
     const { result } = renderHook(() => useWorkerQualificationsUnified("w-1"), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.data).toHaveLength(1);
@@ -136,7 +134,7 @@ describe("useWorkerQualificationsUnified", () => {
   });
 
   it("sinaliza sourceConflict quando mesmo document_type_id existe em ambas as fontes", async () => {
-    sstRows.mockReturnValue([
+    sstRows.current = [
       {
         id: "sst-x",
         worker_id: "w-1",
@@ -149,8 +147,8 @@ describe("useWorkerQualificationsUnified", () => {
         document_url: "sst/w-1/aso/x.pdf",
         expiration_status: "valid",
       },
-    ]);
-    docRows.mockReturnValue([
+    ];
+    docRows.current = [
       {
         id: "doc-x",
         worker_id: "w-1",
@@ -160,7 +158,7 @@ describe("useWorkerQualificationsUnified", () => {
         issue_date: "2026-01-05",
         expiry_date: "2027-01-05",
       },
-    ]);
+    ];
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { result } = renderHook(() => useWorkerQualificationsUnified("w-1"), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -171,10 +169,10 @@ describe("useWorkerQualificationsUnified", () => {
   });
 
   it("integrityConflict=true quando há duas linhas SST vigentes do mesmo tipo", async () => {
-    sstRows.mockReturnValue([
+    sstRows.current = [
       { id: "a", worker_id: "w-1", document_type_id: "dt-nr18", nr_code: "NR18", issued_at: "2026-01-01", expires_at: "2027-01-01", validity_status: "has_expiry", document_status: "ok", document_url: "u1", expiration_status: "valid" },
       { id: "b", worker_id: "w-1", document_type_id: "dt-nr18", nr_code: "NR18", issued_at: "2026-06-01", expires_at: "2027-06-01", validity_status: "has_expiry", document_status: "ok", document_url: "u2", expiration_status: "valid" },
-    ]);
+    ];
     const { result } = renderHook(() => useWorkerQualificationsUnified("w-1"), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.data).toHaveLength(2);
