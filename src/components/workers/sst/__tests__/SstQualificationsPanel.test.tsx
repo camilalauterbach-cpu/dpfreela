@@ -1,27 +1,27 @@
-// Q-024-D-UI-MULTIPLE — Regressão do defeito:
-// O botão "Adicionar qualificação" precisa existir INDEPENDENTEMENTE de rows.length.
+// Q-024-D-UI-MULTIPLE — Testes unitários do painel de qualificações unificado.
+// Cobre: botão permanente, KPIs (linhas unificadas), sourceConflict,
+// validity_unknown e roteamento ASO (storageFlow=worker_documents).
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { SstQualificationsPanel } from "../SstQualificationsPanel";
+import type { UnifiedQualificationRow } from "@/hooks/useWorkerQualificationsUnified";
 
-// Mocks: contexto de auth (canEdit=true) e hooks de dados.
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({ hasAnyRole: () => true }),
 }));
 
-const useWorkerSstQualificationsMock = vi.fn();
-const useWorkerSstSummaryMock = vi.fn();
-vi.mock("@/hooks/useWorkerSst", () => ({
-  useWorkerSstQualifications: (id: string) => useWorkerSstQualificationsMock(id),
-  useWorkerSstSummary: (id: string) => useWorkerSstSummaryMock(id),
-}));
+const unifiedMock = vi.fn();
+const summaryMock = vi.fn();
 
-// Drawer é irrelevante para o teste; substituímos por stub.
-vi.mock("../SstCertificateDrawer", () => ({
-  SstCertificateDrawer: () => null,
+vi.mock("@/hooks/useWorkerQualificationsUnified", () => ({
+  useWorkerQualificationsUnified: (id: string) => unifiedMock(id),
 }));
+vi.mock("@/hooks/useWorkerSst", () => ({
+  useWorkerSstSummary: (id: string) => summaryMock(id),
+}));
+vi.mock("../SstCertificateDrawer", () => ({ SstCertificateDrawer: () => null }));
 
 function renderPanel() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -34,68 +34,107 @@ function renderPanel() {
   );
 }
 
-function summary() {
-  return { data: { valid: 0, expiringSoon: 0, expired: 0, pendingDocs: 0, activeLinksUsingSst: 0 }, isLoading: false };
-}
-
-function row(overrides: Partial<Record<string, unknown>>) {
+function unifiedRow(o: Partial<UnifiedQualificationRow> = {}): UnifiedQualificationRow {
   return {
-    id: "q-" + Math.random().toString(36).slice(2, 8),
-    worker_id: "w-1",
-    nr_code: "NR18",
-    chain_key: "NR18",
-    training_type: null,
-    issued_at: "2026-01-01",
-    expires_at: "2027-01-01",
-    workload_hours: null,
-    provider_name: null,
-    instructor_name: null,
-    document_url: null,
-    document_status: "ok",
-    validity_status: "has_expiry",
-    source_type: "manual",
-    revision_type: "initial",
-    revision_reason: null,
-    document_type_id: "dt-nr18",
-    employment_link_document_id: null,
-    link_group_worker_id: null,
-    link_group_id: null,
-    event_id: null,
-    company_id: null,
-    notes: null,
-    expiration_status: "valid",
-    ...overrides,
+    id: "row-" + Math.random().toString(36).slice(2, 8),
+    workerId: "w-1",
+    documentTypeId: "dt-nr18",
+    code: "NR18",
+    name: "NR-18 Trabalho em Altura",
+    category: "sst_nr",
+    storageFlow: "worker_sst_qualifications",
+    source: "sst",
+    issuedAt: "2026-01-01",
+    expiresAt: "2027-01-01",
+    validityStatus: "has_expiry",
+    documentStatus: "ok",
+    status: "valid",
+    documentUrl: "sst/w-1/NR18/x.pdf",
+    filePath: "sst/w-1/NR18/x.pdf",
+    revisionType: "initial",
+    isCurrent: true,
+    sourceConflict: false,
+    integrityConflict: false,
+    ...o,
   };
 }
 
-describe("SstQualificationsPanel — botão permanente de nova qualificação", () => {
-  it("A. rows = [] — botão 'Adicionar qualificação' existe", () => {
-    useWorkerSstQualificationsMock.mockReturnValue({ data: [], isLoading: false });
-    useWorkerSstSummaryMock.mockReturnValue(summary());
+describe("SstQualificationsPanel — botão permanente", () => {
+  it("botão existe com rows vazias", () => {
+    unifiedMock.mockReturnValue({ data: [], isLoading: false });
+    summaryMock.mockReturnValue({ data: { valid: 0, expiringSoon: 0, expired: 0, pendingDocs: 0, activeLinksUsingSst: 0 }, isLoading: false });
     renderPanel();
     expect(screen.getByTestId("add-qualification-button")).toBeInTheDocument();
   });
 
-  it("B. rows = [NR18] — botão continua existindo", () => {
-    useWorkerSstQualificationsMock.mockReturnValue({
-      data: [row({ nr_code: "NR18", document_type_id: "dt-nr18" })],
-      isLoading: false,
-    });
-    useWorkerSstSummaryMock.mockReturnValue(summary());
-    renderPanel();
-    expect(screen.getByTestId("add-qualification-button")).toBeInTheDocument();
-  });
-
-  it("C. rows = [NR18, NR35] — botão continua existindo", () => {
-    useWorkerSstQualificationsMock.mockReturnValue({
+  it("botão existe com múltiplas linhas", () => {
+    unifiedMock.mockReturnValue({
       data: [
-        row({ nr_code: "NR18", document_type_id: "dt-nr18" }),
-        row({ nr_code: "NR35", document_type_id: "dt-nr35" }),
+        unifiedRow({ code: "NR18", documentTypeId: "dt-nr18" }),
+        unifiedRow({ code: "NR35", documentTypeId: "dt-nr35" }),
       ],
       isLoading: false,
     });
-    useWorkerSstSummaryMock.mockReturnValue(summary());
+    summaryMock.mockReturnValue({ data: { valid: 2, expiringSoon: 0, expired: 0, pendingDocs: 0, activeLinksUsingSst: 0 }, isLoading: false });
     renderPanel();
     expect(screen.getByTestId("add-qualification-button")).toBeInTheDocument();
+  });
+});
+
+describe("SstQualificationsPanel — KPIs unificados", () => {
+  it("exibe os cinco KPIs a partir do summary", () => {
+    unifiedMock.mockReturnValue({ data: [], isLoading: false });
+    summaryMock.mockReturnValue({
+      data: { valid: 7, expiringSoon: 3, expired: 2, pendingDocs: 4, activeLinksUsingSst: 5 },
+      isLoading: false,
+    });
+    renderPanel();
+    expect(screen.getByText("Vencidas").nextSibling?.textContent).toBe("2");
+    expect(screen.getByText("Vencendo").nextSibling?.textContent).toBe("3");
+    expect(screen.getByText("Pendentes de documento").nextSibling?.textContent).toBe("4");
+    expect(screen.getByText("Válidas").nextSibling?.textContent).toBe("7");
+    expect(screen.getByText("Vínculos usando SST").nextSibling?.textContent).toBe("5");
+  });
+});
+
+describe("SstQualificationsPanel — sourceConflict e validity_unknown", () => {
+  it("exibe 'Conflito de fonte' quando sourceConflict=true", () => {
+    unifiedMock.mockReturnValue({
+      data: [unifiedRow({ sourceConflict: true, code: "ASO" })],
+      isLoading: false,
+    });
+    summaryMock.mockReturnValue({ data: { valid: 1, expiringSoon: 0, expired: 0, pendingDocs: 0, activeLinksUsingSst: 0 }, isLoading: false });
+    renderPanel();
+    expect(screen.getByText(/Conflito de fonte/)).toBeInTheDocument();
+  });
+
+  it("exibe 'validade não informada' quando status=validity_unknown", () => {
+    unifiedMock.mockReturnValue({
+      data: [unifiedRow({
+        status: "validity_unknown",
+        expiresAt: null,
+        validityStatus: "unknown",
+      })],
+      isLoading: false,
+    });
+    summaryMock.mockReturnValue({ data: { valid: 0, expiringSoon: 0, expired: 0, pendingDocs: 1, activeLinksUsingSst: 0 }, isLoading: false });
+    renderPanel();
+    expect(screen.getByText(/validade não informada/i)).toBeInTheDocument();
+  });
+
+  it("ASO (storageFlow=worker_documents) mostra 'Gerenciar na aba Documentos'", () => {
+    unifiedMock.mockReturnValue({
+      data: [unifiedRow({
+        code: "ASO",
+        category: "sst_aso",
+        source: "worker_documents",
+        storageFlow: "worker_documents",
+        documentTypeId: "dt-aso",
+      })],
+      isLoading: false,
+    });
+    summaryMock.mockReturnValue({ data: { valid: 1, expiringSoon: 0, expired: 0, pendingDocs: 0, activeLinksUsingSst: 0 }, isLoading: false });
+    renderPanel();
+    expect(screen.getByTestId("manage-in-documents")).toBeInTheDocument();
   });
 });
