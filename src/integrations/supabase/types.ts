@@ -2743,6 +2743,20 @@ export type Database = {
         Args: { p_limit?: number; p_link_id: string }
         Returns: Json
       }
+      get_revision_metrics_daily: {
+        Args: { p_document_type_id?: string; p_from?: string; p_to?: string }
+        Returns: {
+          avg_lock_wait_ms: number
+          commits_count: number
+          day: string
+          document_type_code: string
+          document_type_id: string
+          document_type_name: string
+          idempotent_hit_count: number
+          lock_acquired_count: number
+          max_lock_wait_ms: number
+        }[]
+      }
       get_user_id_by_email: { Args: { _email: string }; Returns: string }
       has_any_role: {
         Args: {
