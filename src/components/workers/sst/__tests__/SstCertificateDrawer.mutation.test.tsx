@@ -150,7 +150,15 @@ describe("SstCertificateDrawer — persistência de treinamento com identidade c
       if ((save as HTMLButtonElement).disabled) {
         const list = document.querySelectorAll("ul li");
         const errs = Array.from(list).map((l) => l.textContent).join("\n");
-        throw new Error("Save still disabled. Errors:\n" + errs);
+        const fileInputEl = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+        const dateEls = document.querySelectorAll('input[type="date"]');
+        const dbg = {
+          errs,
+          fileFiles: fileInputEl?.files?.length,
+          date0: (dateEls[0] as HTMLInputElement)?.value,
+          date1: (dateEls[1] as HTMLInputElement)?.value,
+        };
+        throw new Error("Save still disabled: " + JSON.stringify(dbg));
       }
     }, { timeout: 2000 });
     fireEvent.click(save);
