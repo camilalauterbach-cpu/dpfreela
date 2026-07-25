@@ -14,6 +14,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertTriangle, Loader2, Lock, CheckCircle2, User, Link2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  humanizeValidity,
+  VALIDITY_PRESETS,
+  VALIDITY_UNIT_OPTIONS,
+  type ValidityMode,
+  type ValidityUnit,
+} from "@/lib/document-validity";
 
 type Scope = "worker" | "employment_link";
 
@@ -24,6 +32,11 @@ interface DocType {
   category: string;
   is_active: boolean;
   storage_scope: Scope | null;
+  validity_mode: ValidityMode | null;
+  validity_value: number | null;
+  validity_unit: ValidityUnit | null;
+  has_expiration: boolean;
+  default_validity_days: number | null;
 }
 
 interface GateRow {
@@ -71,12 +84,23 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
   const [saving, setSaving] = useState(false);
   const [notes, setNotes] = useState("");
 
+  // Validade padrão
+  const [validityEditing, setValidityEditing] = useState<DocType | null>(null);
+  const [vMode, setVMode] = useState<ValidityMode>("no_expiry");
+  const [vValue, setVValue] = useState<string>("");
+  const [vUnit, setVUnit] = useState<ValidityUnit>("year");
+  const [vPreset, setVPreset] = useState<string>("none");
+  const [vError, setVError] = useState<string | null>(null);
+  const [vSaving, setVSaving] = useState(false);
+
   const q = useQuery({
     queryKey: ["settings-doc-types-scope"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("document_types")
-        .select("id, code, name, category, is_active, storage_scope")
+        .select(
+          "id, code, name, category, is_active, storage_scope, validity_mode, validity_value, validity_unit, has_expiration, default_validity_days",
+        )
         .order("name");
       if (error) throw error;
       return (data ?? []) as DocType[];
@@ -157,6 +181,99 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
     setChosenScope(null);
     setForce(false);
     setNotes("");
+  };
+
+  const openValidity = (d: DocType) => {
+    if (readOnly) return;
+    setValidityEditing(d);
+    setVError(null);
+    const mode: ValidityMode = (d.validity_mode ?? (d.has_expiration ? "fixed_duration" : "no_expiry")) as ValidityMode;
+    setVMode(mode === "explicit_date" ? "fixed_duration" : mode);
+    if (mode === "fixed_duration") {
+      const val = d.validity_value ?? d.default_validity_days ?? null;
+      const unit: ValidityUnit = (d.validity_unit as ValidityUnit) ?? "day";
+      setVValue(val != null ? String(val) : "");
+      setVUnit(unit);
+      // Auto-detect preset
+      if (val === 1 && unit === "year") setVPreset("1y");
+      else if (val === 2 && unit === "year") setVPreset("2y");
+      else setVPreset("custom");
+    } else {
+      setVValue("");
+      setVUnit("year");
+      setVPreset("none");
+    }
+  };
+
+  const closeValidity = () => {
+    setValidityEditing(null);
+    setVError(null);
+    setVSaving(false);
+  };
+
+  const applyPreset = (key: string) => {
+    setVPreset(key);
+    const preset = VALIDITY_PRESETS.find((p) => p.key === key);
+    if (!preset) return;
+    setVMode(preset.mode === "explicit_date" ? "fixed_duration" : preset.mode);
+    if (preset.mode === "no_expiry") {
+      setVValue("");
+      setVUnit("year");
+    } else if (preset.value != null && preset.unit != null) {
+      setVValue(String(preset.value));
+      setVUnit(preset.unit);
+    } else {
+      // custom — mantém o que já estiver preenchido
+    }
+  };
+
+  const humanizeRpcError = (raw: string): string => {
+    if (raw.includes("validity_value_must_be_positive")) return "Informe uma duração positiva antes de salvar.";
+    if (raw.includes("validity_unit_invalid")) return "Selecione dias, meses ou anos.";
+    if (raw.includes("validity_mode_invalid")) return "Escolha entre Sem vencimento e Com vencimento.";
+    if (raw.includes("not_authorized")) return "Somente administradores/gestores podem configurar a validade.";
+    if (raw.includes("document_type_not_found")) return "Tipo documental não encontrado.";
+    return "Não foi possível salvar a validade. Verifique os dados e tente novamente.";
+  };
+
+  const saveValidity = async () => {
+    if (!validityEditing) return;
+    setVError(null);
+    let payloadValue: number | null = null;
+    if (vMode === "fixed_duration") {
+      const parsed = Number(vValue);
+      if (!Number.isFinite(parsed) || parsed <= 0 || !Number.isInteger(parsed)) {
+        setVError("Informe uma duração inteira positiva (maior que zero).");
+        return;
+      }
+      payloadValue = parsed;
+    }
+    setVSaving(true);
+    try {
+      const { error } = await supabase.rpc("set_document_type_validity" as any, {
+        p_document_type_id: validityEditing.id,
+        p_mode: vMode,
+        p_value: payloadValue,
+        p_unit: vMode === "fixed_duration" ? vUnit : null,
+      } as any);
+      if (error) throw error;
+      toast({
+        title: "Validade padrão atualizada",
+        description: `${validityEditing.name} — passa a valer para novos documentos.`,
+      });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["settings-doc-types-scope"] }),
+        qc.invalidateQueries({ queryKey: ["worker-qualification-types"] }),
+        qc.invalidateQueries({ queryKey: ["qualification-column-catalog"] }),
+        qc.invalidateQueries({ queryKey: ["document_types"] }),
+      ]);
+      closeValidity();
+    } catch (err: any) {
+      const raw = String(err?.message ?? "");
+      setVError(humanizeRpcError(raw));
+    } finally {
+      setVSaving(false);
+    }
   };
 
   const save = async () => {
@@ -282,15 +399,16 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
                   <TableHead>Nome</TableHead>
                   <TableHead className="hidden sm:table-cell">Categoria</TableHead>
                   <TableHead>Escopo</TableHead>
+                  <TableHead className="hidden lg:table-cell">Validade padrão</TableHead>
                   <TableHead className="hidden md:table-cell">Utilizado por</TableHead>
                   <TableHead className="hidden sm:table-cell">Status</TableHead>
-                  <TableHead className="w-[110px] text-right">Ação</TableHead>
+                  <TableHead className="w-[180px] text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                       Nenhum tipo encontrado para este filtro.
                     </TableCell>
                   </TableRow>
@@ -323,6 +441,15 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
                           </Badge>
                         )}
                       </TableCell>
+                      <TableCell className="hidden lg:table-cell text-sm">
+                        {humanizeValidity({
+                          mode: d.validity_mode,
+                          value: d.validity_value,
+                          unit: d.validity_unit,
+                          defaultValidityDays: d.default_validity_days,
+                          hasExpiration: d.has_expiration,
+                        })}
+                      </TableCell>
                       <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
                         {usage ? (
                           <div className="space-y-0.5 leading-tight">
@@ -343,14 +470,24 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant={pending ? "default" : "outline"}
-                          disabled={readOnly}
-                          onClick={() => openEdit(d)}
-                        >
-                          {pending ? "Definir" : "Alterar"}
-                        </Button>
+                        <div className="flex flex-wrap justify-end gap-1.5">
+                          <Button
+                            size="sm"
+                            variant={pending ? "default" : "outline"}
+                            disabled={readOnly}
+                            onClick={() => openEdit(d)}
+                          >
+                            {pending ? "Definir escopo" : "Escopo"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={readOnly}
+                            onClick={() => openValidity(d)}
+                          >
+                            Validade
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -473,6 +610,146 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
             <Button onClick={save} disabled={saving || !chosenScope}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editing?.storage_scope == null ? "Definir escopo" : (editing.storage_scope !== chosenScope ? "Alterar escopo" : "Salvar")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo — Validade padrão */}
+      <Dialog open={!!validityEditing} onOpenChange={(o) => !o && closeValidity()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Validade padrão — {validityEditing?.name}</DialogTitle>
+            <DialogDescription>
+              Define a regra usada para calcular automaticamente o vencimento de novos documentos
+              deste tipo, a partir da data de emissão/realização informada pelo usuário.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Esta alteração vale apenas para <strong>novos registros</strong>. Documentos já
+              cadastrados preservam a data de vencimento atual — nada é reescrito.
+            </AlertDescription>
+          </Alert>
+
+          <div className="space-y-3">
+            <Label className="text-sm">Regra</Label>
+            <RadioGroup
+              value={vMode}
+              onValueChange={(v) => {
+                setVMode(v as ValidityMode);
+                setVPreset(v === "no_expiry" ? "none" : "custom");
+              }}
+              className="space-y-2"
+            >
+              <label
+                htmlFor="v-none"
+                className={`flex gap-3 rounded-md border p-3 cursor-pointer transition ${vMode === "no_expiry" ? "border-primary bg-primary/5" : ""}`}
+              >
+                <RadioGroupItem value="no_expiry" id="v-none" className="mt-1" />
+                <div className="space-y-0.5">
+                  <div className="font-medium">Sem vencimento</div>
+                  <div className="text-sm text-muted-foreground">
+                    O sistema não calcula nem exige data final. Ex.: CPF, CTPS.
+                  </div>
+                </div>
+              </label>
+              <label
+                htmlFor="v-fixed"
+                className={`flex gap-3 rounded-md border p-3 cursor-pointer transition ${vMode === "fixed_duration" ? "border-primary bg-primary/5" : ""}`}
+              >
+                <RadioGroupItem value="fixed_duration" id="v-fixed" className="mt-1" />
+                <div className="space-y-0.5 w-full">
+                  <div className="font-medium">Com vencimento</div>
+                  <div className="text-sm text-muted-foreground">
+                    O vencimento é calculado a partir da data do fato + duração configurada.
+                  </div>
+                </div>
+              </label>
+            </RadioGroup>
+          </div>
+
+          {vMode === "fixed_duration" && (
+            <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+              <div>
+                <Label className="text-xs uppercase text-muted-foreground">Presets</Label>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {VALIDITY_PRESETS.filter((p) => p.key !== "none").map((p) => (
+                    <Button
+                      key={p.key}
+                      type="button"
+                      size="sm"
+                      variant={vPreset === p.key ? "default" : "outline"}
+                      onClick={() => applyPreset(p.key)}
+                      className="h-8"
+                    >
+                      {p.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label htmlFor="v-value" className="text-sm">
+                    Duração <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="v-value"
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={vValue}
+                    onChange={(e) => {
+                      setVValue(e.target.value);
+                      setVPreset("custom");
+                    }}
+                    placeholder="Ex.: 1"
+                    aria-invalid={
+                      vValue !== "" && (Number(vValue) <= 0 || !Number.isInteger(Number(vValue)))
+                    }
+                  />
+                  {vValue !== "" && (Number(vValue) <= 0 || !Number.isInteger(Number(vValue))) && (
+                    <p className="text-xs text-destructive mt-1">Informe um número inteiro maior que zero.</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="v-unit" className="text-sm">Unidade <span className="text-destructive">*</span></Label>
+                  <Select value={vUnit} onValueChange={(v) => { setVUnit(v as ValidityUnit); setVPreset("custom"); }}>
+                    <SelectTrigger id="v-unit">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VALIDITY_UNIT_OPTIONS.map((u) => (
+                        <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {vError && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>{vError}</AlertDescription>
+            </Alert>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeValidity} disabled={vSaving}>Cancelar</Button>
+            <Button
+              onClick={saveValidity}
+              disabled={
+                vSaving ||
+                (vMode === "fixed_duration" &&
+                  (vValue === "" || Number(vValue) <= 0 || !Number.isInteger(Number(vValue))))
+              }
+            >
+              {vSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar validade
             </Button>
           </DialogFooter>
         </DialogContent>
