@@ -452,6 +452,7 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
                   <TableHead>Nome</TableHead>
                   <TableHead className="hidden sm:table-cell">Categoria</TableHead>
                   <TableHead>Escopo</TableHead>
+                  <TableHead className="hidden md:table-cell">Obrigatoriedade</TableHead>
                   <TableHead className="hidden lg:table-cell">Validade padrão</TableHead>
                   <TableHead className="hidden md:table-cell">Utilizado por</TableHead>
                   <TableHead className="hidden sm:table-cell">Status</TableHead>
@@ -461,7 +462,7 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
               <TableBody>
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       Nenhum tipo encontrado para este filtro.
                     </TableCell>
                   </TableRow>
@@ -492,6 +493,13 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
                           >
                             <AlertTriangle className="h-3 w-3" /> Pendente
                           </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {d.completion_requirement === "required" ? (
+                          <Badge className="gap-1 bg-emerald-600 hover:bg-emerald-600">Obrigatório</Badge>
+                        ) : (
+                          <Badge variant="outline">Opcional</Badge>
                         )}
                       </TableCell>
                       <TableCell className="hidden lg:table-cell text-sm">
@@ -539,6 +547,14 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
                             onClick={() => openValidity(d)}
                           >
                             Validade
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={readOnly}
+                            onClick={() => openRequirement(d)}
+                          >
+                            Obrigatoriedade
                           </Button>
                         </div>
                       </TableCell>
