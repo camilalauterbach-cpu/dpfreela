@@ -94,12 +94,6 @@ export default function RevisionMetrics() {
     },
   });
 
-  const selectedWorkerLabel = useMemo(() => {
-    if (!workerId) return "";
-    const row = (metricsQ.data ?? []).find((r) => r.worker_id === workerId);
-    return row?.worker_name ?? "";
-  }, [workerId /* metricsQ.data set below — reference is safe at render */]);
-
   const docTypesQ = useQuery({
     queryKey: ["revision-metrics", "document-types"],
     enabled: canView,
@@ -131,6 +125,12 @@ export default function RevisionMetrics() {
       return ((data ?? []) as unknown) as MetricRow[];
     },
   });
+
+  const selectedWorkerLabel = useMemo(() => {
+    if (!workerId) return "";
+    const row = (metricsQ.data ?? []).find((r) => r.worker_id === workerId);
+    return row?.worker_name ?? "";
+  }, [workerId, metricsQ.data]);
 
   const totals = useMemo(() => {
     const rows = metricsQ.data ?? [];
