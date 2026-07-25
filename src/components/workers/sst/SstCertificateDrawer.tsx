@@ -199,7 +199,17 @@ export function SstCertificateDrawer({
       setInstructor(current.instructor_name || "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, mode, current, presetDocumentTypeId, presetNrCode, types]);
+  }, [open, mode, current, presetDocumentTypeId, presetNrCode]);
+
+  // Resolve preset → document_type_id quando o catálogo carrega tardiamente.
+  // Não toca em nenhum outro campo para evitar apagar o que o usuário digitou.
+  useEffect(() => {
+    if (!open) return;
+    if (selectedDocumentTypeId) return;
+    const resolved = resolvePresetId();
+    if (resolved) setSelectedDocumentTypeId(resolved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, types, presetDocumentTypeId, presetNrCode]);
 
   // Cálculo automático do vencimento: só se o usuário não tiver editado.
   useEffect(() => {
