@@ -97,6 +97,7 @@ const TECHNICAL_PATTERNS: RegExp[] = [
   /uq_worker_sst/i,
   /pg[a-z_]*:/i,
   /pg_[a-z_]+/i,
+  /\bpq:\s/i,
   /relation "[^"]+" does not exist/i,
   /column "[^"]+" does not exist/i,
   /function [a-z0-9_.]+\([^)]*\) does not exist/i,
@@ -132,7 +133,7 @@ const TECHNICAL_PATTERNS: RegExp[] = [
   /RangeError:/,
   /\bundefined is not\b/i,
   /cannot read propert(?:y|ies) of (?:null|undefined)/i,
-  /at\s+[A-Za-z0-9_$.]+\s+\(/, // stack frames
+  /\bat\s+\S+\s+\([^)]*:\d+:\d+\)/, // stack frames
 ];
 
 /**
