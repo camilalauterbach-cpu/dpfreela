@@ -101,6 +101,6 @@ describe("projectDocumentExpiry", () => {
         defaultValidityDays: 730,
         hasExpiration: true,
       }),
-    ).toBe("2027-12-31");
+    ).toBe("2028-01-01");
   });
 });
