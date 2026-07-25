@@ -10,9 +10,51 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
 
+function isTimeoutError(error: unknown): boolean {
+  if (error == null) return false;
+  const anyErr = error as Record<string, unknown>;
+  const status =
+    (anyErr.status as number | undefined) ??
+    (anyErr.statusCode as number | undefined);
+  const message = String(anyErr.message || "").toLowerCase();
+  return (
+    status === 504 ||
+    status === 503 ||
+    status === 502 ||
+    status === 408 ||
+    message.includes("timeout") ||
+    message.includes("timed out") ||
+    message.includes("upstream request timeout") ||
+    message.includes("failed to fetch") ||
+    message.includes("networkerror")
+  );
+}
+
+function getTimeoutDiagnostic(context: "login" | "password-recovery"): {
+  title: string;
+  description: string;
+} {
+  const baseDescription =
+    "O banco de dados está temporariamente saturado e não respondeu a tempo (erro 504/timeout). " +
+    "Aguarde 2–3 minutos para que a fila de processamento se normalize e tente novamente. " +
+    "Se o erro persistir após 10 minutos, contate o administrador do sistema.";
+
+  return {
+    title: "Serviço temporariamente indisponível",
+    description:
+      context === "login"
+        ? `Não foi possível validar seu login. ${baseDescription}`
+        : `Não foi possível enviar o e-mail de recuperação. ${baseDescription}`,
+  };
+}
+
 function getLoginErrorMessage(error: unknown): { title: string; description: string } {
   if (error == null) {
     return { title: "Erro ao entrar", description: "Não foi possível concluir o login. Tente novamente." };
+  }
+
+  if (isTimeoutError(error)) {
+    return getTimeoutDiagnostic("login");
   }
 
   const anyErr = error as Record<string, unknown>;
@@ -20,13 +62,6 @@ function getLoginErrorMessage(error: unknown): { title: string; description: str
   const status =
     (anyErr.status as number | undefined) ??
     (anyErr.statusCode as number | undefined);
-
-  if (status === 504 || status === 503 || status === 502) {
-    return {
-      title: "Serviço temporariamente indisponível",
-      description: "Nossos servidores estão demorando para responder. Aguarde um momento e tente novamente.",
-    };
-  }
 
   if (message.includes("invalid login credentials") || message.includes("invalid credentials")) {
     return {

@@ -8,6 +8,48 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
+function isTimeoutError(error: unknown): boolean {
+  if (error == null) return false;
+  const anyErr = error as Record<string, unknown>;
+  const status =
+    (anyErr.status as number | undefined) ??
+    (anyErr.statusCode as number | undefined);
+  const message = String(anyErr.message || "").toLowerCase();
+  return (
+    status === 504 ||
+    status === 503 ||
+    status === 502 ||
+    status === 408 ||
+    message.includes("timeout") ||
+    message.includes("timed out") ||
+    message.includes("upstream request timeout") ||
+    message.includes("failed to fetch") ||
+    message.includes("networkerror")
+  );
+}
+
+function getResetErrorMessage(error: unknown): { title: string; description: string } {
+  if (error == null) {
+    return { title: "Erro", description: "Não foi possível redefinir a senha. Tente novamente." };
+  }
+
+  if (isTimeoutError(error)) {
+    return {
+      title: "Serviço temporariamente indisponível",
+      description:
+        "O banco de dados está temporariamente saturado e não respondeu a tempo (erro 504/timeout). " +
+        "Aguarde 2–3 minutos para que a fila de processamento se normalize e tente novamente. " +
+        "Se o erro persistir após 10 minutos, contate o administrador do sistema.",
+    };
+  }
+
+  const anyErr = error as Record<string, unknown>;
+  return {
+    title: "Erro",
+    description: String(anyErr.message || "Não foi possível redefinir a senha. Tente novamente."),
+  };
+}
+
 export default function ResetPassword() {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -25,14 +67,21 @@ export default function ResetPassword() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Senha atualizada", description: "Sua senha foi redefinida com sucesso." });
-      navigate("/");
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) {
+        const { title, description } = getResetErrorMessage(error);
+        toast({ title, description, variant: "destructive" });
+      } else {
+        toast({ title: "Senha atualizada", description: "Sua senha foi redefinida com sucesso." });
+        navigate("/");
+      }
+    } catch (err) {
+      const { title, description } = getResetErrorMessage(err);
+      toast({ title, description, variant: "destructive" });
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   };
 
   if (!valid) {
