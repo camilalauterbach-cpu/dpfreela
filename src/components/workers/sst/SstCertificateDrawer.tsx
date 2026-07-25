@@ -623,7 +623,7 @@ export function SstCertificateDrawer({
               <Button
                 size="sm" variant="outline"
                 className="h-7 text-xs shrink-0"
-                onClick={() => submit.mutate()}
+                onClick={() => submit.mutate({ continueAdding: false })}
                 disabled={errors.length > 0}
               >
                 Tentar novamente
@@ -641,16 +641,16 @@ export function SstCertificateDrawer({
           {mode === "create" && (
             <Button
               variant="outline"
-              onClick={() => { setKeepOpenAfterSave(true); submit.mutate(); }}
+              onClick={() => submit.mutate({ continueAdding: true })}
               disabled={!canSubmit}
               data-testid="save-and-add-another"
             >
-              {pending && keepOpenAfterSave && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {pending && submit.variables?.continueAdding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Salvar e adicionar outra
             </Button>
           )}
           <Button
-            onClick={() => { setKeepOpenAfterSave(false); submit.mutate(); }}
+            onClick={() => submit.mutate({ continueAdding: false })}
             disabled={!canSubmit}
             data-testid="save-qualification"
           >
