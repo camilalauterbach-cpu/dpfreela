@@ -317,7 +317,7 @@ export function SstCertificateDrawer({
                 } else {
                   toast.success("Vínculos reavaliados.");
                   invalidateSstCaches(qc);
-                  invalidateComplianceCaches(qc, { workerId, eventSource: "manual_retry" });
+                invalidateComplianceCaches(qc, { workerId, eventSource: "upload" });
                 }
               },
             },
