@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Pencil, Loader2, Trash2 } from "lucide-react";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useDeleteRecord } from "@/hooks/useDeleteRecord";
-import { PaymentMethodsList } from "@/components/workers/PaymentMethodsList";
+import { WorkerPaymentHistoryList } from "@/components/workers/WorkerPaymentHistoryList";
 import { DocumentChecklist } from "@/components/workers/DocumentChecklist";
 import { DpReadinessBadge } from "@/components/workers/DpReadinessBadge";
 import { WorkerLinksList } from "@/components/links/WorkerLinksList";
@@ -238,7 +238,7 @@ export default function WorkerDetail() {
         </TabsContent>
 
         <TabsContent value="pagamento" className="mt-4">
-          <PaymentMethodsList workerId={worker.id} />
+          <WorkerPaymentHistoryList workerId={worker.id} />
         </TabsContent>
 
         <TabsContent value="vinculos" className="mt-4">
