@@ -324,9 +324,31 @@ export function SstCertificateDrawer({
         { payload },
       );
       if (rpcErr) {
+        // Q-024-D-DIAG — captura estruturada da falha da RPC (request/response
+        // + document_type_id + categoria + bundle version) para viabilizar
+        // decisão de gate da E-DOC.2.A sem depender do DevTools do operador.
+        const bundle = captureRpcFailure({
+          rpc: "register_sst_revision",
+          payload,
+          error: rpcErr,
+          context: {
+            worker_id: workerId,
+            worker_name: workerName,
+            mode,
+            operation,
+            document_type_id: selectedType.documentTypeId,
+            document_type_code: normalized,
+            document_type_category: selectedType.category,
+            file_name: file?.name ?? null,
+            file_size: file?.size ?? null,
+            storage_path: path,
+          },
+        });
         // rollback do arquivo — evita órfão no bucket
         await supabase.storage.from("worker-documents").remove([path]).catch(() => {});
-        throw new Error(String(rpcErr.message || "Falha ao registrar revisão."));
+        const err = new Error(String(rpcErr.message || "Falha ao registrar revisão."));
+        (err as any).diagnostic = bundle;
+        throw err;
       }
 
       // 3) reevaluate_worker_links (retorna contagem)
@@ -406,11 +428,25 @@ export function SstCertificateDrawer({
       // Q-024-D-TRAINING-FIX §7: mapear códigos técnicos para texto claro.
       const friendly = mapRpcError(raw);
       setLastError(friendly);
+      const bundle: RpcFailureBundle | undefined = e?.diagnostic;
+      const description = bundle
+        ? `Diagnóstico #${bundle.id} (${bundle.bundle_version})`
+        : undefined;
       toast.error(friendly, {
-        action: {
-          label: "Tentar novamente",
-          onClick: () => submit.mutate({ continueAdding: false }),
-        },
+        description,
+        action: bundle
+          ? {
+              label: "Copiar diagnóstico",
+              onClick: async () => {
+                const ok = await copyRpcFailure(bundle);
+                if (ok) toast.success(`Diagnóstico #${bundle.id} copiado.`);
+                else toast.error("Não foi possível copiar. Veja o console (rpc-failure).");
+              },
+            }
+          : {
+              label: "Tentar novamente",
+              onClick: () => submit.mutate({ continueAdding: false }),
+            },
       });
     },
   });
