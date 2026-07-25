@@ -40,6 +40,7 @@ const SstImport = lazy(() => import("./pages/SstImport"));
 const SstPendencies = lazy(() => import("./pages/SstPendencies"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
+const RevisionLogs = lazy(() => import("./pages/RevisionLogs"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -110,6 +111,7 @@ const App = () => (
                 <Route path="/sst/import" element={<ProtectedRoute requiredRoles={["admin", "manager"]}><SstImport /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute requiredRoles={["admin", "manager"]}><SettingsPage /></ProtectedRoute>} />
                 <Route path="/settings/:tab" element={<ProtectedRoute requiredRoles={["admin", "manager"]}><SettingsPage /></ProtectedRoute>} />
+                <Route path="/diagnostics/revision-logs" element={<ProtectedRoute requiredRoles={["admin", "manager"]}><RevisionLogs /></ProtectedRoute>} />
               </Route>
 
               <Route path="*" element={<NotFound />} />
