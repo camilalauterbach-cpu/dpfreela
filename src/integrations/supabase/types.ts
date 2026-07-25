@@ -2744,35 +2744,35 @@ export type Database = {
         Returns: Json
       }
       get_revision_metrics_daily: {
-        Args: { p_document_type_id?: string; p_from?: string; p_to?: string }
+        Args: { p_document_type_id?: string; p_from: string; p_to: string }
         Returns: {
           avg_lock_wait_ms: number
           commits_count: number
+          completed_calls_with_lock: number
           day: string
           document_type_code: string
           document_type_id: string
           document_type_name: string
           idempotent_hit_count: number
-          lock_acquired_count: number
           max_lock_wait_ms: number
         }[]
       }
       get_revision_metrics_daily_by_worker: {
         Args: {
           p_document_type_id?: string
-          p_from?: string
-          p_to?: string
+          p_from: string
+          p_to: string
           p_worker_id?: string
         }
         Returns: {
           avg_lock_wait_ms: number
           commits_count: number
+          completed_calls_with_lock: number
           day: string
           document_type_code: string
           document_type_id: string
           document_type_name: string
           idempotent_hit_count: number
-          lock_acquired_count: number
           max_lock_wait_ms: number
           worker_cpf: string
           worker_id: string
