@@ -45,30 +45,30 @@ vi.mock("@/lib/upload-validation", () => ({
   ALLOWED_FILE_EXTENSIONS: ".pdf,.jpg,.jpeg,.png,.webp",
 }));
 
-vi.mock("@/hooks/useWorkerQualificationTypes", () => ({
-  useWorkerQualificationTypes: () => ({
-    data: [
-      {
-        documentTypeId: "dt-training-nr35",
-        code: "NR35",
-        normalizedCode: "NR35",
-        name: "NR-35 Altura",
-        category: "training",
-        isActive: true,
-        storageScope: "worker",
-        storageFlow: "worker_sst_qualifications",
-        displayOrder: 0,
-        hasExpiration: true,
-        defaultValidityDays: 730,
-        validityMode: null, validityValue: null, validityUnit: null,
-        selectable: true, searchText: "nr35",
-      },
-    ],
-    isLoading: false,
-    error: null,
-  }),
-  normalizeQualificationSearchTerm: (s: string) => s,
-}));
+vi.mock("@/hooks/useWorkerQualificationTypes", () => {
+  const TYPES = [
+    {
+      documentTypeId: "dt-training-nr35",
+      code: "NR35",
+      normalizedCode: "NR35",
+      name: "NR-35 Altura",
+      category: "training",
+      isActive: true,
+      storageScope: "worker",
+      storageFlow: "worker_sst_qualifications",
+      displayOrder: 0,
+      hasExpiration: true,
+      defaultValidityDays: 730,
+      validityMode: null, validityValue: null, validityUnit: null,
+      selectable: true, searchText: "nr35",
+    },
+  ];
+  const RESULT = { data: TYPES, isLoading: false, error: null };
+  return {
+    useWorkerQualificationTypes: () => RESULT,
+    normalizeQualificationSearchTerm: (s: string) => s,
+  };
+});
 
 // Combobox: renderiza controlado, pré-seleciona o único tipo disponível.
 vi.mock("../QualificationDocumentTypeCombobox", () => ({
