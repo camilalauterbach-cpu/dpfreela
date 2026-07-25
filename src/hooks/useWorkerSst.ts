@@ -56,24 +56,26 @@ export interface SstHistoryRow {
   created_by: string | null;
 }
 
+// Q-024-D-UI-MULTIPLE: identidade canônica agora é worker_id + document_type_id.
+// `nrCode` é preservado apenas como rótulo/legado; a query filtra por UUID.
 export function useSstQualificationHistory(
   workerId: string | undefined,
-  nrCode: string | undefined,
+  documentTypeId: string | undefined,
   opts?: { enabled?: boolean },
 ) {
-  const enabled = !!workerId && !!nrCode && (opts?.enabled ?? true);
+  const enabled = !!workerId && !!documentTypeId && (opts?.enabled ?? true);
   return useQuery({
-    queryKey: ["worker-sst-history", workerId, nrCode],
+    queryKey: ["worker-sst-history", workerId, documentTypeId],
     enabled,
     staleTime: 60_000,
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("worker_sst_qualifications")
         .select(
-          "id, nr_code, chain_key, revision_type, revision_reason, issued_at, expires_at, workload_hours, provider_name, instructor_name, document_url, document_status, validity_status, source_type, notes, supersedes_id, superseded_at, created_at, created_by",
+          "id, nr_code, chain_key, revision_type, revision_reason, issued_at, expires_at, workload_hours, provider_name, instructor_name, document_url, document_status, validity_status, source_type, notes, supersedes_id, superseded_at, created_at, created_by, document_type_id",
         )
         .eq("worker_id", workerId)
-        .eq("nr_code", nrCode)
+        .eq("document_type_id", documentTypeId)
         .order("issued_at", { ascending: false })
         .order("created_at", { ascending: false });
       if (error) throw error;

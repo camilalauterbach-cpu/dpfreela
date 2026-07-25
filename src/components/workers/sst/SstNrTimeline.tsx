@@ -16,6 +16,9 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   workerId: string;
+  /** Identidade canônica (Q-024-D-UI-MULTIPLE). */
+  documentTypeId: string;
+  /** Rótulo/legado — apenas exibição. */
   nrCode: string;
   onOpenLinks?: () => void;
 }
@@ -51,8 +54,8 @@ function fmtDate(iso: string | null | undefined) {
   return new Date(iso.length > 10 ? iso : iso + "T12:00:00").toLocaleDateString("pt-BR");
 }
 
-export function SstNrTimeline({ open, onOpenChange, workerId, nrCode, onOpenLinks }: Props) {
-  const { data, isLoading } = useSstQualificationHistory(workerId, nrCode, { enabled: open });
+export function SstNrTimeline({ open, onOpenChange, workerId, documentTypeId, nrCode, onOpenLinks }: Props) {
+  const { data, isLoading } = useSstQualificationHistory(workerId, documentTypeId, { enabled: open });
   const rows = data ?? [];
 
   return (

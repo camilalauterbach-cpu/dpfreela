@@ -29,6 +29,12 @@ import { QualificationDocumentTypeCombobox } from "./QualificationDocumentTypeCo
 
 export type SstDrawerMode = "create" | "renew" | "replace";
 
+// Q-024-D-UI-MULTIPLE — variável da mutation com a intenção do usuário.
+// Não depende de state atualizado assincronamente antes de submit.mutate().
+export interface SubmitVars {
+  continueAdding: boolean;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -48,6 +54,8 @@ interface Props {
   onRequestReplace?: (row: SstCurrentRow) => void;
   /** Qualificações vigentes (para localizar a linha ao oferecer renew/replace). */
   currentRows?: SstCurrentRow[];
+  /** ASO/worker_documents: navegar até a aba Documentos. */
+  onManageInDocuments?: (documentTypeId: string) => void;
 }
 
 function fmtDate(iso: string | null | undefined) {
@@ -70,7 +78,7 @@ const DESCRIPTIONS: Record<SstDrawerMode, string> = {
 export function SstCertificateDrawer({
   open, onOpenChange, mode, workerId, workerName, current,
   presetDocumentTypeId, presetNrCode, currentByDocumentTypeId,
-  onRequestRenew, onRequestReplace, currentRows,
+  onRequestRenew, onRequestReplace, currentRows, onManageInDocuments,
 }: Props) {
   const qc = useQueryClient();
 
@@ -89,7 +97,6 @@ export function SstCertificateDrawer({
   const [notes, setNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
-  const [keepOpenAfterSave, setKeepOpenAfterSave] = useState(false);
 
   const typeLocked = mode !== "create";
 
@@ -121,7 +128,6 @@ export function SstCertificateDrawer({
     setNotes("");
     setLastError(null);
     setExpiryTouched(false);
-    setKeepOpenAfterSave(false);
     if (mode === "create") {
       setSelectedDocumentTypeId(resolvePresetId());
       setTrainingType("");
@@ -206,7 +212,7 @@ export function SstCertificateDrawer({
   const canSubmit = errors.length === 0 && !uploading && !flowBlocked;
 
   const submit = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (_vars: SubmitVars = { continueAdding: false }) => {
       if (!file) throw new Error("no_file");
       if (!selectedType) throw new Error("no_type_selected");
       const normalized = selectedType.code;
@@ -272,14 +278,15 @@ export function SstCertificateDrawer({
       }
 
       // 3) reevaluate_worker_links (retorna contagem)
-      const { data: reRes } = await (supabase as any).rpc(
+      const reeval = await (supabase as any).rpc(
         "reevaluate_worker_links",
         { p_worker_id: workerId, p_event_source: "upload" },
       );
-      const linksProcessed = Number((reRes as any)?.links_processed ?? 0);
-      return { normalized, linksProcessed };
+      const reevalError = reeval?.error ?? null;
+      const linksProcessed = Number(reeval?.data?.links_processed ?? 0);
+      return { normalized, linksProcessed, reevalError };
     },
-    onSuccess: (res) => {
+    onSuccess: (res, vars) => {
       // 4) Invalidação de caches — KPIs, tabela, histórico, vínculos, pendências
       invalidateSstCaches(qc);
       invalidateComplianceCaches(qc, { workerId, eventSource: "upload" });
@@ -287,17 +294,43 @@ export function SstCertificateDrawer({
       qc.invalidateQueries({ queryKey: ["worker-sst-summary", workerId] });
       qc.invalidateQueries({ queryKey: ["worker-sst-history", workerId] });
       qc.invalidateQueries({ queryKey: ["worker-sst-links-using", workerId] });
+      qc.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs", workerId] });
 
       const verb =
         mode === "renew" ? "renovada" :
         mode === "replace" ? "substituída" :
         "cadastrada";
-      const linkMsg = res.linksProcessed > 0
-        ? ` ${res.linksProcessed} vínculo${res.linksProcessed === 1 ? "" : "s"} reavaliado${res.linksProcessed === 1 ? "" : "s"} automaticamente.`
-        : "";
-      toast.success(`${res.normalized} ${verb} com sucesso.${linkMsg}`);
+      if (res.reevalError) {
+        // Q-024-D-UI-MULTIPLE — reavaliação falhou: NÃO repetir upload nem revisão.
+        toast.warning(
+          `Certificado salvo, mas os vínculos não puderam ser reavaliados.`,
+          {
+            action: {
+              label: "Tentar reavaliar novamente",
+              onClick: async () => {
+                const retry = await (supabase as any).rpc(
+                  "reevaluate_worker_links",
+                  { p_worker_id: workerId, p_event_source: "manual_retry" },
+                );
+                if (retry?.error) {
+                  toast.error("Reavaliação falhou novamente. Verifique com o administrador.");
+                } else {
+                  toast.success("Vínculos reavaliados.");
+                  invalidateSstCaches(qc);
+                invalidateComplianceCaches(qc, { workerId, eventSource: "upload" });
+                }
+              },
+            },
+          },
+        );
+      } else {
+        const linkMsg = res.linksProcessed > 0
+          ? ` ${res.linksProcessed} vínculo${res.linksProcessed === 1 ? "" : "s"} reavaliado${res.linksProcessed === 1 ? "" : "s"} automaticamente.`
+          : "";
+        toast.success(`${res.normalized} ${verb} com sucesso.${linkMsg}`);
+      }
 
-      if (mode === "create" && keepOpenAfterSave) {
+      if (mode === "create" && vars.continueAdding) {
         // "Salvar e adicionar outra": limpa formulário e mantém drawer aberto.
         setSelectedDocumentTypeId(null);
         setFile(null);
@@ -310,7 +343,6 @@ export function SstCertificateDrawer({
         setProvider("");
         setInstructor("");
         setNotes("");
-        setKeepOpenAfterSave(false);
       } else {
         onOpenChange(false);
       }
@@ -322,7 +354,7 @@ export function SstCertificateDrawer({
       toast.error(msg, {
         action: {
           label: "Tentar novamente",
-          onClick: () => submit.mutate(),
+          onClick: () => submit.mutate({ continueAdding: false }),
         },
       });
     },
@@ -437,6 +469,15 @@ export function SstCertificateDrawer({
                         Use a aba <strong>Documentos</strong> para anexar o ASO. Ele não é
                         gravado no registro de NRs para preservar a fonte única de dados.
                       </div>
+                      {onManageInDocuments && selectedType && (
+                        <Button
+                          size="sm" variant="outline" className="mt-2"
+                          onClick={() => onManageInDocuments(selectedType.documentTypeId)}
+                          data-testid="drawer-manage-in-documents"
+                        >
+                          Gerenciar na aba Documentos
+                        </Button>
+                      )}
                     </>
                   ) : (
                     <>
@@ -591,7 +632,7 @@ export function SstCertificateDrawer({
               <Button
                 size="sm" variant="outline"
                 className="h-7 text-xs shrink-0"
-                onClick={() => submit.mutate()}
+                onClick={() => submit.mutate({ continueAdding: false })}
                 disabled={errors.length > 0}
               >
                 Tentar novamente
@@ -609,16 +650,16 @@ export function SstCertificateDrawer({
           {mode === "create" && (
             <Button
               variant="outline"
-              onClick={() => { setKeepOpenAfterSave(true); submit.mutate(); }}
+              onClick={() => submit.mutate({ continueAdding: true })}
               disabled={!canSubmit}
               data-testid="save-and-add-another"
             >
-              {pending && keepOpenAfterSave && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {pending && submit.variables?.continueAdding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Salvar e adicionar outra
             </Button>
           )}
           <Button
-            onClick={() => { setKeepOpenAfterSave(false); submit.mutate(); }}
+            onClick={() => submit.mutate({ continueAdding: false })}
             disabled={!canSubmit}
             data-testid="save-qualification"
           >

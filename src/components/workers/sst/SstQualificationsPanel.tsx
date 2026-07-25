@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,15 +12,19 @@ import {
 } from "@/components/ui/table";
 import {
   Upload, Plus, RefreshCw, Replace, History, Users, MoreHorizontal, GitBranch,
-  FileText, ExternalLink, ShieldCheck,
+  FileText, ExternalLink, ShieldCheck, FolderOpen,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  useWorkerSstQualifications, useWorkerSstSummary,
+  useWorkerSstSummary,
 } from "@/hooks/useWorkerSst";
+import {
+  useWorkerQualificationsUnified,
+  type UnifiedQualificationRow,
+} from "@/hooks/useWorkerQualificationsUnified";
 import type { SstCurrentRow } from "@/hooks/useSstQualifications";
 import {
-  SstStatusBadge, resolveOverall, OVERALL_PRIORITY, daysUntil,
+  SstStatusBadge, type SstOverallStatus, daysUntil,
 } from "./SstStatusBadge";
 import { SstHistorySheet } from "./SstHistorySheet";
 import { SstLinksUsingSheet } from "./SstLinksUsingSheet";
@@ -49,14 +54,15 @@ interface Props {
 }
 
 export function SstQualificationsPanel({ workerId, workerName }: Props) {
+  const navigate = useNavigate();
   const { hasAnyRole } = useAuth();
   const canEdit = hasAnyRole(["admin", "manager", "operator"]);
-  const { data: quals, isLoading } = useWorkerSstQualifications(workerId);
+  const { data: unified, isLoading } = useWorkerQualificationsUnified(workerId);
   const { data: summary, isLoading: loadingSummary } = useWorkerSstSummary(workerId);
 
-  const [historyOpen, setHistoryOpen] = useState<{ nr: string } | null>(null);
+  const [historyOpen, setHistoryOpen] = useState<{ nr: string; documentTypeId: string } | null>(null);
   const [linksOpen, setLinksOpen] = useState<{ nr: string; docTypeId: string | null } | null>(null);
-  const [timelineOpen, setTimelineOpen] = useState<{ nr: string; docTypeId: string | null } | null>(null);
+  const [timelineOpen, setTimelineOpen] = useState<{ nr: string; docTypeId: string } | null>(null);
   const [drawer, setDrawer] = useState<
     {
       mode: SstDrawerMode;
@@ -66,30 +72,25 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
     } | null
   >(null);
 
-  const rows = useMemo(() => {
-    if (!quals) return [];
-    return [...quals].sort((a, b) => {
-      const pa = OVERALL_PRIORITY[resolveOverall(a)];
-      const pb = OVERALL_PRIORITY[resolveOverall(b)];
-      if (pa !== pb) return pa - pb;
-      // dentro da mesma prioridade, mais próximo do vencimento primeiro
-      const da = a.expires_at ? new Date(a.expires_at).getTime() : Infinity;
-      const db = b.expires_at ? new Date(b.expires_at).getTime() : Infinity;
-      if (da !== db) return da - db;
-      return a.nr_code.localeCompare(b.nr_code, "pt-BR");
-    });
-  }, [quals]);
+  const rows = unified ?? [];
+  const sstRawRows: SstCurrentRow[] = useMemo(
+    () => rows.filter((r) => r.source === "sst" && r.sstRaw).map((r) => r.sstRaw as SstCurrentRow),
+    [rows],
+  );
 
   const currentByDocumentTypeId = useMemo(() => {
     const s = new Set<string>();
-    for (const q of quals ?? []) {
-      if (q.document_type_id) s.add(q.document_type_id);
+    for (const r of rows) {
+      if (r.documentTypeId) s.add(r.documentTypeId);
     }
     return s;
-  }, [quals]);
+  }, [rows]);
 
   const openCreateQualification = () =>
     setDrawer({ mode: "create", current: null, presetDocumentTypeId: null, presetNrCode: null });
+
+  const openManageInDocuments = (documentTypeId: string) =>
+    navigate(`/workers/${workerId}?tab=documentos&document_type_id=${documentTypeId}`);
 
   return (
     <div className="space-y-4">
@@ -154,25 +155,27 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>NR</TableHead>
+                  <TableHead>Qualificação</TableHead>
+                  <TableHead className="hidden sm:table-cell">Categoria</TableHead>
                   <TableHead>Situação</TableHead>
                   <TableHead className="hidden sm:table-cell">Vence em</TableHead>
-                  <TableHead className="hidden md:table-cell">Certificado</TableHead>
+                  <TableHead className="hidden md:table-cell">Arquivo</TableHead>
                   <TableHead className="text-right w-[80px]">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((q) => (
                   <QualRow
-                    key={q.id}
+                    key={`${q.source}:${q.id}`}
                     q={q}
                     canEdit={canEdit}
-                    onUpload={() => setDrawer({ mode: "replace", current: q, presetDocumentTypeId: q.document_type_id, presetNrCode: q.nr_code })}
-                    onRenew={() => setDrawer({ mode: "renew", current: q, presetDocumentTypeId: q.document_type_id, presetNrCode: q.nr_code })}
-                    onReplace={() => setDrawer({ mode: "replace", current: q, presetDocumentTypeId: q.document_type_id, presetNrCode: q.nr_code })}
-                    onHistory={() => setHistoryOpen({ nr: q.nr_code })}
-                    onLinks={() => setLinksOpen({ nr: q.nr_code, docTypeId: q.document_type_id })}
-                    onTimeline={() => setTimelineOpen({ nr: q.nr_code, docTypeId: q.document_type_id })}
+                    onUpload={() => q.sstRaw && setDrawer({ mode: "replace", current: q.sstRaw as SstCurrentRow, presetDocumentTypeId: q.documentTypeId, presetNrCode: q.code })}
+                    onRenew={() => q.sstRaw && setDrawer({ mode: "renew", current: q.sstRaw as SstCurrentRow, presetDocumentTypeId: q.documentTypeId, presetNrCode: q.code })}
+                    onReplace={() => q.sstRaw && setDrawer({ mode: "replace", current: q.sstRaw as SstCurrentRow, presetDocumentTypeId: q.documentTypeId, presetNrCode: q.code })}
+                    onHistory={() => setHistoryOpen({ nr: q.code, documentTypeId: q.documentTypeId })}
+                    onLinks={() => setLinksOpen({ nr: q.code, docTypeId: q.documentTypeId })}
+                    onTimeline={() => setTimelineOpen({ nr: q.code, docTypeId: q.documentTypeId })}
+                    onManageInDocuments={() => openManageInDocuments(q.documentTypeId)}
                   />
                 ))}
               </TableBody>
@@ -186,6 +189,7 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
           open={!!historyOpen}
           onOpenChange={(v) => !v && setHistoryOpen(null)}
           workerId={workerId}
+          documentTypeId={historyOpen.documentTypeId}
           nrCode={historyOpen.nr}
         />
       )}
@@ -203,6 +207,7 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
           open={!!timelineOpen}
           onOpenChange={(v) => !v && setTimelineOpen(null)}
           workerId={workerId}
+          documentTypeId={timelineOpen.docTypeId}
           nrCode={timelineOpen.nr}
           onOpenLinks={() =>
             setLinksOpen({ nr: timelineOpen.nr, docTypeId: timelineOpen.docTypeId })
@@ -220,9 +225,13 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
           presetDocumentTypeId={drawer.presetDocumentTypeId}
           presetNrCode={drawer.presetNrCode}
           currentByDocumentTypeId={currentByDocumentTypeId}
-          currentRows={rows}
+          currentRows={sstRawRows}
           onRequestRenew={(row) => setDrawer({ mode: "renew", current: row, presetDocumentTypeId: row.document_type_id, presetNrCode: row.nr_code })}
           onRequestReplace={(row) => setDrawer({ mode: "replace", current: row, presetDocumentTypeId: row.document_type_id, presetNrCode: row.nr_code })}
+          onManageInDocuments={(documentTypeId) => {
+            setDrawer(null);
+            openManageInDocuments(documentTypeId);
+          }}
         />
       )}
     </div>
@@ -230,7 +239,7 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
 }
 
 interface RowProps {
-  q: SstCurrentRow;
+  q: UnifiedQualificationRow;
   canEdit: boolean;
   onUpload: () => void;
   onRenew: () => void;
@@ -238,38 +247,64 @@ interface RowProps {
   onHistory: () => void;
   onLinks: () => void;
   onTimeline: () => void;
+  onManageInDocuments: () => void;
 }
 
-function QualRow({ q, canEdit, onUpload, onRenew, onReplace, onHistory, onLinks, onTimeline }: RowProps) {
-  const status = resolveOverall(q);
-  const days = daysUntil(q.expires_at);
-  const hasCert = !!q.document_url;
+function statusToBadge(s: UnifiedQualificationRow["status"]): SstOverallStatus {
+  if (s === "expired") return "expired";
+  if (s === "warning") return "expiring";
+  if (s === "valid") return "valid";
+  if (s === "rejected") return "pending";
+  if (s === "missing_file") return "no_document";
+  // pending / validity_unknown → tratamos como pendente
+  return "pending";
+}
+
+function categoryLabel(c: UnifiedQualificationRow["category"]): string {
+  if (c === "sst_nr") return "NR";
+  if (c === "sst_aso") return "ASO";
+  if (c === "training") return "Treinamento";
+  return c;
+}
+
+function QualRow({ q, canEdit, onUpload, onRenew, onReplace, onHistory, onLinks, onTimeline, onManageInDocuments }: RowProps) {
+  const status = statusToBadge(q.status);
+  const days = daysUntil(q.expiresAt);
+  const hasCert = !!q.documentUrl;
+  const isDocFlow = q.storageFlow === "worker_documents";
 
   return (
     <TableRow>
       <TableCell>
-        <div className="font-medium">{q.nr_code}</div>
-        {q.training_type && (
-          <div className="text-xs text-muted-foreground">{q.training_type}</div>
+        <div className="font-medium">{q.code}</div>
+        <div className="text-xs text-muted-foreground">{q.name}</div>
+        {q.sourceConflict && (
+          <div className="text-xs text-destructive font-medium">Conflito de fonte — verificar</div>
         )}
+      </TableCell>
+      <TableCell className="hidden sm:table-cell">
+        <span className="text-xs text-muted-foreground">{categoryLabel(q.category)}</span>
       </TableCell>
       <TableCell><SstStatusBadge status={status} /></TableCell>
       <TableCell className="hidden sm:table-cell">
-        <div className="text-sm">{fmtDate(q.expires_at)}</div>
-        {days != null && (status === "expired" || status === "expiring") && (
-          <div className={`text-xs ${status === "expired" ? "text-destructive" : "text-amber-600 dark:text-amber-400"}`}>
+        <div className="text-sm">{fmtDate(q.expiresAt)}</div>
+        {days != null && (q.status === "expired" || q.status === "warning") && (
+          <div className={`text-xs ${q.status === "expired" ? "text-destructive" : "text-amber-600 dark:text-amber-400"}`}>
             {days < 0 ? `há ${Math.abs(days)}d` : `em ${days}d`}
           </div>
         )}
-        {q.validity_status === "no_expiry" && (
+        {q.validityStatus === "no_expiry" && (
           <div className="text-xs text-muted-foreground">sem validade</div>
+        )}
+        {q.status === "validity_unknown" && (
+          <div className="text-xs text-muted-foreground">validade não informada</div>
         )}
       </TableCell>
       <TableCell className="hidden md:table-cell">
         {hasCert ? (
           <button
             type="button"
-            onClick={() => openCertificate(q.document_url)}
+            onClick={() => openCertificate(q.documentUrl)}
             className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
           >
             <FileText className="h-3.5 w-3.5" /> Ver
@@ -280,6 +315,17 @@ function QualRow({ q, canEdit, onUpload, onRenew, onReplace, onHistory, onLinks,
         )}
       </TableCell>
       <TableCell className="text-right">
+        {isDocFlow ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onManageInDocuments}
+            data-testid="manage-in-documents"
+          >
+            <FolderOpen className="mr-1 h-3 w-3" />
+            Gerenciar na aba Documentos
+          </Button>
+        ) : (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -314,6 +360,7 @@ function QualRow({ q, canEdit, onUpload, onRenew, onReplace, onHistory, onLinks,
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        )}
       </TableCell>
     </TableRow>
   );
