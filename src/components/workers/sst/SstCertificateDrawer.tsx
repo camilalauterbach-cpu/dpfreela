@@ -29,6 +29,12 @@ import { QualificationDocumentTypeCombobox } from "./QualificationDocumentTypeCo
 
 export type SstDrawerMode = "create" | "renew" | "replace";
 
+// Q-024-D-UI-MULTIPLE — variável da mutation com a intenção do usuário.
+// Não depende de state atualizado assincronamente antes de submit.mutate().
+export interface SubmitVars {
+  continueAdding: boolean;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -48,6 +54,8 @@ interface Props {
   onRequestReplace?: (row: SstCurrentRow) => void;
   /** Qualificações vigentes (para localizar a linha ao oferecer renew/replace). */
   currentRows?: SstCurrentRow[];
+  /** ASO/worker_documents: navegar até a aba Documentos. */
+  onManageInDocuments?: (documentTypeId: string) => void;
 }
 
 function fmtDate(iso: string | null | undefined) {
@@ -70,7 +78,7 @@ const DESCRIPTIONS: Record<SstDrawerMode, string> = {
 export function SstCertificateDrawer({
   open, onOpenChange, mode, workerId, workerName, current,
   presetDocumentTypeId, presetNrCode, currentByDocumentTypeId,
-  onRequestRenew, onRequestReplace, currentRows,
+  onRequestRenew, onRequestReplace, currentRows, onManageInDocuments,
 }: Props) {
   const qc = useQueryClient();
 
@@ -89,7 +97,6 @@ export function SstCertificateDrawer({
   const [notes, setNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
-  const [keepOpenAfterSave, setKeepOpenAfterSave] = useState(false);
 
   const typeLocked = mode !== "create";
 
@@ -121,7 +128,6 @@ export function SstCertificateDrawer({
     setNotes("");
     setLastError(null);
     setExpiryTouched(false);
-    setKeepOpenAfterSave(false);
     if (mode === "create") {
       setSelectedDocumentTypeId(resolvePresetId());
       setTrainingType("");
