@@ -469,6 +469,15 @@ export function SstCertificateDrawer({
                         Use a aba <strong>Documentos</strong> para anexar o ASO. Ele não é
                         gravado no registro de NRs para preservar a fonte única de dados.
                       </div>
+                      {onManageInDocuments && selectedType && (
+                        <Button
+                          size="sm" variant="outline" className="mt-2"
+                          onClick={() => onManageInDocuments(selectedType.documentTypeId)}
+                          data-testid="drawer-manage-in-documents"
+                        >
+                          Gerenciar na aba Documentos
+                        </Button>
+                      )}
                     </>
                   ) : (
                     <>
