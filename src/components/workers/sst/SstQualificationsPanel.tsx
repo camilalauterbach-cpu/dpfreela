@@ -43,12 +43,14 @@ function fmtDate(iso: string | null) {
   return new Date(iso + "T12:00:00").toLocaleDateString("pt-BR");
 }
 
-function KpiCard({ label, value, tone }: { label: string; value: number; tone: string }) {
+function KpiCard({
+  label, value, tone, testId,
+}: { label: string; value: number; tone: string; testId?: string }) {
   return (
-    <Card>
+    <Card data-testid={testId}>
       <CardContent className="p-4">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className={`text-2xl font-semibold mt-1 ${tone}`}>{value}</p>
+        <p className={`text-2xl font-semibold mt-1 ${tone}`} data-testid={testId ? `${testId}-value` : undefined}>{value}</p>
       </CardContent>
     </Card>
   );
@@ -85,23 +87,52 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
 
   const deleteMut = useMutation({
     mutationFn: async (id: string) => {
+      const traceId = `del-${id.slice(0, 8)}-${Date.now().toString(36)}`;
+      const before = summary
+        ? {
+            expired: summary.expired,
+            expiringSoon: summary.expiringSoon,
+            valid: summary.valid,
+            pendingDocs: summary.pendingDocs,
+          }
+        : null;
+      // eslint-disable-next-line no-console
+      console.info("[sst-delete] start", {
+        traceId, workerId, qualificationId: id, summaryBefore: before,
+      });
+      const t0 = performance.now();
       const { error } = await (supabase as any).rpc("delete_sst_revision", {
         p_qualification_id: id,
       });
-      if (error) throw error;
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error("[sst-delete] rpc_error", {
+          traceId, qualificationId: id, error: error.message, code: (error as any).code,
+        });
+        throw error;
+      }
       // Reavalia vínculos após exclusão para recalcular indicadores.
       await (supabase as any).rpc("reevaluate_worker_links", {
         p_worker_id: workerId,
         p_event_source: "delete_sst_revision",
       });
+      // eslint-disable-next-line no-console
+      console.info("[sst-delete] rpc_ok", {
+        traceId, qualificationId: id, elapsedMs: Math.round(performance.now() - t0),
+      });
+      return { traceId, before };
     },
-    onSuccess: () => {
+    onSuccess: (ctx) => {
       invalidateSstCaches(qc);
       invalidateComplianceCaches(qc, { workerId, eventSource: "admin_update" });
       qc.invalidateQueries({ queryKey: ["worker-sst-current", workerId] });
       qc.invalidateQueries({ queryKey: ["worker-sst-summary", workerId] });
       qc.invalidateQueries({ queryKey: ["worker-sst-history", workerId] });
       qc.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs", workerId] });
+      // eslint-disable-next-line no-console
+      console.info("[sst-delete] caches_invalidated", {
+        traceId: ctx?.traceId, workerId, summaryBefore: ctx?.before,
+      });
       toast.success("Certificado excluído.");
       setDeleteTarget(null);
     },
@@ -138,15 +169,15 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
           Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20" />)
         ) : (
           <>
-            <KpiCard label="Vencidas" value={summary?.expired ?? 0}
+            <KpiCard testId="kpi-expired" label="Vencidas" value={summary?.expired ?? 0}
               tone={summary?.expired ? "text-destructive" : ""} />
-            <KpiCard label="Vencendo" value={summary?.expiringSoon ?? 0}
+            <KpiCard testId="kpi-expiring" label="Vencendo" value={summary?.expiringSoon ?? 0}
               tone={summary?.expiringSoon ? "text-amber-600 dark:text-amber-400" : ""} />
-            <KpiCard label="Pendentes de documento" value={summary?.pendingDocs ?? 0}
+            <KpiCard testId="kpi-pending-docs" label="Pendentes de documento" value={summary?.pendingDocs ?? 0}
               tone={summary?.pendingDocs ? "text-blue-600 dark:text-blue-400" : ""} />
-            <KpiCard label="Válidas" value={summary?.valid ?? 0}
+            <KpiCard testId="kpi-valid" label="Válidas" value={summary?.valid ?? 0}
               tone={summary?.valid ? "text-emerald-600 dark:text-emerald-400" : ""} />
-            <KpiCard label="Vínculos usando SST" value={summary?.activeLinksUsingSst ?? 0} tone="" />
+            <KpiCard testId="kpi-active-links" label="Vínculos usando SST" value={summary?.activeLinksUsingSst ?? 0} tone="" />
           </>
         )}
       </div>
