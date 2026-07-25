@@ -1693,27 +1693,6 @@ export type Database = {
         }
         Relationships: []
       }
-      test_completion_debug: {
-        Row: {
-          created_at: string | null
-          id: string
-          label: string | null
-          payload: Json | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          label?: string | null
-          payload?: Json | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          label?: string | null
-          payload?: Json | null
-        }
-        Relationships: []
-      }
       user_roles: {
         Row: {
           created_at: string
