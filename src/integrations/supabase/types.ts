@@ -277,6 +277,7 @@ export type Database = {
         Row: {
           category: string
           code: string
+          completion_requirement: Database["public"]["Enums"]["document_completion_requirement"]
           created_at: string
           created_by: string | null
           default_validity_days: number | null
@@ -303,6 +304,7 @@ export type Database = {
         Insert: {
           category?: string
           code: string
+          completion_requirement?: Database["public"]["Enums"]["document_completion_requirement"]
           created_at?: string
           created_by?: string | null
           default_validity_days?: number | null
@@ -329,6 +331,7 @@ export type Database = {
         Update: {
           category?: string
           code?: string
+          completion_requirement?: Database["public"]["Enums"]["document_completion_requirement"]
           created_at?: string
           created_by?: string | null
           default_validity_days?: number | null
@@ -2696,6 +2699,17 @@ export type Database = {
         Args: { p_warning_days?: number }
         Returns: Json
       }
+      document_is_valid_for_completion: {
+        Args: {
+          p_deleted_at: string
+          p_expiry_date: string
+          p_has_expiration: boolean
+          p_is_current: boolean
+          p_status: string
+          p_validity_mode: Database["public"]["Enums"]["document_validity_mode"]
+        }
+        Returns: boolean
+      }
       document_type_scope_gate_status: { Args: never; Returns: Json }
       document_type_usage_counts: {
         Args: never
@@ -2719,6 +2733,10 @@ export type Database = {
       }
       ensure_worker: { Args: { mode?: string; payload: Json }; Returns: Json }
       evaluate_link_compliance: { Args: { p_link_id: string }; Returns: Json }
+      evaluate_worker_registration_completion: {
+        Args: { p_worker_id: string }
+        Returns: Json
+      }
       f_job_roles_hygiene_baseline: { Args: never; Returns: Json }
       f_job_roles_hygiene_data_fingerprint: { Args: never; Returns: string }
       f_normalize_job_role: { Args: { p_text: string }; Returns: string }
@@ -2876,6 +2894,10 @@ export type Database = {
         Args: { _primary: string; _secondary: string }
         Returns: Json
       }
+      recompute_all_workers_registration_status: {
+        Args: never
+        Returns: number
+      }
       record_compliance_transitions: {
         Args: { p_event_source?: string; p_link_id: string }
         Returns: Json
@@ -3010,6 +3032,10 @@ export type Database = {
         }
         Returns: Json
       }
+      set_document_type_completion_requirement: {
+        Args: { p_document_type_id: string; p_requirement: string }
+        Returns: Json
+      }
       set_document_type_validity: {
         Args: {
           p_document_type_id: string
@@ -3020,6 +3046,7 @@ export type Database = {
         Returns: {
           category: string
           code: string
+          completion_requirement: Database["public"]["Enums"]["document_completion_requirement"]
           created_at: string
           created_by: string | null
           default_validity_days: number | null
@@ -3104,6 +3131,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "manager" | "operator" | "viewer"
+      document_completion_requirement: "required" | "optional"
       document_storage_scope: "worker" | "employment_link"
       document_validity_mode: "fixed_duration" | "explicit_date" | "no_expiry"
       document_validity_unit: "day" | "month" | "year"
@@ -3244,6 +3272,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "manager", "operator", "viewer"],
+      document_completion_requirement: ["required", "optional"],
       document_storage_scope: ["worker", "employment_link"],
       document_validity_mode: ["fixed_duration", "explicit_date", "no_expiry"],
       document_validity_unit: ["day", "month", "year"],

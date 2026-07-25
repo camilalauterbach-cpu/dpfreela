@@ -17,6 +17,7 @@ import { DocumentChecklist } from "@/components/workers/DocumentChecklist";
 import { DpReadinessBadge } from "@/components/workers/DpReadinessBadge";
 import { WorkerLinksList } from "@/components/links/WorkerLinksList";
 import { SstQualificationsPanel } from "@/components/workers/sst/SstQualificationsPanel";
+import { WorkerCompletionChecklist } from "@/components/workers/WorkerCompletionChecklist";
 
 export default function WorkerDetail() {
   const { id } = useParams();
@@ -131,6 +132,7 @@ export default function WorkerDetail() {
         </TabsList>
 
         <TabsContent value="dados" className="space-y-4 mt-4">
+          <WorkerCompletionChecklist workerId={worker.id} />
           {/* DP Readiness detail */}
           <Card>
             <CardHeader><CardTitle className="text-base">Completude para DP</CardTitle></CardHeader>

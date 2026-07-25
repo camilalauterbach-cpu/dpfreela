@@ -37,6 +37,7 @@ interface DocType {
   validity_unit: ValidityUnit | null;
   has_expiration: boolean;
   default_validity_days: number | null;
+  completion_requirement: "required" | "optional";
 }
 
 interface GateRow {
@@ -93,13 +94,19 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
   const [vError, setVError] = useState<string | null>(null);
   const [vSaving, setVSaving] = useState(false);
 
+  // Obrigatoriedade para conclusão do cadastro
+  const [reqEditing, setReqEditing] = useState<DocType | null>(null);
+  const [reqValue, setReqValue] = useState<"required" | "optional">("optional");
+  const [reqSaving, setReqSaving] = useState(false);
+  const [reqError, setReqError] = useState<string | null>(null);
+
   const q = useQuery({
     queryKey: ["settings-doc-types-scope"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("document_types")
         .select(
-          "id, code, name, category, is_active, storage_scope, validity_mode, validity_value, validity_unit, has_expiration, default_validity_days",
+          "id, code, name, category, is_active, storage_scope, validity_mode, validity_value, validity_unit, has_expiration, default_validity_days, completion_requirement",
         )
         .order("name");
       if (error) throw error;
@@ -209,6 +216,52 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
     setValidityEditing(null);
     setVError(null);
     setVSaving(false);
+  };
+
+  const openRequirement = (d: DocType) => {
+    if (readOnly) return;
+    setReqEditing(d);
+    setReqValue(d.completion_requirement ?? "optional");
+    setReqError(null);
+  };
+  const closeRequirement = () => {
+    setReqEditing(null);
+    setReqError(null);
+    setReqSaving(false);
+  };
+  const saveRequirement = async () => {
+    if (!reqEditing) return;
+    if (reqEditing.completion_requirement === reqValue) {
+      closeRequirement();
+      return;
+    }
+    setReqSaving(true);
+    setReqError(null);
+    try {
+      const { error } = await supabase.rpc(
+        "set_document_type_completion_requirement" as any,
+        { p_document_type_id: reqEditing.id, p_requirement: reqValue } as any,
+      );
+      if (error) throw error;
+      toast({
+        title: "Obrigatoriedade atualizada",
+        description: `${reqEditing.name} — agora ${reqValue === "required" ? "obrigatório" : "opcional"}. Cadastros afetados foram recalculados.`,
+      });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["settings-doc-types-scope"] }),
+        qc.invalidateQueries({ queryKey: ["worker-completion"] }),
+        qc.invalidateQueries({ queryKey: ["workers"] }),
+      ]);
+      closeRequirement();
+    } catch (err: any) {
+      const raw = String(err?.message ?? "");
+      if (raw.includes("not_authorized")) setReqError("Apenas admin/manager podem alterar esta configuração.");
+      else if (raw.includes("requirement_invalid")) setReqError("Opção inválida.");
+      else if (raw.includes("document_type_not_found")) setReqError("Tipo documental não encontrado.");
+      else setReqError("Não foi possível salvar. Tente novamente.");
+    } finally {
+      setReqSaving(false);
+    }
   };
 
   const applyPreset = (key: string) => {
@@ -399,6 +452,7 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
                   <TableHead>Nome</TableHead>
                   <TableHead className="hidden sm:table-cell">Categoria</TableHead>
                   <TableHead>Escopo</TableHead>
+                  <TableHead className="hidden md:table-cell">Obrigatoriedade</TableHead>
                   <TableHead className="hidden lg:table-cell">Validade padrão</TableHead>
                   <TableHead className="hidden md:table-cell">Utilizado por</TableHead>
                   <TableHead className="hidden sm:table-cell">Status</TableHead>
@@ -408,7 +462,7 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
               <TableBody>
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       Nenhum tipo encontrado para este filtro.
                     </TableCell>
                   </TableRow>
@@ -439,6 +493,13 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
                           >
                             <AlertTriangle className="h-3 w-3" /> Pendente
                           </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {d.completion_requirement === "required" ? (
+                          <Badge className="gap-1 bg-emerald-600 hover:bg-emerald-600">Obrigatório</Badge>
+                        ) : (
+                          <Badge variant="outline">Opcional</Badge>
                         )}
                       </TableCell>
                       <TableCell className="hidden lg:table-cell text-sm">
@@ -486,6 +547,14 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
                             onClick={() => openValidity(d)}
                           >
                             Validade
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={readOnly}
+                            onClick={() => openRequirement(d)}
+                          >
+                            Obrigatoriedade
                           </Button>
                         </div>
                       </TableCell>
@@ -750,6 +819,75 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
             >
               {vSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Salvar validade
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo — Obrigatoriedade para conclusão do cadastro */}
+      <Dialog open={!!reqEditing} onOpenChange={(o) => !o && closeRequirement()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Obrigatoriedade — {reqEditing?.name}</DialogTitle>
+            <DialogDescription>
+              Define se este tipo é exigido para <strong>concluir o cadastro</strong> do trabalhador
+              e <strong>liberar a ativação de vínculo</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Alterar esta configuração recalcula automaticamente <strong>todos</strong> os trabalhadores.
+              Nenhum documento existente é apagado.
+            </AlertDescription>
+          </Alert>
+
+          <RadioGroup
+            value={reqValue}
+            onValueChange={(v) => setReqValue(v as "required" | "optional")}
+            className="space-y-2"
+          >
+            <label
+              htmlFor="req-required"
+              className={`flex gap-3 rounded-md border p-3 cursor-pointer transition ${reqValue === "required" ? "border-primary bg-primary/5" : ""}`}
+            >
+              <RadioGroupItem value="required" id="req-required" className="mt-1" />
+              <div className="space-y-0.5">
+                <div className="font-medium">Obrigatório para concluir o cadastro</div>
+                <div className="text-sm text-muted-foreground">
+                  A ausência, rejeição ou vencimento (se houver controle de validade) mantém o cadastro
+                  incompleto e bloqueia a ativação de vínculos.
+                </div>
+              </div>
+            </label>
+            <label
+              htmlFor="req-optional"
+              className={`flex gap-3 rounded-md border p-3 cursor-pointer transition ${reqValue === "optional" ? "border-primary bg-primary/5" : ""}`}
+            >
+              <RadioGroupItem value="optional" id="req-optional" className="mt-1" />
+              <div className="space-y-0.5">
+                <div className="font-medium">Opcional</div>
+                <div className="text-sm text-muted-foreground">
+                  Pode ser enviado e consultado, mas <strong>não</strong> altera a completude nem entra
+                  em métricas executivas de pendência ou vencidos.
+                </div>
+              </div>
+            </label>
+          </RadioGroup>
+
+          {reqError && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>{reqError}</AlertDescription>
+            </Alert>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeRequirement} disabled={reqSaving}>Cancelar</Button>
+            <Button onClick={saveRequirement} disabled={reqSaving}>
+              {reqSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar
             </Button>
           </DialogFooter>
         </DialogContent>
