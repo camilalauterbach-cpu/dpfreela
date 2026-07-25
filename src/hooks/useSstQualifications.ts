@@ -47,6 +47,17 @@ export interface SstWorkerRow {
   qualifications: SstCurrentRow[];
 }
 
+/**
+ * Qualificação que não conseguiu resolver um trabalhador vivo em `workers`
+ * (worker_id ausente ou trabalhador com deleted_at). Usada para a aba de
+ * auditoria "Órfãos e legados" — nunca deve virar linha operacional nem
+ * receber um nome inventado ou reaproveitado de outra pessoa.
+ */
+export interface SstOrphanRow {
+  row: SstCurrentRow;
+  reason: "worker_not_found" | "worker_deleted" | "missing_document_type";
+}
+
 interface Filters {
   search: string;
   nr?: string;
@@ -82,17 +93,27 @@ export function useSstOverview(filters: Filters) {
       const rows = (quals || []) as SstCurrentRow[];
 
       const workerIds = Array.from(new Set(rows.map((r) => r.worker_id)));
-      if (workerIds.length === 0) return { workers: [] as SstWorkerRow[] };
+      if (workerIds.length === 0) {
+        return { workers: [] as SstWorkerRow[], orphans: [] as SstOrphanRow[] };
+      }
 
+      // Buscamos inclusive workers com deleted_at para classificar corretamente
+      // órfãos (worker excluído) vs. worker_id que não existe mais na tabela.
       const { data: workers, error: wErr } = await supabase
         .from("workers")
-        .select("id, full_name, nickname, cpf")
-        .in("id", workerIds)
-        .is("deleted_at", null);
+        .select("id, full_name, nickname, cpf, deleted_at")
+        .in("id", workerIds);
       if (wErr) throw wErr;
 
       const byWorker = new Map<string, SstWorkerRow>();
+      const deletedIds = new Set<string>();
+      const knownIds = new Set<string>();
       for (const w of workers || []) {
+        knownIds.add(w.id);
+        if ((w as any).deleted_at) {
+          deletedIds.add(w.id);
+          continue;
+        }
         byWorker.set(w.id, {
           worker_id: w.id,
           full_name: w.full_name,
@@ -101,9 +122,20 @@ export function useSstOverview(filters: Filters) {
           qualifications: [],
         });
       }
+      const orphans: SstOrphanRow[] = [];
       for (const r of rows) {
         const w = byWorker.get(r.worker_id);
-        if (w) w.qualifications.push(r);
+        if (w) {
+          w.qualifications.push(r);
+          if (!r.document_type_id && r.nr_code) {
+            // NR canônica sem document_type — legado que precisa reassociação.
+            orphans.push({ row: r, reason: "missing_document_type" });
+          }
+        } else if (deletedIds.has(r.worker_id)) {
+          orphans.push({ row: r, reason: "worker_deleted" });
+        } else {
+          orphans.push({ row: r, reason: "worker_not_found" });
+        }
       }
 
       let list = Array.from(byWorker.values());
@@ -149,7 +181,7 @@ export function useSstOverview(filters: Filters) {
       }
 
       list.sort((a, b) => a.full_name.localeCompare(b.full_name, "pt-BR"));
-      return { workers: list };
+      return { workers: list, orphans };
     },
     staleTime: 60_000,
   });
