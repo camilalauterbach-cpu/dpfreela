@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapRpcError } from "../SstCertificateDrawer";
+import { mapRpcError, looksTechnical } from "../SstCertificateDrawer";
 
 describe("mapRpcError — mensagens amigáveis para o usuário", () => {
   describe("Renovar com datas idênticas", () => {
@@ -93,5 +93,78 @@ describe("mapRpcError — mensagens amigáveis para o usuário", () => {
         mapRpcError(raw, { mode: "create", category: "sst_nr" }),
       ).toBe(raw);
     });
+  });
+});
+
+describe("looksTechnical — detecção ampliada de padrões técnicos", () => {
+  // Cada entrada é uma mensagem "crua" que já foi observada (ou é plausível)
+  // vindo do Postgres, PostgREST, Supabase, HTTP ou runtime JS. Todas devem
+  // ser detectadas como técnicas e nunca chegar ao usuário como estão.
+  const technicalSamples: Array<[string, string]> = [
+    ["duplicate key value", 'duplicate key value violates unique constraint "uq_x"'],
+    ["check constraint", "new row violates check constraint chk_positive"],
+    ["foreign key", "insert violates foreign key constraint fk_worker"],
+    ["not-null constraint", 'null value in column "worker_id" violates not-null constraint'],
+    ["exclusion constraint", "conflicting key value violates exclusion constraint ex_range"],
+    ["sqlstate padrão", "ERROR: something (SQLSTATE 23505)"],
+    ["errcode ERRCODE", "ERRCODE=40001 could not serialize access"],
+    ["sqlstate 22001", "value too long (22001)"],
+    ["sqlstate 40001", "sqlstate 40001: serialization failure"],
+    ["sqlstate 42703", "column does not exist (42703)"],
+    ["sqlstate 42P01", "relation not found 42P01"],
+    ["P0001 raise", "P0001: custom raise"],
+    ["relation missing", 'relation "public.foo" does not exist'],
+    ["column missing", 'column "deleted_at" does not exist'],
+    ["function missing", "function public.foo(uuid) does not exist"],
+    ["operator missing", "operator does not exist: text = integer"],
+    ["invalid input", "invalid input syntax for type uuid: \"abc\""],
+    ["syntax error", "syntax error at or near \"SELECT\""],
+    ["deadlock", "deadlock detected while waiting for lock"],
+    ["serialize", "could not serialize access due to concurrent update"],
+    ["permission denied", "permission denied for table workers"],
+    ["plpgsql context", "CONTEXT: PL/pgSQL function register_sst_revision"],
+    ["HINT postgres", "HINT: Try granting SELECT to authenticated"],
+    ["DETAIL postgres", "DETAIL: Key (worker_id)=(...) already exists."],
+    ["pg_ prefix", "pg_stat_activity blocked"],
+    ["pq prefix", "pq: could not connect"],
+    ["PGRST code", "PGRST116: JSON object requested, multiple (or no) rows returned"],
+    ["JWT expired", "JWT expired"],
+    ["JWT malformed", "JWT malformed"],
+    ["Results contain rows", "Results contain 0 rows"],
+    ["http 500", "HTTP 500 Internal Server Error"],
+    ["status code", "status code: 504"],
+    ["ECONNRESET", "ECONNRESET at socket"],
+    ["ETIMEDOUT", "ETIMEDOUT while contacting supabase"],
+    ["TypeError", "TypeError: Cannot read properties of undefined (reading 'id')"],
+    ["ReferenceError", "ReferenceError: foo is not defined"],
+    ["stack frame", "at Object.<anonymous> (SstCertificateDrawer.tsx:1:1)"],
+  ];
+
+  it.each(technicalSamples)("detecta padrão técnico: %s", (_label, raw) => {
+    expect(looksTechnical(raw)).toBe(true);
+  });
+
+  it.each(technicalSamples)(
+    "mapRpcError nunca vaza o texto cru: %s",
+    (_label, raw) => {
+      const friendly = mapRpcError(raw, { mode: "create", category: "sst_nr" });
+      // O texto amigável não pode conter os fragmentos mais reveladores.
+      expect(friendly).not.toMatch(
+        /SQLSTATE|ERRCODE|PGRST\d+|duplicate key|unique constraint|check constraint|foreign key|not-null|deadlock|serialize|permission denied|PL\/pgSQL|TypeError|ReferenceError|ECONN|ETIMEDOUT|HTTP \d{3}|relation "|column "|function [a-z0-9_.]+\(/i,
+      );
+      // E precisa ser uma frase humana em português.
+      expect(friendly.length).toBeGreaterThan(0);
+      expect(/[a-záéíóúãõç]/i.test(friendly)).toBe(true);
+    },
+  );
+
+  it("mensagem vazia não é considerada técnica", () => {
+    expect(looksTechnical("")).toBe(false);
+  });
+
+  it("texto humano em português não é considerado técnico", () => {
+    expect(
+      looksTechnical("Não foi possível enviar o arquivo. Tente novamente."),
+    ).toBe(false);
   });
 });

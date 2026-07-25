@@ -66,19 +66,83 @@ const RPC_ERROR_MESSAGES: Record<string, string> = {
     "Este tipo documental não é aceito no cadastro de qualificações (apenas NRs e Treinamentos).",
 };
 
-// Padrões "técnicos" que jamais devem chegar ao usuário como estão.
+// Padrões "técnicos" que jamais devem chegar ao usuário como estão. A lista é
+// intencionalmente ampla: cobre erros do Postgres (SQLSTATE, restrições,
+// gatilhos, PL/pgSQL), do PostgREST/Supabase (códigos PGRST*, hints, "Results
+// contain 0 rows"), da camada HTTP (status técnicos) e do runtime JS
+// (TypeError, stack traces). Qualquer expressão nova identificada em produção
+// deve ser acrescentada aqui com um teste de regressão em
+// `mapRpcError.test.ts`.
 const TECHNICAL_PATTERNS: RegExp[] = [
+  // Postgres — restrições e integridade
   /duplicate key/i,
   /unique constraint/i,
+  /check constraint/i,
+  /foreign key/i,
+  /not[- ]null constraint/i,
+  /null value in column/i,
   /violates/i,
+  /exclusion constraint/i,
+  /conflict on constraint/i,
+  // Postgres — códigos SQLSTATE e ERRCODE
   /sqlstate/i,
   /errcode/i,
-  /\b23505\b/,
+  /\bP0001\b/,
+  /\b23\d{3}\b/, // 23xxx integrity_constraint_violation
+  /\b22\d{3}\b/, // 22xxx data_exception
+  /\b40\d{3}\b/, // 40xxx transaction rollback (deadlock/serialize)
+  /\b42\d{3}\b/, // 42xxx syntax/access
+  /\b42P\d{2}\b/i,
+  // Postgres — objetos/nomes internos
   /uq_worker_sst/i,
   /pg[a-z_]*:/i,
+  /pg_[a-z_]+/i,
+  /\bpq:\s/i,
+  /relation "[^"]+" does not exist/i,
+  /column "[^"]+" does not exist/i,
+  /function [a-z0-9_.]+\([^)]*\) does not exist/i,
+  /operator does not exist/i,
+  /invalid input syntax for type/i,
+  /syntax error at or near/i,
+  /deadlock detected/i,
+  /could not serialize access/i,
+  /permission denied for/i,
+  /schema "[^"]+"/i,
+  /raise exception/i,
+  /CONTEXT:\s*PL\/pgSQL/i,
+  /QUERY:\s/i,
+  /HINT:\s/i,
+  /DETAIL:\s/i,
+  // PostgREST / Supabase
+  /PGRST\d+/i,
+  /postgrest/i,
+  /supabase/i,
+  /JWT (?:expired|malformed|invalid)/i,
+  /Results contain \d+ rows/i,
+  /no rows returned/i,
+  // HTTP / infraestrutura
+  /\bHTTP\s+\d{3}\b/i,
+  /status(?: code)?\s*[:=]\s*\d{3}/i,
+  /\bECONN[A-Z]+\b/,
+  /\bETIMEDOUT\b/,
+  /\bENOTFOUND\b/,
+  // Runtime JS
+  /TypeError:/,
+  /ReferenceError:/,
+  /SyntaxError:/,
+  /RangeError:/,
+  /\bundefined is not\b/i,
+  /cannot read propert(?:y|ies) of (?:null|undefined)/i,
+  /\bat\s+\S+\s+\([^)]*:\d+:\d+\)/, // stack frames
 ];
 
-function looksTechnical(raw: string): boolean {
+/**
+ * Verdadeiro quando o texto tem aparência de erro técnico (SQL, PostgREST,
+ * stack trace, etc.) e nunca deve ser exibido ao usuário como está.
+ * Exportado para permitir testes de regressão diretos.
+ */
+export function looksTechnical(raw: string): boolean {
+  if (!raw) return false;
   return TECHNICAL_PATTERNS.some((rx) => rx.test(raw));
 }
 
