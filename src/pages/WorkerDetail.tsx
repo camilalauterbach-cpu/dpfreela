@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,8 +21,15 @@ import { SstQualificationsPanel } from "@/components/workers/sst/SstQualificatio
 export default function WorkerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const initialTab = searchParams.get("tab") || "dados";
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get("tab") || "dados";
+  const [activeTab, setActiveTab] = useState<string>(urlTab);
+  // Sync activeTab quando a URL muda (ex.: botão "Gerenciar na aba Documentos"
+  // navega de dentro do painel SST para ?tab=documentos&document_type_id=...).
+  useEffect(() => {
+    if (urlTab !== activeTab) setActiveTab(urlTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlTab]);
   const { data: worker, isLoading } = useWorker(id);
   const { hasAnyRole } = useAuth();
   const canEdit = hasAnyRole(["admin", "manager", "operator"]);
@@ -104,7 +111,17 @@ export default function WorkerDetail() {
         />
       </div>
 
-      <Tabs defaultValue={initialTab} className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => {
+          setActiveTab(v);
+          const next = new URLSearchParams(searchParams);
+          if (v === "dados") next.delete("tab");
+          else next.set("tab", v);
+          setSearchParams(next, { replace: true });
+        }}
+        className="w-full"
+      >
         <TabsList className="w-full justify-start">
           <TabsTrigger value="dados">Dados</TabsTrigger>
           <TabsTrigger value="documentos">Documentos</TabsTrigger>
