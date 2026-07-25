@@ -12,6 +12,9 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   workerId: string;
+  /** Identidade canônica (Q-024-D-UI-MULTIPLE). */
+  documentTypeId: string;
+  /** Rótulo/legado — apenas exibição. */
   nrCode: string;
 }
 
@@ -36,8 +39,8 @@ function fmtDate(iso: string | null | undefined) {
   return new Date(iso.length > 10 ? iso : iso + "T12:00:00").toLocaleDateString("pt-BR");
 }
 
-export function SstHistorySheet({ open, onOpenChange, workerId, nrCode }: Props) {
-  const { data, isLoading } = useSstQualificationHistory(workerId, nrCode, { enabled: open });
+export function SstHistorySheet({ open, onOpenChange, workerId, documentTypeId, nrCode }: Props) {
+  const { data, isLoading } = useSstQualificationHistory(workerId, documentTypeId, { enabled: open });
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
