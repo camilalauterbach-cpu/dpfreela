@@ -149,8 +149,11 @@ test("drawer: ASO exibe roteamento humano e não expõe jargão técnico", async
   const search = page.getByPlaceholder(/Buscar por nome ou código/i);
   await expect(search).toBeVisible();
   await search.fill("ASO");
-  // ASO tem code "ASO" → normalizedCode "ASO" → testid suffix "ASO".
-  await page.getByTestId("qualification-type-option-ASO").click();
+  // O CommandItem do shadcn expõe apenas role=option — não propaga data-testid
+  // para o DOM final; ancoramos pelo nome acessível (código + nome).
+  await page
+    .getByRole("option", { name: /ASO\s+—\s+Atestado de Saúde Ocupacional/i })
+    .click();
 
   // Painel de roteamento humano (worker_documents).
   await expect(drawer).toContainText(/aba Documentos/i);
