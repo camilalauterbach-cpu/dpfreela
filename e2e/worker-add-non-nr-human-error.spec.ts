@@ -145,6 +145,10 @@ test("drawer: ASO exibe roteamento humano e não expõe jargão técnico", async
   await expect(drawer).toBeVisible();
 
   await drawer.getByTestId("qualification-type-combobox").click();
+  // Filtra a lista para garantir renderização mesmo em catálogos grandes.
+  const search = page.getByPlaceholder(/Buscar por nome ou código/i);
+  await expect(search).toBeVisible();
+  await search.fill("ASO");
   // ASO tem code "ASO" → normalizedCode "ASO" → testid suffix "ASO".
   await page.getByTestId("qualification-type-option-ASO").click();
 
