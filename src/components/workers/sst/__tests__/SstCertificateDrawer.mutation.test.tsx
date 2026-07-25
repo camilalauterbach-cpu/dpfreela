@@ -117,15 +117,26 @@ describe("SstCertificateDrawer — persistência de treinamento com identidade c
     fireEvent.change(dateInputs[0], { target: { value: past } });
     fireEvent.change(dateInputs[1], { target: { value: future } });
 
-    // Preenche treinamento
-    const trainingType = screen.getAllByLabelText("Tipo")[1] as HTMLInputElement;
-    fireEvent.change(trainingType, { target: { value: "Reciclagem" } });
-    const workload = screen.getByLabelText("Carga horária") as HTMLInputElement;
-    fireEvent.change(workload, { target: { value: "8" } });
-    const provider = screen.getByLabelText("Instituição") as HTMLInputElement;
-    fireEvent.change(provider, { target: { value: "SESI" } });
-    const instructor = screen.getByLabelText("Instrutor") as HTMLInputElement;
-    fireEvent.change(instructor, { target: { value: "Prof. X" } });
+    // Preenche treinamento (usa placeholders/atributos porque os shadcn Labels
+    // não têm htmlFor associado ao input).
+    fireEvent.change(
+      screen.getByPlaceholderText("Inicial, Reciclagem…"),
+      { target: { value: "Reciclagem" } },
+    );
+    fireEvent.change(
+      screen.getByPlaceholderText("Horas (inteiro)"),
+      { target: { value: "8" } },
+    );
+    const inputs = document.querySelectorAll("input");
+    // Instituição e Instrutor: dois últimos <input> visíveis antes do textarea.
+    const provider = Array.from(inputs).find((el) =>
+      el.previousElementSibling?.textContent === "Instituição",
+    ) as HTMLInputElement | undefined;
+    const instructor = Array.from(inputs).find((el) =>
+      el.previousElementSibling?.textContent === "Instrutor",
+    ) as HTMLInputElement | undefined;
+    if (provider) fireEvent.change(provider, { target: { value: "SESI" } });
+    if (instructor) fireEvent.change(instructor, { target: { value: "Prof. X" } });
 
     // Submete
     const save = await screen.findByTestId("save-qualification");
