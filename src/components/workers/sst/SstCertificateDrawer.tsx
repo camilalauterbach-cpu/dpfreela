@@ -593,11 +593,33 @@ export function SstCertificateDrawer({
           <div className={"grid grid-cols-2 gap-3 " + (flowBlocked ? "opacity-50 pointer-events-none" : "")}>
             <div>
               <Label>Tipo</Label>
-              <Input
-                value={trainingType}
-                onChange={(e) => setTrainingType(e.target.value)}
-                placeholder="Inicial, Reciclagem…"
-              />
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={
+                  trainingType === "" || TRAINING_TYPE_OPTIONS.includes(trainingType as typeof TRAINING_TYPE_OPTIONS[number])
+                    ? trainingType
+                    : "Outro"
+                }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setTrainingType(v);
+                  if (v !== "Outro") setTrainingTypeOther("");
+                }}
+                data-testid="training-type-select"
+              >
+                <option value="">Selecione…</option>
+                {TRAINING_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+              {trainingType === "Outro" && (
+                <Input
+                  className="mt-1"
+                  value={trainingTypeOther}
+                  onChange={(e) => setTrainingTypeOther(e.target.value)}
+                  placeholder="Descreva o tipo"
+                />
+              )}
             </div>
             <div>
               <Label>Data de realização/conclusão *</Label>
