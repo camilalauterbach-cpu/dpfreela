@@ -15,6 +15,11 @@ import {
   collectPendencies, groupPendenciesByWorker,
   DOC_LABEL_PT, EXP_LABEL_PT, type PendencyRow,
 } from "@/lib/sst/export";
+import { partitionByTestData } from "@/lib/sst/test-data";
+import { exportPendenciesXlsx } from "@/lib/sst/pendencies-export";
+import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -22,7 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Search, Loader2, ExternalLink, ArrowLeft, Upload } from "lucide-react";
+import { Search, Loader2, ExternalLink, ArrowLeft, Upload, FileSpreadsheet, AlertTriangle, FlaskConical } from "lucide-react";
 import { TablePagination } from "@/components/TablePagination";
 import { SstCertificateDrawer, type SstDrawerMode } from "@/components/workers/sst/SstCertificateDrawer";
 import {
@@ -150,16 +155,22 @@ function useActiveOverridesForWorkers(
 export default function SstPendencies() {
   const { hasAnyRole } = useAuth();
   const canWrite = hasAnyRole(["admin", "manager", "operator"]);
+  const isAdmin = hasAnyRole(["admin", "manager"]);
 
   const [sp, setSp] = useSearchParams();
   const [search, setSearch] = useState(sp.get("q") ?? "");
   const [category, setCategory] = useState<Category>((sp.get("cat") as Category) || "");
   const [nr, setNr] = useState(sp.get("nr") ?? "");
   const [page, setPage] = useState(0);
+  const [includeTest, setIncludeTest] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Carrega dataset completo — filtragem/paginação client-side.
   const overview = useSstOverview({ search: "" });
-  const workers = overview.data?.workers || [];
+  const allWorkers = overview.data?.workers || [];
+  const orphans = overview.data?.orphans || [];
+  const partitioned = useMemo(() => partitionByTestData(allWorkers), [allWorkers]);
+  const workers = includeTest ? allWorkers : partitioned.operational;
 
   const allPendencies = useMemo(() => collectPendencies(workers), [workers]);
 
@@ -244,6 +255,30 @@ export default function SstPendencies() {
 
   const clear = () => { setSearch(""); setCategory(""); setNr(""); };
 
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const count = await exportPendenciesXlsx({
+        filters: {
+          search: search || undefined,
+          category: category || undefined,
+          nr: nr || undefined,
+          includeTestData: includeTest,
+        },
+        operationalWorkers: workers,
+        filteredPendencies,
+        testWorkers: partitioned.test,
+        orphans,
+      });
+      toast.success(`Planilha exportada — ${count} pendência${count === 1 ? "" : "s"}.`);
+    } catch (err) {
+      console.error("[SstPendencies] export failed", err);
+      toast.error("Não foi possível gerar a planilha. Tente novamente em instantes.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <TooltipProvider delayDuration={200}>
     <div className="space-y-4">
@@ -266,8 +301,50 @@ export default function SstPendencies() {
           <Badge variant="outline">
             {filteredPendencies.length} pendência{filteredPendencies.length !== 1 ? "s" : ""}
           </Badge>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 gap-1"
+            onClick={handleExport}
+            disabled={exporting || overview.isLoading}
+            data-testid="btn-export-pendencies-xlsx"
+          >
+            {exporting
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <FileSpreadsheet className="h-4 w-4" />}
+            Exportar planilha
+          </Button>
         </div>
       </div>
+
+      {(orphans.length > 0 || partitioned.test.length > 0 || isAdmin) && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {orphans.length > 0 && (
+            <span className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-amber-900">
+              <AlertTriangle className="h-3 w-3" />
+              {orphans.length} órfão{orphans.length === 1 ? "" : "s"} / legado{orphans.length === 1 ? "" : "s"} — auditoria via exportação
+            </span>
+          )}
+          {partitioned.test.length > 0 && (
+            <span className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-slate-700">
+              <FlaskConical className="h-3 w-3" />
+              {partitioned.test.length} dado{partitioned.test.length === 1 ? "" : "s"} de teste detectado{partitioned.test.length === 1 ? "" : "s"}
+            </span>
+          )}
+          {isAdmin && (
+            <div className="ml-auto inline-flex items-center gap-2">
+              <Switch
+                id="toggle-test-data"
+                checked={includeTest}
+                onCheckedChange={(v) => setIncludeTest(Boolean(v))}
+              />
+              <Label htmlFor="toggle-test-data" className="text-xs">
+                Incluir dados de teste
+              </Label>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {(Object.keys(CATEGORY_LABEL) as Array<Exclude<Category, "">>).map((k) => {
