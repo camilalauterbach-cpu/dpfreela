@@ -56,3 +56,22 @@
 
 ## PAUSED
 - Q-014.1-CLOSEOUT — Pausada pelo P0 (Q-020). Não desfazer.
+
+## VALIDATING
+- Q-024-D-TRAINING-FIX — Gate manual pendente: gravação real de "Treinamento Interno" no preview (aba anônima ou hard reload). Cobertura E2E anônima em `e2e/worker-add-training-interno.spec.ts` (bloqueada apenas por role no sandbox). Diagnóstico automático de falha da RPC ativo (`src/lib/rpc-diagnostics.ts` + captura no `SstCertificateDrawer`).
+
+## AUTO_TRIGGERS
+- Ao registrar Q-024-D-TRAINING-FIX = DONE (após homologação manual do Treinamento Interno OU execução verde do E2E autenticado), promover automaticamente E-DOC.2.A de BLOCKED → IN_PROGRESS sem necessidade de nova autorização. Justificativa: decisão de escopo já autorizada em turno anterior condicionada ao gate funcional.
+  - Ação imediata do gatilho:
+    1. Mover Q-024-D-TRAINING-FIX para DONE.
+    2. Abrir E-DOC.2.A conforme escopo abaixo.
+    3. Notificar o operador com o resumo do escopo e checklist de gates.
+
+## READY_ON_TRIGGER
+- E-DOC.2.A — Revisão canônica do ASO em `worker_documents` (bloqueada até o gatilho acima). Escopo pré-aprovado:
+  - Identidade canônica por `worker_id + document_type_id` (categoria `sst_aso`) via `register_worker_document_revision` (já existente).
+  - Migração/backfill dos 46 ASOs legados em `worker_documents` para o formato canônico (`is_current`, `document_type_id` populado, `uq_worker_documents_current_by_type` respeitado). Dry-run obrigatório antes de qualquer DML.
+  - `SstCertificateDrawer` roteia `sst_aso` exclusivamente para `worker_documents` (já implementado) — validar que nenhum ASO cai em `worker_sst_qualifications` após o gatilho.
+  - Hook unificado `useWorkerQualificationsUnified` continua fonte única (NR + treinamento + ASO) na aba Trabalhador.
+  - Compliance: `resolve_effective_document_requirements` mantém ASO global; reavaliação por `reevaluate_worker_links` após qualquer revisão.
+  - Gates de saída: 0 ASOs órfãos (`document_type_id IS NULL` em `worker_documents` categoria `sst_aso`); 0 duplo `is_current=true` por `(worker_id, document_type_id)`; E2E anônimo do fluxo ASO verde após hard reload; diagnóstico RPC não dispara em caminho feliz.
