@@ -826,7 +826,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
 
   return (
     <div className="space-y-6">
-      {focusedDocumentTypeId && (
+      {focusedDocumentTypeId && !focusedCategory && (
         <WorkerDocumentRevisionPanel
           workerId={workerId}
           documentTypeId={focusedDocumentTypeId}
