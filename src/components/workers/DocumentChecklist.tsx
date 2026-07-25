@@ -65,6 +65,30 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     setSearchParams(next, { replace: true });
   };
 
+  // Canonical map: legacy category code (lowercased) → document_types row.
+  // Identity for uploads travels via document_type_id; the textual `category`
+  // column is kept only for legacy read paths still in transition.
+  const { data: typesByCategory } = useQuery({
+    queryKey: ["worker-doc-types-by-category"],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("document_types")
+        .select("id, code, category, storage_scope, is_active");
+      if (error) throw error;
+      const map = new Map<string, { id: string; code: string; category: string | null; storage_scope: string | null }>();
+      for (const r of data ?? []) {
+        const key = (r as any).code?.toLowerCase();
+        if (key && !map.has(key)) map.set(key, r as any);
+      }
+      return map;
+    },
+  });
+
+  const resolveTypeForCategory = (category: string) => {
+    return typesByCategory?.get(category.toLowerCase()) ?? null;
+  };
+
   const { data: docs, isLoading } = useQuery({
     queryKey: ["worker-documents", workerId],
     queryFn: async () => {
@@ -94,10 +118,38 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
       const ext = file.name.split(".").pop();
       const path = `${workerId}/${category}/${Date.now()}.${ext}`;
 
+      const docType = resolveTypeForCategory(category);
+      const documentTypeId = docType?.id ?? null;
+
+      // Worker-scoped canonical types (currently: ASO / exame toxicológico) go
+      // through register_worker_document_revision. The RPC invalidates the
+      // previous current revision, inserts the new one and emits audit.
+      const useCanonicalRpc = !!docType && docType.storage_scope === "worker" && !!documentTypeId;
+
       const { error: uploadErr } = await supabase.storage
         .from("worker-documents")
-        .upload(path, file, { upsert: true, contentType: getSafeContentType(file) });
+        .upload(path, file, { upsert: !useCanonicalRpc, contentType: getSafeContentType(file) });
       if (uploadErr) throw uploadErr;
+
+      if (useCanonicalRpc) {
+        const { error: rpcErr } = await (supabase as any).rpc(
+          "register_worker_document_revision",
+          {
+            p_worker_id: workerId,
+            p_document_type_id: documentTypeId,
+            p_file_path: path,
+            p_file_name: file.name,
+            p_file_size: file.size,
+            p_mime_type: file.type,
+            p_status: "uploaded",
+          },
+        );
+        if (rpcErr) {
+          await supabase.storage.from("worker-documents").remove([path]).catch(() => {});
+          throw rpcErr;
+        }
+        return;
+      }
 
       if (alwaysInsert) {
         const { error } = await supabase
@@ -106,6 +158,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
             worker_id: workerId,
             document_type: category,
             category,
+            document_type_id: documentTypeId,
             file_path: path,
             file_name: file.name,
             file_size: file.size,
@@ -126,6 +179,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
             file_size: file.size,
             mime_type: file.type,
             status: "uploaded",
+            document_type_id: documentTypeId ?? existing.document_type_id,
             updated_at: new Date().toISOString(),
           })
           .eq("id", existing.id);
@@ -137,6 +191,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
             worker_id: workerId,
             document_type: category,
             category,
+            document_type_id: documentTypeId,
             file_path: path,
             file_name: file.name,
             file_size: file.size,
@@ -148,6 +203,8 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["worker-documents", workerId] });
+      queryClient.invalidateQueries({ queryKey: ["worker-doc-revisions", workerId] });
+      queryClient.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs", workerId] });
       invalidateComplianceCaches(queryClient, { workerId, eventSource: "upload" });
       setUploadingCategory(null);
       toast({ title: "Documento enviado" });
