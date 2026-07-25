@@ -24,6 +24,7 @@ import { computeCertificateExpiry } from "@/lib/sst/validity";
 import {
   useWorkerQualificationTypes,
   type WorkerQualificationType,
+  normalizeQualificationSearchTerm,
 } from "@/hooks/useWorkerQualificationTypes";
 import { QualificationDocumentTypeCombobox } from "./QualificationDocumentTypeCombobox";
 
@@ -115,10 +116,9 @@ export function SstCertificateDrawer({
   const resolvePresetId = (): string | null => {
     if (presetDocumentTypeId) return presetDocumentTypeId;
     if (!presetNrCode) return null;
-    const upper = presetNrCode.trim().toUpperCase();
-    const found = (types ?? []).find(
-      (t) => t.code.toUpperCase() === upper || t.normalizedCode === upper.toLowerCase().replace(/\s+/g, ""),
-    );
+    // Q-024-D-UI-MULTIPLE §8 — normalizador canônico compartilhado do catálogo.
+    const compact = normalizeQualificationSearchTerm(presetNrCode).replace(/\s+/g, "");
+    const found = (types ?? []).find((t) => t.normalizedCode === compact);
     return found?.documentTypeId ?? null;
   };
 
