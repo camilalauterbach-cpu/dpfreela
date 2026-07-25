@@ -102,6 +102,79 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     },
   });
 
+  // Extra files attached to a worker document (e.g. RG front + back within a
+  // single canonical `rg` row). Keyed by worker_document_id → files[].
+  const rgDoc = docs?.find((d) => d.category === "rg" || (d as any).document_type === "rg");
+  const { data: rgFiles } = useQuery({
+    enabled: !!rgDoc?.id,
+    queryKey: ["worker-document-files", rgDoc?.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("worker_document_files")
+        .select("*")
+        .eq("worker_document_id", rgDoc!.id)
+        .is("deleted_at", null)
+        .order("position", { ascending: true });
+      if (error) throw error;
+      return data as Array<{ id: string; file_path: string; file_name: string | null; mime_type: string | null; position: number }>;
+    },
+  });
+
+  const addRgAttachment = async (file: File) => {
+    if (!rgDoc) {
+      toast({ title: "Envie primeiro o arquivo principal do RG", variant: "destructive" });
+      return;
+    }
+    const validationError = validateUpload(file);
+    if (validationError) { toast({ title: "Arquivo inválido", description: validationError, variant: "destructive" }); return; }
+    const ext = file.name.split(".").pop();
+    const path = `${workerId}/rg/${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("worker-documents")
+      .upload(path, file, { contentType: getSafeContentType(file) });
+    if (upErr) { toast({ title: "Erro no upload", description: upErr.message, variant: "destructive" }); return; }
+    const nextPos = ((rgFiles?.length ?? 0) + 1);
+    const { error } = await (supabase as any).from("worker_document_files").insert({
+      worker_document_id: rgDoc.id,
+      file_path: path,
+      file_name: file.name,
+      file_size: file.size,
+      mime_type: file.type,
+      position: nextPos,
+      origin: "attachment",
+    });
+    if (error) { toast({ title: "Erro ao anexar", description: error.message, variant: "destructive" }); return; }
+    queryClient.invalidateQueries({ queryKey: ["worker-document-files", rgDoc.id] });
+    toast({ title: "Arquivo anexado ao RG" });
+  };
+
+  const removeRgAttachment = async (fileRow: { id: string; file_path: string }) => {
+    const { error } = await (supabase as any)
+      .from("worker_document_files")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", fileRow.id);
+    if (error) { toast({ title: "Erro ao remover", description: error.message, variant: "destructive" }); return; }
+    await supabase.storage.from("worker-documents").remove([fileRow.file_path]).catch(() => {});
+    queryClient.invalidateQueries({ queryKey: ["worker-document-files", rgDoc?.id] });
+    toast({ title: "Arquivo removido" });
+  };
+
+  const previewAttachment = async (fileRow: { file_path: string; file_name: string | null; mime_type: string | null }) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from("worker-documents")
+        .createSignedUrl(fileRow.file_path, 300);
+      if (error || !data?.signedUrl) throw new Error("Falha ao gerar URL");
+      setPreviewUrl(data.signedUrl);
+      setPreviewMime(fileRow.mime_type);
+      setPreviewFileName(fileRow.file_name || "documento");
+      setPreviewError(false);
+    } catch {
+      setPreviewError(true);
+      setPreviewUrl("error");
+    }
+  };
+
   const [uploadingCategory, setUploadingCategory] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewMime, setPreviewMime] = useState<string | null>(null);
@@ -328,6 +401,8 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
 
     const doc = docs?.find((d) => d.category === category);
     const status = doc?.status || "pending";
+    const isRg = category === "rg";
+    const attachments = isRg ? (rgFiles ?? []) : [];
 
     return (
       <Card key={category} className="overflow-hidden">
@@ -423,6 +498,64 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
               </>
             )}
           </div>
+
+          {isRg && doc && (
+            <div className="pt-2 border-t border-border space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Arquivos anexados ({attachments.length})
+                </span>
+                {canEdit && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 text-xs"
+                    onClick={() => {
+                      const input = document.createElement("input");
+                      input.type = "file";
+                      input.accept = "image/*,.pdf";
+                      input.onchange = (e) => {
+                        const f = (e.target as HTMLInputElement).files?.[0];
+                        if (f) addRgAttachment(f);
+                      };
+                      input.click();
+                    }}
+                  >
+                    <Plus className="mr-1 h-3 w-3" /> Adicionar arquivo
+                  </Button>
+                )}
+              </div>
+              {attachments.length === 0 && (
+                <p className="text-xs text-muted-foreground">Nenhum anexo adicional.</p>
+              )}
+              {attachments.map((f) => (
+                <div key={f.id} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate flex items-center gap-1 min-w-0">
+                    {f.mime_type?.startsWith("image/")
+                      ? <ImageIcon className="h-3 w-3 text-muted-foreground shrink-0" />
+                      : <FileText className="h-3 w-3 text-muted-foreground shrink-0" />}
+                    <span className="truncate">{f.file_name || `Anexo ${f.position}`}</span>
+                  </span>
+                  <span className="flex items-center gap-1 shrink-0">
+                    <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => previewAttachment(f)}>
+                      <Eye className="h-3 w-3" />
+                    </Button>
+                    {canEdit && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => removeRgAttachment({ id: f.id, file_path: f.file_path })}
+                        aria-label="Remover anexo"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     );
