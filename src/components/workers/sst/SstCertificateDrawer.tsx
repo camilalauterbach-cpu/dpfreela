@@ -517,7 +517,10 @@ export function SstCertificateDrawer({
       setUploading(false);
       const raw = String(e?.message || "Falha ao registrar certificado.");
       // Q-024-D-TRAINING-FIX §7: mapear códigos técnicos para texto claro.
-      const friendly = mapRpcError(raw);
+      const friendly = mapRpcError(raw, {
+        mode,
+        category: selectedType?.category ?? null,
+      });
       setLastError(friendly);
       const bundle: RpcFailureBundle | undefined = e?.diagnostic;
       const description = bundle
