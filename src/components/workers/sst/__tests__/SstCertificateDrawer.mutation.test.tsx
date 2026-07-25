@@ -114,12 +114,13 @@ describe("SstCertificateDrawer — persistência de treinamento com identidade c
   it("submete document_type_id (UUID) + training_type + workload em register_sst_revision", async () => {
     renderDrawer();
 
-    // Aguarda o drawer renderizar (Sheet Radix usa portal).
-    await screen.findByTestId("sst-certificate-drawer");
-
     // Anexa arquivo
     const file = new File([new Uint8Array([1, 2, 3])], "cert.pdf", { type: "application/pdf" });
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const fileInput = await waitFor(() => {
+      const el = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+      if (!el) throw new Error("file input não montado");
+      return el;
+    });
     Object.defineProperty(fileInput, "files", { value: [file], configurable: true });
     fireEvent.change(fileInput);
 
