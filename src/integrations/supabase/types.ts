@@ -1761,6 +1761,62 @@ export type Database = {
           },
         ]
       }
+      worker_document_files: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          file_name: string | null
+          file_path: string
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          notes: string | null
+          origin: string | null
+          position: number
+          updated_at: string
+          worker_document_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          file_name?: string | null
+          file_path: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          origin?: string | null
+          position?: number
+          updated_at?: string
+          worker_document_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          file_name?: string | null
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          origin?: string | null
+          position?: number
+          updated_at?: string
+          worker_document_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_document_files_worker_document_id_fkey"
+            columns: ["worker_document_id"]
+            isOneToOne: false
+            referencedRelation: "worker_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       worker_documents: {
         Row: {
           category: string | null
