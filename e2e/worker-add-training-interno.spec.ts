@@ -264,12 +264,23 @@ test("cadastra Treinamento Interno sem invalid_nr_code_format e persiste após h
 
   // ---- Hard reload (bypass cache) ---------------------------------------
   await page.reload({ waitUntil: "domcontentloaded" });
-  await expect(page.getByTestId("add-qualification-button")).toBeVisible({
-    timeout: 15_000,
-  });
-  await expect(page.getByRole("table")).toContainText(/Treinamento Interno/i);
 
-  // Ainda uma única versão vigente após reload.
+  // Botão "Adicionar qualificação" continua visível E habilitado.
+  const addBtnAfterReload = page.getByTestId("add-qualification-button");
+  await expect(addBtnAfterReload).toBeVisible({ timeout: 15_000 });
+  await expect(addBtnAfterReload).toBeEnabled();
+
+  // Treinamento Interno permanece como linha na tabela após reload.
+  const tableAfterReload = page.getByRole("table");
+  await expect(tableAfterReload).toContainText(/Treinamento Interno/i);
+
+  // A linha do Treinamento Interno é uma linha real (não placeholder).
+  const trainingRow = tableAfterReload
+    .locator("tr", { hasText: /Treinamento Interno/i })
+    .first();
+  await expect(trainingRow).toBeVisible();
+
+  // ---- Banco: exatamente 1 versão vigente do Treinamento Interno --------
   expect(
     Number(
       psql(
@@ -277,4 +288,38 @@ test("cadastra Treinamento Interno sem invalid_nr_code_format e persiste após h
       ),
     ),
   ).toBe(1);
+
+  // ---- Nenhuma NR fictícia foi criada -----------------------------------
+  // (a) worker_sst_qualifications: nenhum registro com nr_code preenchido
+  //     ou apontando para document_type de categoria 'sst_nr'.
+  const spuriousNrCount = Number(
+    psql(
+      `select count(*) from public.worker_sst_qualifications q
+         left join public.document_types dt on dt.id = q.document_type_id
+        where q.worker_id='${WORKER_ID}'
+          and q.deleted_at is null
+          and (
+            q.nr_code is not null
+            or dt.category = 'sst_nr'
+          )`,
+    ),
+  );
+  expect(
+    spuriousNrCount,
+    "cadastro de Treinamento Interno não pode gerar NR fictícia (nr_code preenchido ou document_type sst_nr)",
+  ).toBe(0);
+
+  // (b) UI não deve exibir qualquer chip/badge no formato "NR" + dígitos
+  //     para este worker recém-criado.
+  const nrBadgeMatches = await tableAfterReload
+    .locator("tbody tr")
+    .filter({ hasText: /\bNR\s*-?\s*\d+/i })
+    .count();
+  expect(nrBadgeMatches, "nenhuma linha NR fictícia deve aparecer na tabela").toBe(0);
+
+  // (c) O único document_type_id vigente para este worker é o Treinamento Interno.
+  const activeTypes = psql(
+    `select coalesce(string_agg(distinct document_type_id::text, ','), '') from public.worker_sst_qualifications where worker_id='${WORKER_ID}' and superseded_at is null and deleted_at is null`,
+  );
+  expect(activeTypes).toBe(TREINAMENTO_INT_ID);
 });
