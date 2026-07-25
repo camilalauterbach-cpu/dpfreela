@@ -12,7 +12,7 @@ export const RECOMMENDED_FIELDS = [
 ] as const;
 
 export const REQUIRED_DOC_CATEGORIES = [
-  "cpf", "rg_front", "rg_back", "proof_of_address", "photo", "bank_document",
+  "cpf", "rg", "proof_of_address", "photo", "bank_document",
 ] as const;
 
 export const CONDITIONAL_DOC_CATEGORIES = [
@@ -21,8 +21,9 @@ export const CONDITIONAL_DOC_CATEGORIES = [
 
 export const DOC_CATEGORY_LABELS: Record<string, string> = {
   cpf: "CPF",
-  rg_front: "RG — Frente",
-  rg_back: "RG — Verso",
+  rg: "RG",
+  rg_front: "RG — Frente (legado)",
+  rg_back: "RG — Verso (legado)",
   proof_of_address: "Comprovante de residência",
   photo: "Foto",
   bank_document: "Documento bancário",
