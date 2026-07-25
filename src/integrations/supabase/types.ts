@@ -3010,6 +3010,46 @@ export type Database = {
         }
         Returns: Json
       }
+      set_document_type_validity: {
+        Args: {
+          p_document_type_id: string
+          p_mode: string
+          p_unit?: string
+          p_value?: number
+        }
+        Returns: {
+          category: string
+          code: string
+          created_at: string
+          created_by: string | null
+          default_validity_days: number | null
+          display_order: number
+          has_expiration: boolean
+          id: string
+          is_active: boolean
+          name: string
+          needs_review: boolean
+          notes: string | null
+          requires_file: boolean
+          storage_scope:
+            | Database["public"]["Enums"]["document_storage_scope"]
+            | null
+          updated_at: string
+          validity_mode:
+            | Database["public"]["Enums"]["document_validity_mode"]
+            | null
+          validity_unit:
+            | Database["public"]["Enums"]["document_validity_unit"]
+            | null
+          validity_value: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "document_types"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_worker_document_review_status: {
         Args: { p_document_id: string; p_reason?: string; p_status: string }
         Returns: {
