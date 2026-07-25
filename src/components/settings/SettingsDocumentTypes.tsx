@@ -823,6 +823,75 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Diálogo — Obrigatoriedade para conclusão do cadastro */}
+      <Dialog open={!!reqEditing} onOpenChange={(o) => !o && closeRequirement()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Obrigatoriedade — {reqEditing?.name}</DialogTitle>
+            <DialogDescription>
+              Define se este tipo é exigido para <strong>concluir o cadastro</strong> do trabalhador
+              e <strong>liberar a ativação de vínculo</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Alterar esta configuração recalcula automaticamente <strong>todos</strong> os trabalhadores.
+              Nenhum documento existente é apagado.
+            </AlertDescription>
+          </Alert>
+
+          <RadioGroup
+            value={reqValue}
+            onValueChange={(v) => setReqValue(v as "required" | "optional")}
+            className="space-y-2"
+          >
+            <label
+              htmlFor="req-required"
+              className={`flex gap-3 rounded-md border p-3 cursor-pointer transition ${reqValue === "required" ? "border-primary bg-primary/5" : ""}`}
+            >
+              <RadioGroupItem value="required" id="req-required" className="mt-1" />
+              <div className="space-y-0.5">
+                <div className="font-medium">Obrigatório para concluir o cadastro</div>
+                <div className="text-sm text-muted-foreground">
+                  A ausência, rejeição ou vencimento (se houver controle de validade) mantém o cadastro
+                  incompleto e bloqueia a ativação de vínculos.
+                </div>
+              </div>
+            </label>
+            <label
+              htmlFor="req-optional"
+              className={`flex gap-3 rounded-md border p-3 cursor-pointer transition ${reqValue === "optional" ? "border-primary bg-primary/5" : ""}`}
+            >
+              <RadioGroupItem value="optional" id="req-optional" className="mt-1" />
+              <div className="space-y-0.5">
+                <div className="font-medium">Opcional</div>
+                <div className="text-sm text-muted-foreground">
+                  Pode ser enviado e consultado, mas <strong>não</strong> altera a completude nem entra
+                  em métricas executivas de pendência ou vencidos.
+                </div>
+              </div>
+            </label>
+          </RadioGroup>
+
+          {reqError && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>{reqError}</AlertDescription>
+            </Alert>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeRequirement} disabled={reqSaving}>Cancelar</Button>
+            <Button onClick={saveRequirement} disabled={reqSaving}>
+              {reqSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
