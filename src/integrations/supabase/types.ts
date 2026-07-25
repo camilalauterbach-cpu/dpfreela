@@ -2688,6 +2688,10 @@ export type Database = {
         }
         Returns: Json
       }
+      delete_sst_revision: {
+        Args: { p_qualification_id: string }
+        Returns: Json
+      }
       document_compliance_summary: {
         Args: { p_warning_days?: number }
         Returns: Json
