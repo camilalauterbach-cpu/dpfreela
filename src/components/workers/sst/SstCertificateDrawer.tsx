@@ -32,6 +32,7 @@ import { QualificationDocumentTypeCombobox } from "./QualificationDocumentTypeCo
 export type SstDrawerMode = "create" | "renew" | "replace";
 
 // Q-024-D-TRAINING-FIX §7 — mapeamento de erros técnicos → texto claro.
+// Q-025-UX — nenhuma mensagem técnica de duplicidade pode vazar para o usuário.
 const RPC_ERROR_MESSAGES: Record<string, string> = {
   invalid_nr_code_format:
     "Este tipo documental foi tratado incorretamente como NR.",
@@ -58,15 +59,91 @@ const RPC_ERROR_MESSAGES: Record<string, string> = {
   invalid_expiry:
     "Data de validade inválida — deve ser posterior à realização.",
   renewal_same_period_use_correction:
-    "As datas informadas são idênticas à vigência atual. Para corrigir o certificado atual, use Substituir.",
+    "As datas informadas são idênticas à vigência atual. Para corrigir o certificado vigente, use Substituir (não Renovar).",
   document_type_not_sst_or_training:
+    "Este tipo documental não é aceito no cadastro de qualificações (apenas NRs e Treinamentos).",
+  document_type_not_sst_nr:
     "Este tipo documental não é aceito no cadastro de qualificações (apenas NRs e Treinamentos).",
 };
 
-function mapRpcError(raw: string): string {
+// Padrões "técnicos" que jamais devem chegar ao usuário como estão.
+const TECHNICAL_PATTERNS: RegExp[] = [
+  /duplicate key/i,
+  /unique constraint/i,
+  /violates/i,
+  /sqlstate/i,
+  /errcode/i,
+  /\b23505\b/,
+  /uq_worker_sst/i,
+  /pg[a-z_]*:/i,
+];
+
+function looksTechnical(raw: string): boolean {
+  return TECHNICAL_PATTERNS.some((rx) => rx.test(raw));
+}
+
+export interface MapRpcErrorCtx {
+  mode: SstDrawerMode;
+  /** Categoria do document_type selecionado (sst_nr | sst_aso | training | null). */
+  category?: string | null;
+}
+
+/**
+ * Traduz mensagens da RPC/Postgres em texto claro e sem jargão. Nunca deixa
+ * vazar erro técnico de duplicidade (23505/uq_worker_sst/duplicate key) — a
+ * orientação depende do modo (Renovar vs Cadastrar/Substituir) e da categoria
+ * do tipo escolhido (NR × ASO × Treinamento).
+ */
+export function mapRpcError(raw: string, ctx: MapRpcErrorCtx): string {
+  const lower = raw.toLowerCase();
+
+  // 1) Códigos canônicos da RPC — com refinamento sensível ao contexto.
   for (const [code, text] of Object.entries(RPC_ERROR_MESSAGES)) {
-    if (raw.includes(code)) return text;
+    if (!lower.includes(code)) continue;
+
+    if (code === "qualification_current_version_exists" || code === "additional_conflicts_with_current") {
+      if (ctx.mode === "renew") {
+        return "As datas informadas correspondem à vigência atual. Para corrigir o certificado vigente, use Substituir (não Renovar).";
+      }
+      if (ctx.mode === "replace") {
+        return "A versão vigente mudou desde a última leitura. Recarregue a página e tente Substituir novamente.";
+      }
+      return text;
+    }
+
+    if (code === "document_type_not_sst_or_training" || code === "document_type_not_sst_nr") {
+      if (ctx.category === "sst_aso") {
+        return "ASO não é cadastrado aqui. Gerencie o ASO pela aba Documentos do trabalhador.";
+      }
+      return "Este tipo documental não é aceito neste cadastro. Selecione uma NR ou um Treinamento.";
+    }
+
+    if (code === "invalid_nr_code_format" && ctx.category && ctx.category !== "sst_nr") {
+      return "O tipo selecionado não é uma NR. Escolha uma NR válida ou um Treinamento.";
+    }
+
+    return text;
   }
+
+  // 2) Assinaturas de duplicidade "cruas" do Postgres — nunca expor ao usuário.
+  if (
+    lower.includes("duplicate key") ||
+    lower.includes("unique constraint") ||
+    lower.includes("uq_worker_sst") ||
+    lower.includes(" 23505") ||
+    lower.startsWith("23505")
+  ) {
+    if (ctx.mode === "renew") {
+      return "As datas informadas correspondem à vigência atual. Para corrigir o certificado vigente, use Substituir (não Renovar).";
+    }
+    return "Já existe uma versão vigente deste tipo. Use Renovar (para uma nova vigência) ou Substituir (para corrigir a atual).";
+  }
+
+  // 3) Qualquer outro erro tipicamente técnico → mensagem genérica cordial.
+  if (looksTechnical(raw)) {
+    return "Não foi possível salvar o certificado. Recarregue a página e tente novamente.";
+  }
+
   return raw;
 }
 
