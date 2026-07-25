@@ -252,6 +252,31 @@ test("Renovar com datas idênticas rejeita com renewal_same_period_use_correctio
   expect(last.body).toContain("renewal_same_period_use_correction");
   await expect(drawer).toBeVisible();
 
+  // UI: mensagem amigável Renovar→Substituir; nunca texto técnico.
+  const errorBox = drawer.getByTestId("save-qualification").locator(
+    "xpath=ancestor::*[self::div or self::section][1]//*[contains(@class,'destructive') or @role='alert']",
+  );
+  // Fallback robusto: verifica o conteúdo do próprio drawer.
+  const drawerText = (await drawer.innerText()).toLowerCase();
+  expect(drawerText).toMatch(/substituir/);
+  expect(drawerText).toMatch(/não\s+renovar|use\s+substituir/);
+  // Nunca vazar jargão técnico para o usuário.
+  const FORBIDDEN = [
+    "renewal_same_period_use_correction",
+    "register_sst_revision",
+    "duplicate key",
+    "sqlstate",
+    "23505",
+    "conflict",
+    "postgres",
+    "row-level",
+    "rls",
+  ];
+  for (const term of FORBIDDEN) {
+    expect(drawerText).not.toContain(term);
+  }
+  void errorBox; // referência mantida para futuras asserções específicas.
+
   // Sem duplicidade no banco.
   const activeCount = Number(psql(
     `select count(*) from public.worker_sst_qualifications
