@@ -10,19 +10,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
 
-const RETRYABLE_STATUSES = new Set([408, 502, 503, 504]);
-const MAX_ATTEMPTS = 4; // 1 initial + 3 retries
-const BASE_DELAY_MS = 800;
-
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 export default function Login() {
   const { user, loading } = useAuth();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [attemptInfo, setAttemptInfo] = useState<string | null>(null);
 
   if (loading) {
     return (
@@ -36,42 +29,33 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
+
     setSubmitting(true);
-    setAttemptInfo(null);
 
-    let lastError: { message: string; status?: number } | null = null;
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      if (attempt > 1) {
-        setAttemptInfo(`Serviço indisponível. Tentando novamente (${attempt}/${MAX_ATTEMPTS})…`);
+      if (error) {
+        toast({
+          title: "Erro ao entrar",
+          description: error.message,
+          variant: "destructive",
+        });
       }
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (!error) {
-        setAttemptInfo(null);
-        setSubmitting(false);
-        return;
-      }
-      lastError = { message: error.message, status: (error as { status?: number }).status };
-      const retryable = lastError.status !== undefined && RETRYABLE_STATUSES.has(lastError.status);
-      if (!retryable || attempt === MAX_ATTEMPTS) break;
-      // exponential backoff with jitter: 0.8s, 1.6s, 3.2s (+/- 20%)
-      const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
-      const jitter = delay * (0.8 + Math.random() * 0.4);
-      await wait(jitter);
-    }
-
-    if (lastError) {
-      const isTimeout = lastError.status && RETRYABLE_STATUSES.has(lastError.status);
+    } catch {
       toast({
-        title: "Erro ao entrar",
-        description: isTimeout
-          ? `Serviço de autenticação indisponível (HTTP ${lastError.status}). Tente novamente em instantes.`
-          : lastError.message,
+        title: "Serviço indisponível",
+        description:
+          "Não foi possível concluir o login. Verifique sua conexão e tente novamente.",
         variant: "destructive",
       });
+    } finally {
+      setSubmitting(false);
     }
-    setAttemptInfo(null);
-    setSubmitting(false);
   };
 
   return (
@@ -99,11 +83,6 @@ export default function Login() {
               {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Entrar
             </Button>
-            {attemptInfo && (
-              <p className="text-xs text-muted-foreground text-center" role="status" aria-live="polite">
-                {attemptInfo}
-              </p>
-            )}
             <div className="flex w-full justify-between text-sm">
               <Link to="/signup" className="text-muted-foreground hover:text-foreground">Criar conta</Link>
               <Link to="/forgot-password" className="text-muted-foreground hover:text-foreground">Esqueci a senha</Link>
