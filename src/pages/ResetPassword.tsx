@@ -67,14 +67,21 @@ export default function ResetPassword() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Senha atualizada", description: "Sua senha foi redefinida com sucesso." });
-      navigate("/");
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) {
+        const { title, description } = getResetErrorMessage(error);
+        toast({ title, description, variant: "destructive" });
+      } else {
+        toast({ title: "Senha atualizada", description: "Sua senha foi redefinida com sucesso." });
+        navigate("/");
+      }
+    } catch (err) {
+      const { title, description } = getResetErrorMessage(err);
+      toast({ title, description, variant: "destructive" });
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   };
 
   if (!valid) {
