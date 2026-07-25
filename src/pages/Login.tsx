@@ -10,6 +10,51 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
 
+function getLoginErrorMessage(error: unknown): { title: string; description: string } {
+  if (error == null) {
+    return { title: "Erro ao entrar", description: "Não foi possível concluir o login. Tente novamente." };
+  }
+
+  const anyErr = error as Record<string, unknown>;
+  const message = String(anyErr.message || "").toLowerCase();
+  const status =
+    (anyErr.status as number | undefined) ??
+    (anyErr.statusCode as number | undefined);
+
+  if (status === 504 || status === 503 || status === 502) {
+    return {
+      title: "Serviço temporariamente indisponível",
+      description: "Nossos servidores estão demorando para responder. Aguarde um momento e tente novamente.",
+    };
+  }
+
+  if (message.includes("invalid login credentials") || message.includes("invalid credentials")) {
+    return {
+      title: "Credenciais inválidas",
+      description: "Verifique se o e-mail e a senha estão corretos.",
+    };
+  }
+
+  if (message.includes("email not confirmed") || message.includes("not confirmed")) {
+    return {
+      title: "E-mail não confirmado",
+      description: "Confirme seu e-mail antes de fazer login. Verifique sua caixa de entrada.",
+    };
+  }
+
+  if (status === 429 || message.includes("rate limit") || message.includes("too many requests")) {
+    return {
+      title: "Muitas tentativas",
+      description: "Você tentou entrar várias vezes em pouco tempo. Aguarde alguns minutos e tente novamente.",
+    };
+  }
+
+  return {
+    title: "Erro ao entrar",
+    description: String(anyErr.message || "Não foi possível concluir o login. Tente novamente."),
+  };
+}
+
 export default function Login() {
   const { user, loading } = useAuth();
   const { toast } = useToast();
@@ -40,19 +85,12 @@ export default function Login() {
       });
 
       if (error) {
-        toast({
-          title: "Erro ao entrar",
-          description: error.message,
-          variant: "destructive",
-        });
+        const { title, description } = getLoginErrorMessage(error);
+        toast({ title, description, variant: "destructive" });
       }
-    } catch {
-      toast({
-        title: "Serviço indisponível",
-        description:
-          "Não foi possível concluir o login. Verifique sua conexão e tente novamente.",
-        variant: "destructive",
-      });
+    } catch (err) {
+      const { title, description } = getLoginErrorMessage(err);
+      toast({ title, description, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
