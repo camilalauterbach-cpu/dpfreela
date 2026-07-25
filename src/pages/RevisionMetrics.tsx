@@ -77,13 +77,13 @@ export default function RevisionMetrics() {
     queryKey: ["revision-metrics", from, to, documentTypeId],
     enabled: canView && !!from && !!to,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_revision_metrics_daily", {
+      const { data, error } = await (supabase.rpc as any)("get_revision_metrics_daily", {
         p_from: from,
         p_to: to,
         p_document_type_id: documentTypeId ? documentTypeId : null,
       });
       if (error) throw error;
-      return (data ?? []) as MetricRow[];
+      return ((data ?? []) as unknown) as MetricRow[];
     },
   });
 
