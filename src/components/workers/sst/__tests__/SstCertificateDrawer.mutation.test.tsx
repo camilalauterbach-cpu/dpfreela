@@ -104,14 +104,21 @@ describe("SstCertificateDrawer — persistência de treinamento com identidade c
   it("submete document_type_id (UUID) + training_type + workload em register_sst_revision", async () => {
     renderDrawer();
 
+    // Aguarda o drawer renderizar (Sheet Radix usa portal).
+    await screen.findByTestId("sst-certificate-drawer");
+
     // Anexa arquivo
     const file = new File([new Uint8Array([1, 2, 3])], "cert.pdf", { type: "application/pdf" });
-    const inputs = document.querySelectorAll('input[type="file"]');
-    fireEvent.change(inputs[0], { target: { files: [file] } });
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(fileInput, "files", { value: [file], configurable: true });
+    fireEvent.change(fileInput);
 
-    // Datas: realização e vencimento futuros
+    // Datas
+    await waitFor(() => {
+      const dates = document.querySelectorAll('input[type="date"]');
+      if (dates.length < 2) throw new Error("aguardando datas");
+    });
     const dateInputs = document.querySelectorAll('input[type="date"]');
-    // dateInputs[0] = realização, dateInputs[1] = vencimento
     const past = "2026-01-01";
     const future = "2028-01-01";
     fireEvent.change(dateInputs[0], { target: { value: past } });
