@@ -1771,6 +1771,7 @@ export type Database = {
           file_path: string | null
           file_size: number | null
           id: string
+          is_current: boolean
           issue_date: string | null
           issuing_authority: string | null
           mime_type: string | null
@@ -1791,6 +1792,7 @@ export type Database = {
           file_path?: string | null
           file_size?: number | null
           id?: string
+          is_current?: boolean
           issue_date?: string | null
           issuing_authority?: string | null
           mime_type?: string | null
@@ -1811,6 +1813,7 @@ export type Database = {
           file_path?: string | null
           file_size?: number | null
           id?: string
+          is_current?: boolean
           issue_date?: string | null
           issuing_authority?: string | null
           mime_type?: string | null
@@ -2809,6 +2812,49 @@ export type Database = {
         Returns: Json
       }
       register_sst_revision: { Args: { payload: Json }; Returns: Json }
+      register_worker_document_revision: {
+        Args: {
+          p_document_number?: string
+          p_document_type_id: string
+          p_expiry_date?: string
+          p_file_name?: string
+          p_file_path?: string
+          p_file_size?: number
+          p_issue_date?: string
+          p_issuing_authority?: string
+          p_mime_type?: string
+          p_notes?: string
+          p_status?: string
+          p_worker_id: string
+        }
+        Returns: {
+          category: string | null
+          created_at: string
+          deleted_at: string | null
+          document_number: string | null
+          document_type: string
+          document_type_id: string | null
+          expiry_date: string | null
+          file_name: string | null
+          file_path: string | null
+          file_size: number | null
+          id: string
+          is_current: boolean
+          issue_date: string | null
+          issuing_authority: string | null
+          mime_type: string | null
+          notes: string | null
+          status: string
+          updated_at: string
+          worker_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "worker_documents"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       release_public_invite: {
         Args: { _error_code: string; _invite_id: string; _nonce: string }
         Returns: Json
