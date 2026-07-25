@@ -28,7 +28,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface MetricRow {
   day: string;
@@ -39,7 +48,7 @@ interface MetricRow {
   worker_name?: string | null;
   worker_cpf?: string | null;
   commits_count: number;
-  lock_acquired_count: number;
+  completed_calls_with_lock: number;
   idempotent_hit_count: number;
   avg_lock_wait_ms: number | null;
   max_lock_wait_ms: number | null;
@@ -64,6 +73,32 @@ export default function RevisionMetrics() {
   const [to, setTo] = useState<string>(defaultTo);
   const [documentTypeId, setDocumentTypeId] = useState<string>("");
   const [groupByWorker, setGroupByWorker] = useState<boolean>(false);
+  const [workerId, setWorkerId] = useState<string>("");
+  const [workerSearch, setWorkerSearch] = useState<string>("");
+  const [workerPopoverOpen, setWorkerPopoverOpen] = useState(false);
+
+  const workersQ = useQuery({
+    queryKey: ["revision-metrics", "workers", workerSearch],
+    enabled: canView && groupByWorker && workerPopoverOpen,
+    queryFn: async () => {
+      let q = supabase
+        .from("workers")
+        .select("id, full_name, cpf")
+        .is("deleted_at", null)
+        .order("full_name")
+        .limit(20);
+      if (workerSearch.trim()) q = q.ilike("full_name", `%${workerSearch.trim()}%`);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const selectedWorkerLabel = useMemo(() => {
+    if (!workerId) return "";
+    const row = (metricsQ.data ?? []).find((r) => r.worker_id === workerId);
+    return row?.worker_name ?? "";
+  }, [workerId /* metricsQ.data set below — reference is safe at render */]);
 
   const docTypesQ = useQuery({
     queryKey: ["revision-metrics", "document-types"],
@@ -79,7 +114,7 @@ export default function RevisionMetrics() {
   });
 
   const metricsQ = useQuery({
-    queryKey: ["revision-metrics", from, to, documentTypeId, groupByWorker],
+    queryKey: ["revision-metrics", from, to, documentTypeId, groupByWorker, workerId],
     enabled: canView && !!from && !!to,
     queryFn: async () => {
       const rpcName = groupByWorker
@@ -90,7 +125,7 @@ export default function RevisionMetrics() {
         p_to: to,
         p_document_type_id: documentTypeId ? documentTypeId : null,
       };
-      if (groupByWorker) params.p_worker_id = null;
+      if (groupByWorker) params.p_worker_id = workerId ? workerId : null;
       const { data, error } = await (supabase.rpc as any)(rpcName, params);
       if (error) throw error;
       return ((data ?? []) as unknown) as MetricRow[];
@@ -102,7 +137,7 @@ export default function RevisionMetrics() {
     return rows.reduce(
       (acc, r) => {
         acc.commits += Number(r.commits_count ?? 0);
-        acc.locks += Number(r.lock_acquired_count ?? 0);
+        acc.locks += Number(r.completed_calls_with_lock ?? 0);
         acc.idempotent += Number(r.idempotent_hit_count ?? 0);
         if (r.max_lock_wait_ms != null) {
           acc.maxWait = Math.max(acc.maxWait, Number(r.max_lock_wait_ms));
@@ -127,7 +162,8 @@ export default function RevisionMetrics() {
       <div>
         <h1 className="text-2xl font-semibold">Métricas de revisões</h1>
         <p className="text-sm text-muted-foreground">
-          Contagens diárias de commits, locks adquiridos e idempotent hits por tipo de documento.
+          Contagens diárias de commits, chamadas concluídas com lock e idempotent hits por tipo de documento.
+          Filtro e agrupamento no fuso <span className="font-mono">America/Sao_Paulo</span>.
         </p>
       </div>
 
@@ -179,10 +215,76 @@ export default function RevisionMetrics() {
           <Switch
             id="group-by-worker"
             checked={groupByWorker}
-            onCheckedChange={setGroupByWorker}
+            onCheckedChange={(v) => {
+              setGroupByWorker(v);
+              if (!v) setWorkerId("");
+            }}
           />
         </CardContent>
       </Card>
+
+      {groupByWorker && (
+        <Card>
+          <CardContent className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <Label className="text-sm font-medium">Filtrar trabalhador</Label>
+              <p className="text-xs text-muted-foreground">
+                Opcional. Deixe vazio para agregar todos os trabalhadores.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Popover open={workerPopoverOpen} onOpenChange={setWorkerPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[280px] justify-start">
+                    {workerId
+                      ? selectedWorkerLabel || "Trabalhador selecionado"
+                      : "Buscar trabalhador…"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[320px] p-0" align="end">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Digite o nome…"
+                      value={workerSearch}
+                      onValueChange={setWorkerSearch}
+                    />
+                    <CommandList>
+                      {workersQ.isLoading ? (
+                        <div className="flex justify-center py-3">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : (
+                        <>
+                          <CommandEmpty>Nenhum trabalhador encontrado.</CommandEmpty>
+                          <CommandGroup>
+                            {(workersQ.data ?? []).map((w: any) => (
+                              <CommandItem
+                                key={w.id}
+                                value={w.id}
+                                onSelect={() => {
+                                  setWorkerId(w.id);
+                                  setWorkerPopoverOpen(false);
+                                }}
+                              >
+                                {w.full_name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </>
+                      )}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {workerId && (
+                <Button variant="ghost" size="icon" onClick={() => setWorkerId("")}>
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
@@ -195,7 +297,7 @@ export default function RevisionMetrics() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Locks adquiridos</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Chamadas c/ lock</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-semibold">{totals.locks}</div>
@@ -243,7 +345,7 @@ export default function RevisionMetrics() {
                     <TableHead>Tipo</TableHead>
                     {groupByWorker && <TableHead>Trabalhador</TableHead>}
                     <TableHead className="text-right">Commits</TableHead>
-                    <TableHead className="text-right">Locks</TableHead>
+                    <TableHead className="text-right">Chamadas c/ lock</TableHead>
                     <TableHead className="text-right">Idempotent</TableHead>
                     <TableHead className="text-right">Avg wait (ms)</TableHead>
                     <TableHead className="text-right">Max wait (ms)</TableHead>
@@ -280,7 +382,7 @@ export default function RevisionMetrics() {
                         </TableCell>
                       )}
                       <TableCell className="text-right">{row.commits_count}</TableCell>
-                      <TableCell className="text-right">{row.lock_acquired_count}</TableCell>
+                      <TableCell className="text-right">{row.completed_calls_with_lock}</TableCell>
                       <TableCell className="text-right">{row.idempotent_hit_count}</TableCell>
                       <TableCell className="text-right">{row.avg_lock_wait_ms ?? "—"}</TableCell>
                       <TableCell className="text-right">{row.max_lock_wait_ms ?? "—"}</TableCell>
