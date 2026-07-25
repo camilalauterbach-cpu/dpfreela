@@ -1,5 +1,8 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import {
   Upload, Plus, RefreshCw, Replace, History, Users, MoreHorizontal, GitBranch,
-  FileText, ExternalLink, ShieldCheck, FolderOpen,
+  FileText, ExternalLink, ShieldCheck, FolderOpen, Trash2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -31,6 +34,9 @@ import { SstLinksUsingSheet } from "./SstLinksUsingSheet";
 import { SstNrTimeline } from "./SstNrTimeline";
 import { SstCertificateDrawer, type SstDrawerMode } from "./SstCertificateDrawer";
 import { openCertificate } from "@/lib/sst/certificate-url";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
+import { invalidateSstCaches } from "@/hooks/useSstQualifications";
+import { invalidateComplianceCaches } from "@/lib/compliance-cache";
 
 function fmtDate(iso: string | null) {
   if (!iso) return "—";
@@ -56,7 +62,9 @@ interface Props {
 export function SstQualificationsPanel({ workerId, workerName }: Props) {
   const navigate = useNavigate();
   const { hasAnyRole } = useAuth();
+  const qc = useQueryClient();
   const canEdit = hasAnyRole(["admin", "manager", "operator"]);
+  const canDelete = hasAnyRole(["admin", "manager", "operator"]);
   const { data: unified, isLoading } = useWorkerQualificationsUnified(workerId);
   const { data: summary, isLoading: loadingSummary } = useWorkerSstSummary(workerId);
 
@@ -71,6 +79,36 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
       presetNrCode: string | null;
     } | null
   >(null);
+  const [deleteTarget, setDeleteTarget] = useState<
+    { id: string; code: string; issuedAt: string | null } | null
+  >(null);
+
+  const deleteMut = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any).rpc("delete_sst_revision", {
+        p_qualification_id: id,
+      });
+      if (error) throw error;
+      // Reavalia vínculos após exclusão para recalcular indicadores.
+      await (supabase as any).rpc("reevaluate_worker_links", {
+        p_worker_id: workerId,
+        p_event_source: "delete_sst_revision",
+      });
+    },
+    onSuccess: () => {
+      invalidateSstCaches(qc);
+      invalidateComplianceCaches(qc, { workerId, eventSource: "delete_sst_revision" });
+      qc.invalidateQueries({ queryKey: ["worker-sst-current", workerId] });
+      qc.invalidateQueries({ queryKey: ["worker-sst-summary", workerId] });
+      qc.invalidateQueries({ queryKey: ["worker-sst-history", workerId] });
+      qc.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs", workerId] });
+      toast.success("Certificado excluído.");
+      setDeleteTarget(null);
+    },
+    onError: (e: any) => {
+      toast.error(String(e?.message || "Falha ao excluir certificado."));
+    },
+  });
 
   const rows = unified ?? [];
   const sstRawRows: SstCurrentRow[] = useMemo(
@@ -176,6 +214,16 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
                     onLinks={() => setLinksOpen({ nr: q.code, docTypeId: q.documentTypeId })}
                     onTimeline={() => setTimelineOpen({ nr: q.code, docTypeId: q.documentTypeId })}
                     onManageInDocuments={() => openManageInDocuments(q.documentTypeId)}
+                    onDelete={
+                      canDelete && q.source === "sst" && q.sstRaw
+                        ? () =>
+                            setDeleteTarget({
+                              id: (q.sstRaw as SstCurrentRow).id,
+                              code: q.code,
+                              issuedAt: q.issuedAt,
+                            })
+                        : undefined
+                    }
                   />
                 ))}
               </TableBody>
@@ -234,6 +282,22 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
           }}
         />
       )}
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+        title="Excluir certificado"
+        description={
+          deleteTarget
+            ? `Excluir o certificado ${deleteTarget.code}${
+                deleteTarget.issuedAt
+                  ? ` de ${new Date(deleteTarget.issuedAt + "T12:00:00").toLocaleDateString("pt-BR")}`
+                  : ""
+              }? Apenas este registro será removido. Outros certificados e o trabalhador não serão afetados. Os indicadores serão recalculados.`
+            : ""
+        }
+        onConfirm={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
+        isDeleting={deleteMut.isPending}
+      />
     </div>
   );
 }
@@ -248,6 +312,7 @@ interface RowProps {
   onLinks: () => void;
   onTimeline: () => void;
   onManageInDocuments: () => void;
+  onDelete?: () => void;
 }
 
 function statusToBadge(s: UnifiedQualificationRow["status"]): SstOverallStatus {
@@ -267,7 +332,7 @@ function categoryLabel(c: UnifiedQualificationRow["category"]): string {
   return c;
 }
 
-function QualRow({ q, canEdit, onUpload, onRenew, onReplace, onHistory, onLinks, onTimeline, onManageInDocuments }: RowProps) {
+function QualRow({ q, canEdit, onUpload, onRenew, onReplace, onHistory, onLinks, onTimeline, onManageInDocuments, onDelete }: RowProps) {
   const status = statusToBadge(q.status);
   const days = daysUntil(q.expiresAt);
   const hasCert = !!q.documentUrl;
@@ -358,6 +423,18 @@ function QualRow({ q, canEdit, onUpload, onRenew, onReplace, onHistory, onLinks,
             <DropdownMenuItem onClick={onLinks}>
               <Users className="mr-2 h-4 w-4" /> Ver vínculos
             </DropdownMenuItem>
+            {onDelete && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={onDelete}
+                  className="text-destructive focus:text-destructive"
+                  data-testid="delete-qualification"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> Excluir certificado
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
         )}
