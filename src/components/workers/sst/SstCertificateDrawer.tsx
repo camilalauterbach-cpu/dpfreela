@@ -30,6 +30,50 @@ import { QualificationDocumentTypeCombobox } from "./QualificationDocumentTypeCo
 
 export type SstDrawerMode = "create" | "renew" | "replace";
 
+// Q-024-D-TRAINING-FIX §7 — mapeamento de erros técnicos → texto claro.
+const RPC_ERROR_MESSAGES: Record<string, string> = {
+  invalid_nr_code_format:
+    "Este tipo documental foi tratado incorretamente como NR.",
+  training_document_type_id_required:
+    "Selecione o treinamento no catálogo.",
+  qualification_storage_flow_not_supported:
+    "Este tipo deve ser cadastrado em outro fluxo documental.",
+  unknown_document_type:
+    "O tipo selecionado não foi encontrado no catálogo.",
+  document_type_code_mismatch:
+    "O tipo selecionado não corresponde ao código informado.",
+  document_type_inactive:
+    "Este tipo documental está inativo no catálogo.",
+  qualification_current_version_exists:
+    "Já existe versão vigente deste tipo. Use Renovar ou Substituir.",
+  additional_conflicts_with_current:
+    "Já existe versão vigente deste tipo. Use Renovar ou Substituir.",
+  no_current_qualification_to_revise:
+    "Nenhuma versão vigente encontrada para revisar.",
+  stale_current_qualification:
+    "A versão vigente mudou desde a última leitura. Recarregue e tente novamente.",
+  invariant_violation_multiple_current_qualifications:
+    "Conflito de integridade: mais de uma versão vigente. Contate o administrador.",
+  invalid_expiry:
+    "Data de validade inválida — deve ser posterior à realização.",
+};
+
+function mapRpcError(raw: string): string {
+  for (const [code, text] of Object.entries(RPC_ERROR_MESSAGES)) {
+    if (raw.includes(code)) return text;
+  }
+  return raw;
+}
+
+// Q-024-D-TRAINING-FIX §6 — opções controladas de `training_type`.
+const TRAINING_TYPE_OPTIONS = [
+  "Inicial",
+  "Reciclagem",
+  "Atualização",
+  "Complementar",
+  "Outro",
+] as const;
+
 // Q-024-D-UI-MULTIPLE — variável da mutation com a intenção do usuário.
 // Não depende de state atualizado assincronamente antes de submit.mutate().
 export interface SubmitVars {
@@ -86,6 +130,7 @@ export function SstCertificateDrawer({
   const [file, setFile] = useState<File | null>(null);
   const [selectedDocumentTypeId, setSelectedDocumentTypeId] = useState<string | null>(null);
   const [trainingType, setTrainingType] = useState("");
+  const [trainingTypeOther, setTrainingTypeOther] = useState("");
   const [issuedAt, setIssuedAt] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [hasExpiry, setHasExpiry] = useState(true);
@@ -131,6 +176,7 @@ export function SstCertificateDrawer({
     if (mode === "create") {
       setSelectedDocumentTypeId(resolvePresetId());
       setTrainingType("");
+      setTrainingTypeOther("");
       setIssuedAt("");
       setExpiresAt("");
       setHasExpiry(true);
@@ -246,16 +292,21 @@ export function SstCertificateDrawer({
 
       const payload: Record<string, unknown> = {
         worker_id: workerId,
-        // Identidade canônica (Q-024.B). Mantemos `nr_code` como legado no payload
-        // para compatibilidade da RPC, mas a fonte de verdade é o UUID.
+        // Q-024-D-TRAINING-FIX §3: identidade canônica pelo UUID. `nr_code` só
+        // acompanha o payload para category='sst_nr' — a RPC ignora o campo em
+        // treinamento, mas evitamos disparar `invalid_nr_code_format` no backend
+        // não enviando um valor não-NR.
         document_type_id: selectedType.documentTypeId,
-        nr_code: normalized,
+        ...(selectedType.category === "sst_nr" ? { nr_code: normalized } : {}),
         operation,
         previous_qualification_id:
           (mode === "renew" || mode === "replace") ? current?.id ?? null : null,
         expected_current_qualification_id:
           (mode === "renew" || mode === "replace") ? current?.id ?? null : null,
-        training_type: trainingType.trim() || null,
+        training_type:
+          trainingType === "Outro"
+            ? (trainingTypeOther.trim() || null)
+            : (trainingType.trim() || null),
         issued_at: issuedAt,
         expires_at: hasExpiry ? expiresAt : null,
         validity_status: hasExpiry ? "has_expiry" : "no_expiry",
@@ -335,6 +386,7 @@ export function SstCertificateDrawer({
         setSelectedDocumentTypeId(null);
         setFile(null);
         setTrainingType("");
+        setTrainingTypeOther("");
         setIssuedAt("");
         setExpiresAt("");
         setHasExpiry(true);
@@ -349,9 +401,11 @@ export function SstCertificateDrawer({
     },
     onError: (e: any) => {
       setUploading(false);
-      const msg = String(e?.message || "Falha ao registrar certificado.");
-      setLastError(msg);
-      toast.error(msg, {
+      const raw = String(e?.message || "Falha ao registrar certificado.");
+      // Q-024-D-TRAINING-FIX §7: mapear códigos técnicos para texto claro.
+      const friendly = mapRpcError(raw);
+      setLastError(friendly);
+      toast.error(friendly, {
         action: {
           label: "Tentar novamente",
           onClick: () => submit.mutate({ continueAdding: false }),
@@ -542,11 +596,33 @@ export function SstCertificateDrawer({
           <div className={"grid grid-cols-2 gap-3 " + (flowBlocked ? "opacity-50 pointer-events-none" : "")}>
             <div>
               <Label>Tipo</Label>
-              <Input
-                value={trainingType}
-                onChange={(e) => setTrainingType(e.target.value)}
-                placeholder="Inicial, Reciclagem…"
-              />
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={
+                  trainingType === "" || TRAINING_TYPE_OPTIONS.includes(trainingType as typeof TRAINING_TYPE_OPTIONS[number])
+                    ? trainingType
+                    : "Outro"
+                }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setTrainingType(v);
+                  if (v !== "Outro") setTrainingTypeOther("");
+                }}
+                data-testid="training-type-select"
+              >
+                <option value="">Selecione…</option>
+                {TRAINING_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+              {trainingType === "Outro" && (
+                <Input
+                  className="mt-1"
+                  value={trainingTypeOther}
+                  onChange={(e) => setTrainingTypeOther(e.target.value)}
+                  placeholder="Descreva o tipo"
+                />
+              )}
             </div>
             <div>
               <Label>Data de realização/conclusão *</Label>
