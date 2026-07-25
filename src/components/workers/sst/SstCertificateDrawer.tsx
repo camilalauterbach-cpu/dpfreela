@@ -212,7 +212,7 @@ export function SstCertificateDrawer({
   const canSubmit = errors.length === 0 && !uploading && !flowBlocked;
 
   const submit = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (_vars: SubmitVars = { continueAdding: false }) => {
       if (!file) throw new Error("no_file");
       if (!selectedType) throw new Error("no_type_selected");
       const normalized = selectedType.code;
@@ -278,14 +278,15 @@ export function SstCertificateDrawer({
       }
 
       // 3) reevaluate_worker_links (retorna contagem)
-      const { data: reRes } = await (supabase as any).rpc(
+      const reeval = await (supabase as any).rpc(
         "reevaluate_worker_links",
         { p_worker_id: workerId, p_event_source: "upload" },
       );
-      const linksProcessed = Number((reRes as any)?.links_processed ?? 0);
-      return { normalized, linksProcessed };
+      const reevalError = reeval?.error ?? null;
+      const linksProcessed = Number(reeval?.data?.links_processed ?? 0);
+      return { normalized, linksProcessed, reevalError };
     },
-    onSuccess: (res) => {
+    onSuccess: (res, vars) => {
       // 4) Invalidação de caches — KPIs, tabela, histórico, vínculos, pendências
       invalidateSstCaches(qc);
       invalidateComplianceCaches(qc, { workerId, eventSource: "upload" });
@@ -293,17 +294,43 @@ export function SstCertificateDrawer({
       qc.invalidateQueries({ queryKey: ["worker-sst-summary", workerId] });
       qc.invalidateQueries({ queryKey: ["worker-sst-history", workerId] });
       qc.invalidateQueries({ queryKey: ["worker-sst-links-using", workerId] });
+      qc.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs", workerId] });
 
       const verb =
         mode === "renew" ? "renovada" :
         mode === "replace" ? "substituída" :
         "cadastrada";
-      const linkMsg = res.linksProcessed > 0
-        ? ` ${res.linksProcessed} vínculo${res.linksProcessed === 1 ? "" : "s"} reavaliado${res.linksProcessed === 1 ? "" : "s"} automaticamente.`
-        : "";
-      toast.success(`${res.normalized} ${verb} com sucesso.${linkMsg}`);
+      if (res.reevalError) {
+        // Q-024-D-UI-MULTIPLE — reavaliação falhou: NÃO repetir upload nem revisão.
+        toast.warning(
+          `Certificado salvo, mas os vínculos não puderam ser reavaliados.`,
+          {
+            action: {
+              label: "Tentar reavaliar novamente",
+              onClick: async () => {
+                const retry = await (supabase as any).rpc(
+                  "reevaluate_worker_links",
+                  { p_worker_id: workerId, p_event_source: "manual_retry" },
+                );
+                if (retry?.error) {
+                  toast.error("Reavaliação falhou novamente. Verifique com o administrador.");
+                } else {
+                  toast.success("Vínculos reavaliados.");
+                  invalidateSstCaches(qc);
+                  invalidateComplianceCaches(qc, { workerId, eventSource: "manual_retry" });
+                }
+              },
+            },
+          },
+        );
+      } else {
+        const linkMsg = res.linksProcessed > 0
+          ? ` ${res.linksProcessed} vínculo${res.linksProcessed === 1 ? "" : "s"} reavaliado${res.linksProcessed === 1 ? "" : "s"} automaticamente.`
+          : "";
+        toast.success(`${res.normalized} ${verb} com sucesso.${linkMsg}`);
+      }
 
-      if (mode === "create" && keepOpenAfterSave) {
+      if (mode === "create" && vars.continueAdding) {
         // "Salvar e adicionar outra": limpa formulário e mantém drawer aberto.
         setSelectedDocumentTypeId(null);
         setFile(null);
@@ -316,7 +343,6 @@ export function SstCertificateDrawer({
         setProvider("");
         setInstructor("");
         setNotes("");
-        setKeepOpenAfterSave(false);
       } else {
         onOpenChange(false);
       }
@@ -328,7 +354,7 @@ export function SstCertificateDrawer({
       toast.error(msg, {
         action: {
           label: "Tentar novamente",
-          onClick: () => submit.mutate(),
+          onClick: () => submit.mutate({ continueAdding: false }),
         },
       });
     },
