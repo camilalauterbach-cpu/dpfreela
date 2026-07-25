@@ -246,10 +246,12 @@ export function SstCertificateDrawer({
 
       const payload: Record<string, unknown> = {
         worker_id: workerId,
-        // Identidade canônica (Q-024.B). Mantemos `nr_code` como legado no payload
-        // para compatibilidade da RPC, mas a fonte de verdade é o UUID.
+        // Q-024-D-TRAINING-FIX §3: identidade canônica pelo UUID. `nr_code` só
+        // acompanha o payload para category='sst_nr' — a RPC ignora o campo em
+        // treinamento, mas evitamos disparar `invalid_nr_code_format` no backend
+        // não enviando um valor não-NR.
         document_type_id: selectedType.documentTypeId,
-        nr_code: normalized,
+        ...(selectedType.category === "sst_nr" ? { nr_code: normalized } : {}),
         operation,
         previous_qualification_id:
           (mode === "renew" || mode === "replace") ? current?.id ?? null : null,
@@ -349,9 +351,11 @@ export function SstCertificateDrawer({
     },
     onError: (e: any) => {
       setUploading(false);
-      const msg = String(e?.message || "Falha ao registrar certificado.");
-      setLastError(msg);
-      toast.error(msg, {
+      const raw = String(e?.message || "Falha ao registrar certificado.");
+      // Q-024-D-TRAINING-FIX §7: mapear códigos técnicos para texto claro.
+      const friendly = mapRpcError(raw);
+      setLastError(friendly);
+      toast.error(friendly, {
         action: {
           label: "Tentar novamente",
           onClick: () => submit.mutate({ continueAdding: false }),
