@@ -37,6 +37,7 @@ interface DocType {
   validity_unit: ValidityUnit | null;
   has_expiration: boolean;
   default_validity_days: number | null;
+  completion_requirement: "required" | "optional";
 }
 
 interface GateRow {
@@ -93,13 +94,19 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
   const [vError, setVError] = useState<string | null>(null);
   const [vSaving, setVSaving] = useState(false);
 
+  // Obrigatoriedade para conclusão do cadastro
+  const [reqEditing, setReqEditing] = useState<DocType | null>(null);
+  const [reqValue, setReqValue] = useState<"required" | "optional">("optional");
+  const [reqSaving, setReqSaving] = useState(false);
+  const [reqError, setReqError] = useState<string | null>(null);
+
   const q = useQuery({
     queryKey: ["settings-doc-types-scope"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("document_types")
         .select(
-          "id, code, name, category, is_active, storage_scope, validity_mode, validity_value, validity_unit, has_expiration, default_validity_days",
+          "id, code, name, category, is_active, storage_scope, validity_mode, validity_value, validity_unit, has_expiration, default_validity_days, completion_requirement",
         )
         .order("name");
       if (error) throw error;
