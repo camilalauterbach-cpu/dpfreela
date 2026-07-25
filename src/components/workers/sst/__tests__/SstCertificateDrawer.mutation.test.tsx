@@ -121,8 +121,7 @@ describe("SstCertificateDrawer — persistência de treinamento com identidade c
       if (!el) throw new Error("file input não montado");
       return el;
     });
-    Object.defineProperty(fileInput, "files", { value: [file], configurable: true });
-    fireEvent.change(fileInput);
+    fireEvent.change(fileInput, { target: { files: [file] } });
 
     // Datas
     await waitFor(() => {
