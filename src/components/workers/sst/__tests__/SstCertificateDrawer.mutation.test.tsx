@@ -29,6 +29,16 @@ vi.mock("sonner", () => ({
 vi.mock("@/lib/compliance-cache", () => ({ invalidateComplianceCaches: vi.fn() }));
 vi.mock("@/hooks/useSstQualifications", () => ({ invalidateSstCaches: vi.fn() }));
 
+// Neutraliza a Sheet (Radix + portal) para renderizar o conteúdo inline no
+// container do teste — evita interações assíncronas com portal/presence.
+vi.mock("@/components/ui/sheet", () => {
+  const Div = ({ children }: any) => <div>{children}</div>;
+  return {
+    Sheet: Div, SheetContent: Div, SheetHeader: Div, SheetTitle: Div,
+    SheetDescription: Div, SheetFooter: Div,
+  };
+});
+
 vi.mock("@/lib/upload-validation", () => ({
   validateUpload: () => null,
   getSafeContentType: () => "application/pdf",
