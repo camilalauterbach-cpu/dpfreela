@@ -18,6 +18,13 @@ interface Missing {
   code: string;
   name: string;
   reason: "ausente" | "vencido" | "rejeitado" | string;
+  status?: string | null;
+  expiry_date?: string | null;
+  rejected_at?: string | null;
+  last_update_at?: string | null;
+  worker_document_id?: string | null;
+  file_name?: string | null;
+  file_path?: string | null;
 }
 
 interface Result {
@@ -31,6 +38,25 @@ const REASON_LABEL: Record<string, string> = {
   ausente: "Não enviado",
   vencido: "Vencido",
   rejeitado: "Rejeitado",
+};
+
+const formatDate = (iso?: string | null) => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("pt-BR");
+};
+
+const buildReasonSummary = (m: Missing): string | null => {
+  if (m.reason === "vencido") {
+    const d = formatDate(m.expiry_date);
+    return d ? `Venceu em ${d}` : "Fora da validade";
+  }
+  if (m.reason === "rejeitado") {
+    const d = formatDate(m.rejected_at ?? m.last_update_at);
+    return d ? `Rejeitado em ${d}` : "Rejeitado na análise";
+  }
+  return null;
 };
 
 const REASON_DETAIL: Record<string, string> = {
@@ -137,7 +163,22 @@ export function WorkerCompletionChecklist({ workerId }: { workerId: string }) {
                     <div className="flex flex-1 items-center justify-between gap-2 pr-2">
                       <div className="flex items-center gap-2 min-w-0">
                         {REASON_ICON[m.reason] ?? <AlertTriangle className="h-4 w-4 text-destructive" />}
-                        <span className="text-sm font-medium truncate text-left">{m.name}</span>
+                        <div className="min-w-0 text-left">
+                          <p className="text-sm font-medium truncate">{m.name}</p>
+                          {(() => {
+                            const summary = buildReasonSummary(m);
+                            if (summary || m.file_name) {
+                              return (
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {summary}
+                                  {summary && m.file_name ? " · " : ""}
+                                  {m.file_name ?? ""}
+                                </p>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
                       </div>
                       <Badge variant="outline" className="border-destructive/40 text-destructive shrink-0">
                         {REASON_LABEL[m.reason] ?? m.reason}
@@ -150,6 +191,28 @@ export function WorkerCompletionChecklist({ workerId }: { workerId: string }) {
                         {REASON_DETAIL[m.reason] ??
                           "Regularize este documento obrigatório para desbloquear o cadastro."}
                       </p>
+                      {(m.reason === "vencido" || m.reason === "rejeitado" || m.file_name) && (
+                        <ul className="space-y-1 rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground">
+                          {m.reason === "vencido" && (
+                            <li>
+                              <span className="font-medium text-foreground">Vencimento:</span>{" "}
+                              {formatDate(m.expiry_date) ?? "não informado"}
+                            </li>
+                          )}
+                          {m.reason === "rejeitado" && (
+                            <li>
+                              <span className="font-medium text-foreground">Rejeitado em:</span>{" "}
+                              {formatDate(m.rejected_at ?? m.last_update_at) ?? "data não registrada"}
+                            </li>
+                          )}
+                          {m.file_name && (
+                            <li className="truncate">
+                              <span className="font-medium text-foreground">Documento correlato:</span>{" "}
+                              {m.file_name}
+                            </li>
+                          )}
+                        </ul>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
