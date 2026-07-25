@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -34,6 +35,9 @@ interface MetricRow {
   document_type_id: string | null;
   document_type_code: string | null;
   document_type_name: string | null;
+  worker_id?: string | null;
+  worker_name?: string | null;
+  worker_cpf?: string | null;
   commits_count: number;
   lock_acquired_count: number;
   idempotent_hit_count: number;
@@ -59,6 +63,7 @@ export default function RevisionMetrics() {
   const [from, setFrom] = useState<string>(defaultFrom);
   const [to, setTo] = useState<string>(defaultTo);
   const [documentTypeId, setDocumentTypeId] = useState<string>("");
+  const [groupByWorker, setGroupByWorker] = useState<boolean>(false);
 
   const docTypesQ = useQuery({
     queryKey: ["revision-metrics", "document-types"],
@@ -74,14 +79,19 @@ export default function RevisionMetrics() {
   });
 
   const metricsQ = useQuery({
-    queryKey: ["revision-metrics", from, to, documentTypeId],
+    queryKey: ["revision-metrics", from, to, documentTypeId, groupByWorker],
     enabled: canView && !!from && !!to,
     queryFn: async () => {
-      const { data, error } = await (supabase.rpc as any)("get_revision_metrics_daily", {
+      const rpcName = groupByWorker
+        ? "get_revision_metrics_daily_by_worker"
+        : "get_revision_metrics_daily";
+      const params: Record<string, unknown> = {
         p_from: from,
         p_to: to,
         p_document_type_id: documentTypeId ? documentTypeId : null,
-      });
+      };
+      if (groupByWorker) params.p_worker_id = null;
+      const { data, error } = await (supabase.rpc as any)(rpcName, params);
       if (error) throw error;
       return ((data ?? []) as unknown) as MetricRow[];
     },
@@ -156,6 +166,24 @@ export default function RevisionMetrics() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardContent className="flex items-center justify-between py-4">
+          <div>
+            <Label htmlFor="group-by-worker" className="text-sm font-medium">
+              Agrupar por trabalhador
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Detalha as contagens por <code>worker_id</code> além de dia e tipo de documento.
+            </p>
+          </div>
+          <Switch
+            id="group-by-worker"
+            checked={groupByWorker}
+            onCheckedChange={setGroupByWorker}
+          />
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
@@ -213,6 +241,7 @@ export default function RevisionMetrics() {
                   <TableRow>
                     <TableHead>Dia</TableHead>
                     <TableHead>Tipo</TableHead>
+                    {groupByWorker && <TableHead>Trabalhador</TableHead>}
                     <TableHead className="text-right">Commits</TableHead>
                     <TableHead className="text-right">Locks</TableHead>
                     <TableHead className="text-right">Idempotent</TableHead>
@@ -222,7 +251,9 @@ export default function RevisionMetrics() {
                 </TableHeader>
                 <TableBody>
                   {(metricsQ.data ?? []).map((row, idx) => (
-                    <TableRow key={`${row.day}-${row.document_type_id ?? "null"}-${idx}`}>
+                    <TableRow
+                      key={`${row.day}-${row.document_type_id ?? "null"}-${row.worker_id ?? "no-worker"}-${idx}`}
+                    >
                       <TableCell className="font-mono text-xs">{row.day}</TableCell>
                       <TableCell>
                         {row.document_type_code ? (
@@ -234,6 +265,20 @@ export default function RevisionMetrics() {
                           <span className="text-xs text-muted-foreground">— sem tipo —</span>
                         )}
                       </TableCell>
+                      {groupByWorker && (
+                        <TableCell>
+                          {row.worker_id ? (
+                            <div className="flex flex-col">
+                              <span className="text-sm">{row.worker_name ?? "—"}</span>
+                              {row.worker_cpf && (
+                                <span className="text-xs text-muted-foreground">{row.worker_cpf}</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">— sem worker —</span>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell className="text-right">{row.commits_count}</TableCell>
                       <TableCell className="text-right">{row.lock_acquired_count}</TableCell>
                       <TableCell className="text-right">{row.idempotent_hit_count}</TableCell>
