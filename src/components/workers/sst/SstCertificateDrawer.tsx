@@ -57,6 +57,10 @@ const RPC_ERROR_MESSAGES: Record<string, string> = {
     "Conflito de integridade: mais de uma versão vigente. Contate o administrador.",
   invalid_expiry:
     "Data de validade inválida — deve ser posterior à realização.",
+  renewal_same_period_use_correction:
+    "As datas informadas são idênticas à vigência atual. Para corrigir o certificado atual, use Substituir.",
+  document_type_not_sst_or_training:
+    "Este tipo documental não é aceito no cadastro de qualificações (apenas NRs e Treinamentos).",
 };
 
 function mapRpcError(raw: string): string {
@@ -288,7 +292,7 @@ export function SstCertificateDrawer({
       // 2) register_sst_revision
       const operation =
         mode === "renew" ? "renewal" :
-        mode === "replace" ? "replacement" :
+        mode === "replace" ? "correction" :
         "initial";
 
       const payload: Record<string, unknown> = {
