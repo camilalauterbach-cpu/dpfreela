@@ -218,6 +218,52 @@ export function SettingsDocumentTypes({ readOnly = false }: Props) {
     setVSaving(false);
   };
 
+  const openRequirement = (d: DocType) => {
+    if (readOnly) return;
+    setReqEditing(d);
+    setReqValue(d.completion_requirement ?? "optional");
+    setReqError(null);
+  };
+  const closeRequirement = () => {
+    setReqEditing(null);
+    setReqError(null);
+    setReqSaving(false);
+  };
+  const saveRequirement = async () => {
+    if (!reqEditing) return;
+    if (reqEditing.completion_requirement === reqValue) {
+      closeRequirement();
+      return;
+    }
+    setReqSaving(true);
+    setReqError(null);
+    try {
+      const { error } = await supabase.rpc(
+        "set_document_type_completion_requirement" as any,
+        { p_document_type_id: reqEditing.id, p_requirement: reqValue } as any,
+      );
+      if (error) throw error;
+      toast({
+        title: "Obrigatoriedade atualizada",
+        description: `${reqEditing.name} — agora ${reqValue === "required" ? "obrigatório" : "opcional"}. Cadastros afetados foram recalculados.`,
+      });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["settings-doc-types-scope"] }),
+        qc.invalidateQueries({ queryKey: ["worker-completion"] }),
+        qc.invalidateQueries({ queryKey: ["workers"] }),
+      ]);
+      closeRequirement();
+    } catch (err: any) {
+      const raw = String(err?.message ?? "");
+      if (raw.includes("not_authorized")) setReqError("Apenas admin/manager podem alterar esta configuração.");
+      else if (raw.includes("requirement_invalid")) setReqError("Opção inválida.");
+      else if (raw.includes("document_type_not_found")) setReqError("Tipo documental não encontrado.");
+      else setReqError("Não foi possível salvar. Tente novamente.");
+    } finally {
+      setReqSaving(false);
+    }
+  };
+
   const applyPreset = (key: string) => {
     setVPreset(key);
     const preset = VALIDITY_PRESETS.find((p) => p.key === key);
