@@ -127,12 +127,11 @@ describe("SstCertificateDrawer — persistência de treinamento com identidade c
       screen.getByPlaceholderText("Horas (inteiro)"),
       { target: { value: "8" } },
     );
-    const inputs = document.querySelectorAll("input");
-    // Instituição e Instrutor: dois últimos <input> visíveis antes do textarea.
-    const provider = Array.from(inputs).find((el) =>
+    const allInputs = document.querySelectorAll("input");
+    const provider = Array.from(allInputs).find((el) =>
       el.previousElementSibling?.textContent === "Instituição",
     ) as HTMLInputElement | undefined;
-    const instructor = Array.from(inputs).find((el) =>
+    const instructor = Array.from(allInputs).find((el) =>
       el.previousElementSibling?.textContent === "Instrutor",
     ) as HTMLInputElement | undefined;
     if (provider) fireEvent.change(provider, { target: { value: "SESI" } });
