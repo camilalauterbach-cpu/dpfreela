@@ -5,10 +5,13 @@
 //     and on focus/visibilitychange(visible)/online events.
 //   - When the remote version differs from the bundle's __APP_VERSION__,
 //     surface a blocking gate that only allows "Update now" (auto after 15s).
-//   - Cross-tab: BroadcastChannel with in-memory fallback.
+//   - Cross-tab: BroadcastChannel with a real `storage`-event fallback keyed
+//     on a dedicated key. Never clears any other storage.
 //   - Network/parse failures never trigger a false divergence; they emit
 //     an "offline" hint and are retried when connectivity returns.
-//   - Reload guard uses sessionStorage to avoid reload loops.
+//   - Reload guard is bound to the target remote version (not a global
+//     boolean): a given target reloads at most once, but a later new target
+//     in the same session may still reload once.
 //   - Never touch localStorage/IndexedDB/session/form data.
 
 export const LOCAL_VERSION: string =
@@ -16,8 +19,9 @@ export const LOCAL_VERSION: string =
 
 const POLL_MS = 60_000;
 const AUTO_UPDATE_MS = 15_000;
-const RELOAD_GUARD_KEY = "__dpfreela_version_reloaded__";
+const RELOAD_GUARD_KEY = "__dpfreela_reload_for_version__";
 const CHANNEL_NAME = "dpfreela-version";
+const STORAGE_FALLBACK_KEY = "__dpfreela_version_broadcast__";
 
 export type VersionState =
   | { kind: "ok"; remote: string }
@@ -70,17 +74,35 @@ export async function fetchRemoteVersion(
 }
 
 /**
- * Perform the update: try SW skip-waiting + controllerchange, then reload
- * exactly once (guarded by sessionStorage). Never clears user data —
- * only Cache Storage entries related to the app.
+ * Perform the update for a specific target version.
+ *
+ * Reload guard is scoped to `targetVersion`: if this session already reloaded
+ * for that exact version and the app still sees the old bundle, we do NOT
+ * reload again automatically — we surface a failure the caller can show as
+ * a retry state. A later, different target version can still reload once.
+ *
+ * Never touches localStorage / IndexedDB / user data — only Cache Storage
+ * buckets that look app/asset related.
  */
-export async function performUpdate(): Promise<void> {
-  // Reload-loop guard.
+export type UpdateResult =
+  | { reloaded: true }
+  | { reloaded: false; reason: "already-attempted" | "no-target" | "error"; message?: string };
+
+export async function performUpdate(targetVersion?: string): Promise<UpdateResult> {
+  if (!targetVersion) {
+    return { reloaded: false, reason: "no-target", message: "Sem versão de destino." };
+  }
+  // Reload guard scoped to the target version.
   if (typeof sessionStorage !== "undefined") {
-    if (sessionStorage.getItem(RELOAD_GUARD_KEY) === "1") {
-      return;
+    if (sessionStorage.getItem(RELOAD_GUARD_KEY) === targetVersion) {
+      return {
+        reloaded: false,
+        reason: "already-attempted",
+        message:
+          "Já tentamos atualizar para esta versão nesta sessão. Verifique sua conexão e tente novamente.",
+      };
     }
-    sessionStorage.setItem(RELOAD_GUARD_KEY, "1");
+    sessionStorage.setItem(RELOAD_GUARD_KEY, targetVersion);
   }
   try {
     // Clear app-related Cache Storage buckets (never localStorage/IndexedDB).
@@ -123,18 +145,24 @@ export async function performUpdate(): Promise<void> {
         /* ignore */
       }
     }
-  } finally {
+  } catch (err) {
+    return {
+      reloaded: false,
+      reason: "error",
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
     if (typeof location !== "undefined") {
       location.reload();
     }
-  }
+  return { reloaded: true };
 }
 
 export type Controller = {
   getState: () => VersionState;
   subscribe: (listener: (state: VersionState) => void) => () => void;
   checkNow: () => Promise<void>;
-  triggerUpdate: () => Promise<void>;
+  triggerUpdate: () => Promise<UpdateResult>;
   stop: () => void;
   /** Force a stale state (used by BroadcastChannel receivers, and tests). */
   markStale: (remote: string) => void;
@@ -151,6 +179,7 @@ export function createVersionController(deps: Deps = {}): Controller {
   const channel = createChannel(CHANNEL_NAME);
   let stopped = false;
   let interval: ReturnType<typeof setInterval> | null = null;
+  const hasChannel = !!channel;
 
   function emit(next: VersionState) {
     state = next;
@@ -171,6 +200,18 @@ export function createVersionController(deps: Deps = {}): Controller {
     } catch {
       /* noop */
     }
+    // Storage fallback for browsers/contexts without BroadcastChannel.
+    if (!hasChannel && typeof localStorage !== "undefined") {
+      try {
+        // Dedicated key only — never touches any other user data.
+        localStorage.setItem(
+          STORAGE_FALLBACK_KEY,
+          JSON.stringify({ type: "stale", remote, ts: now() }),
+        );
+      } catch {
+        /* noop */
+      }
+    }
   }
 
   async function checkNow() {
@@ -187,6 +228,18 @@ export function createVersionController(deps: Deps = {}): Controller {
     if (result.version && result.version !== local) {
       markStale(result.version);
     } else {
+      // Confirmed running the current version — clear any prior reload
+      // guard so a future new target in this same session can reload once.
+      if (
+        typeof sessionStorage !== "undefined" &&
+        sessionStorage.getItem(RELOAD_GUARD_KEY)
+      ) {
+        try {
+          sessionStorage.removeItem(RELOAD_GUARD_KEY);
+        } catch {
+          /* noop */
+        }
+      }
       emit({ kind: "ok", remote: result.version });
     }
   }
@@ -197,6 +250,22 @@ export function createVersionController(deps: Deps = {}): Controller {
       markStale(data.remote);
     }
   });
+
+  // storage-event fallback (only when there is no BroadcastChannel).
+  const onStorage = (e: StorageEvent) => {
+    if (e.key !== STORAGE_FALLBACK_KEY || !e.newValue) return;
+    try {
+      const data = JSON.parse(e.newValue);
+      if (data && data.type === "stale" && typeof data.remote === "string") {
+        markStale(data.remote);
+      }
+    } catch {
+      /* noop */
+    }
+  };
+  if (!hasChannel && typeof window !== "undefined") {
+    window.addEventListener("storage", onStorage);
+  }
 
   interval = setInterval(() => {
     void checkNow();
@@ -229,7 +298,10 @@ export function createVersionController(deps: Deps = {}): Controller {
       return () => listeners.delete(listener);
     },
     checkNow,
-    triggerUpdate: performUpdate,
+    triggerUpdate: async () => {
+      const target = state.kind === "stale" ? state.remote : undefined;
+      return performUpdate(target);
+    },
     markStale,
     stop() {
       stopped = true;
@@ -238,6 +310,7 @@ export function createVersionController(deps: Deps = {}): Controller {
       if (typeof window !== "undefined") {
         window.removeEventListener("focus", onFocus);
         window.removeEventListener("online", onOnline);
+        if (!hasChannel) window.removeEventListener("storage", onStorage);
       }
       if (typeof document !== "undefined") {
         document.removeEventListener("visibilitychange", onVisibility);
@@ -249,3 +322,4 @@ export function createVersionController(deps: Deps = {}): Controller {
 export const AUTO_UPDATE_MS_EXPORT = AUTO_UPDATE_MS;
 export const POLL_MS_EXPORT = POLL_MS;
 export const RELOAD_GUARD_KEY_EXPORT = RELOAD_GUARD_KEY;
+export const STORAGE_FALLBACK_KEY_EXPORT = STORAGE_FALLBACK_KEY;
