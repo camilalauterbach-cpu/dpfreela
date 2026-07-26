@@ -69,17 +69,23 @@ interface Filters {
 }
 
 /** Invalida todas as queries relacionadas ao Controle SST e à listagem de docs de vínculo. */
-export function invalidateSstCaches(qc: QueryClient, opts?: { linkDocsOwnerId?: string }) {
-  qc.invalidateQueries({ queryKey: ["sst-qualifications"] });
-  qc.invalidateQueries({ queryKey: ["sst-summary"] });
-  qc.invalidateQueries({ queryKey: ["sst-alert-counts"] });
-  qc.invalidateQueries({ queryKey: ["sst-worker-details"] });
-  qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+export function invalidateSstCaches(
+  qc: QueryClient,
+  opts?: { linkDocsOwnerId?: string },
+): Promise<void> {
+  const jobs: Promise<unknown>[] = [
+    qc.invalidateQueries({ queryKey: ["sst-qualifications"] }),
+    qc.invalidateQueries({ queryKey: ["sst-summary"] }),
+    qc.invalidateQueries({ queryKey: ["sst-alert-counts"] }),
+    qc.invalidateQueries({ queryKey: ["sst-worker-details"] }),
+    qc.invalidateQueries({ queryKey: ["dashboard-counts"] }),
+  ];
   if (opts?.linkDocsOwnerId) {
-    qc.invalidateQueries({ queryKey: ["link-docs", opts.linkDocsOwnerId] });
+    jobs.push(qc.invalidateQueries({ queryKey: ["link-docs", opts.linkDocsOwnerId] }));
   } else {
-    qc.invalidateQueries({ queryKey: ["link-docs"] });
+    jobs.push(qc.invalidateQueries({ queryKey: ["link-docs"] }));
   }
+  return Promise.all(jobs).then(() => undefined);
 }
 
 export function useSstOverview(filters: Filters) {
