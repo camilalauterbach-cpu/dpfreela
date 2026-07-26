@@ -33,6 +33,26 @@ import { WorkerDocumentRevisionPanel } from "./WorkerDocumentRevisionPanel";
 import { formatSupabaseErrorForUser } from "@/lib/format-error";
 import { registerWorkerDocumentRevision } from "@/lib/worker-document-revisions";
 
+// Marca a fase em que o envio falhou para que o toast diferencie claramente
+// "não subiu o arquivo" (Storage) de "arquivo subiu mas não foi registrado"
+// (banco de dados / RPC). Também usamos para pré-validações.
+type UploadStage = "validation" | "storage_upload" | "db_registration";
+class UploadStageError extends Error {
+  stage: UploadStage;
+  cause?: unknown;
+  constructor(stage: UploadStage, message: string, cause?: unknown) {
+    super(message);
+    this.stage = stage;
+    this.cause = cause;
+  }
+}
+
+const STAGE_TITLES: Record<UploadStage, string> = {
+  validation: "Não foi possível iniciar o envio",
+  storage_upload: "Falha ao enviar o arquivo",
+  db_registration: "Arquivo enviado, mas não foi registrado",
+};
+
 interface Props {
   workerId: string;
   workerName?: string;
