@@ -1871,6 +1871,8 @@ export type Database = {
           document_type_id: string | null
           id: string
           last_error: string | null
+          max_attempts: number
+          next_attempt_at: string
           path: string
           source: string
           status: string
@@ -1886,6 +1888,8 @@ export type Database = {
           document_type_id?: string | null
           id?: string
           last_error?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
           path: string
           source?: string
           status?: string
@@ -1901,6 +1905,8 @@ export type Database = {
           document_type_id?: string | null
           id?: string
           last_error?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
           path?: string
           source?: string
           status?: string
@@ -3002,6 +3008,8 @@ export type Database = {
           document_type_id: string | null
           id: string
           last_error: string | null
+          max_attempts: number
+          next_attempt_at: string
           path: string
           source: string
           status: string
@@ -3088,6 +3096,8 @@ export type Database = {
           document_type_id: string | null
           id: string
           last_error: string | null
+          max_attempts: number
+          next_attempt_at: string
           path: string
           source: string
           status: string
