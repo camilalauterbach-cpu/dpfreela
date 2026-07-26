@@ -20,13 +20,13 @@ function makeFile(name = "aso.pdf", size = 1234, type = "application/pdf", lastM
 }
 
 function makeClient(overrides?: {
-  rpc?: (name: string, args: any) => Promise<{ data: unknown; error: unknown }>;
-  upload?: (path: string, file: any, opts?: any) => Promise<{ error: unknown }>;
-  remove?: (paths: string[]) => Promise<{ error: unknown }>;
+  rpc?: any;
+  upload?: any;
+  remove?: any;
 }) {
-  const rpc = overrides?.rpc ?? vi.fn(async () => ({ data: { document: { id: "doc-1" }, trace_id: "t1" }, error: null }));
-  const upload = overrides?.upload ?? vi.fn(async () => ({ error: null }));
-  const remove = overrides?.remove ?? vi.fn(async () => ({ error: null }));
+  const rpc: any = overrides?.rpc ?? vi.fn(async () => ({ data: { document: { id: "doc-1" }, trace_id: "t1" }, error: null }));
+  const upload: any = overrides?.upload ?? vi.fn(async () => ({ error: null }));
+  const remove: any = overrides?.remove ?? vi.fn(async () => ({ error: null }));
   return {
     rpc,
     storage: {
