@@ -289,6 +289,13 @@ export function SstCertificateDrawer({
   const [notes, setNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
+  // Vigente detectada por preflight autoritativo OU por conflito de concorrência
+  // após a RPC. Fonte de verdade para converter create→renewal sem depender
+  // do cache/props de `currentRows`.
+  const [preflightConflict, setPreflightConflict] = useState<
+    | { row: SstCurrentRow; sameDates: boolean }
+    | null
+  >(null);
 
   const typeLocked = mode !== "create";
 
@@ -319,6 +326,7 @@ export function SstCertificateDrawer({
     setNotes("");
     setLastError(null);
     setExpiryTouched(false);
+    setPreflightConflict(null);
     if (mode === "create") {
       setSelectedDocumentTypeId(resolvePresetId());
       setTrainingType("");
@@ -381,6 +389,16 @@ export function SstCertificateDrawer({
     ? currentRows.find((r) => r.document_type_id === selectedDocumentTypeId) ?? null
     : null;
 
+  // Vigente efetiva: preflight tem precedência; senão usa o cache.
+  const effectiveExistingRow: SstCurrentRow | null =
+    preflightConflict?.row ?? existingRow;
+  // Em modo create, converte-se automaticamente em renovação quando há vigente.
+  const willAutoRenew =
+    mode === "create" && !!effectiveExistingRow && !preflightConflict?.sameDates;
+  // Bloqueio pré-Storage: mesmo período detectado pelo preflight.
+  const samePeriodBlock =
+    mode === "create" && !!preflightConflict?.sameDates;
+
   const storageFlow = selectedType?.storageFlow ?? null;
   const flowBlocked = storageFlow === "worker_documents" || storageFlow === "unresolved";
 
@@ -388,8 +406,8 @@ export function SstCertificateDrawer({
     const errs: string[] = [];
     if (!selectedDocumentTypeId) errs.push("Selecione o tipo (NR, ASO ou treinamento).");
     if (selectedType && !selectedType.isActive) errs.push("Tipo selecionado está inativo.");
-    if (mode === "create" && alreadyRegistered) {
-      errs.push("Este tipo já possui uma qualificação vigente. Use Renovar ou Substituir.");
+    if (samePeriodBlock) {
+      errs.push("As datas informadas são idênticas à vigência atual. Use Substituir.");
     }
     if (flowBlocked) {
       // Bloqueado antes de validar arquivo — evita ruído de mensagens.
@@ -407,11 +425,29 @@ export function SstCertificateDrawer({
     }
     return errs;
   }, [
-    file, selectedDocumentTypeId, selectedType, mode, alreadyRegistered, flowBlocked,
+    file, selectedDocumentTypeId, selectedType, mode, samePeriodBlock, flowBlocked,
     issuedAt, expiresAt, hasExpiry, today,
   ]);
 
   const canSubmit = errors.length === 0 && !uploading && !flowBlocked;
+
+  // Preflight autoritativo — consulta a fonte canônica antes de qualquer upload.
+  // Retorna null quando não há vigente para (worker_id, document_type_id).
+  async function preflightCurrent(documentTypeId: string): Promise<SstCurrentRow | null> {
+    const { data, error } = await (supabase as any)
+      .from("worker_sst_qualifications_current")
+      .select("*")
+      .eq("worker_id", workerId)
+      .eq("document_type_id", documentTypeId)
+      .maybeSingle();
+    if (error) {
+      // Não bloquear em erro de leitura — a RPC ainda protege por índice único.
+      // eslint-disable-next-line no-console
+      console.warn("[sst-preflight] falhou:", error);
+      return null;
+    }
+    return (data as SstCurrentRow | null) ?? null;
+  }
 
   const submit = useMutation({
     mutationFn: async (_vars: SubmitVars = { continueAdding: false }) => {
@@ -421,15 +457,41 @@ export function SstCertificateDrawer({
       const validationError = validateUpload(file);
       if (validationError) throw new Error(validationError);
 
-      // 1) Upload
+      // 1) Preflight autoritativo — NUNCA sobe arquivo antes de decidir a operação.
+      let effectiveOperation: "initial" | "renewal" | "correction" =
+        mode === "renew" ? "renewal" :
+        mode === "replace" ? "correction" :
+        "initial";
+      let previousId: string | null =
+        (mode === "renew" || mode === "replace") ? current?.id ?? null : null;
+
+      if (mode === "create") {
+        const pf = await preflightCurrent(selectedType.documentTypeId);
+        if (pf) {
+          const sameDates =
+            (pf.issued_at || "") === issuedAt &&
+            ((pf.expires_at || "") === (hasExpiry ? expiresAt : ""));
+          if (sameDates) {
+            // Bloqueio antes do Storage — preserva arquivo/campos e exige Substituir.
+            setPreflightConflict({ row: pf, sameDates: true });
+            const err = new Error("preflight_same_period");
+            (err as any).preflightRow = pf;
+            throw err;
+          }
+          effectiveOperation = "renewal";
+          previousId = pf.id;
+        }
+      }
+
+      // 2) Upload
       setUploading(true);
       setLastError(null);
       const ext = (file.name.split(".").pop() || "bin").toLowerCase();
       // Timestamp ISO compacto (YYYYMMDDTHHMMSSZ) — legível durante inspeções.
       const stamp = new Date().toISOString().replace(/[-:.]/g, "").replace(/\..+$/, "").slice(0, 15) + "Z";
       const opTag =
-        mode === "renew" ? "renewal" :
-        mode === "replace" ? "replacement" : "initial";
+        effectiveOperation === "renewal" ? "renewal" :
+        effectiveOperation === "correction" ? "replacement" : "initial";
       const path = `sst/${workerId}/${normalized}/${stamp}_${opTag}.${ext}`;
       const { error: upErr } = await supabase.storage
         .from("worker-documents")
@@ -440,12 +502,8 @@ export function SstCertificateDrawer({
       setUploading(false);
       if (upErr) throw new Error(`Falha no upload: ${upErr.message}`);
 
-      // 2) register_sst_revision
-      const operation =
-        mode === "renew" ? "renewal" :
-        mode === "replace" ? "correction" :
-        "initial";
-
+      // 3) register_sst_revision
+      const operation = effectiveOperation;
       const payload: Record<string, unknown> = {
         worker_id: workerId,
         // Q-024-D-TRAINING-FIX §3: identidade canônica pelo UUID. `nr_code` só
@@ -455,10 +513,8 @@ export function SstCertificateDrawer({
         document_type_id: selectedType.documentTypeId,
         ...(selectedType.category === "sst_nr" ? { nr_code: normalized } : {}),
         operation,
-        previous_qualification_id:
-          (mode === "renew" || mode === "replace") ? current?.id ?? null : null,
-        expected_current_qualification_id:
-          (mode === "renew" || mode === "replace") ? current?.id ?? null : null,
+        previous_qualification_id: previousId,
+        expected_current_qualification_id: previousId,
         training_type:
           trainingType === "Outro"
             ? (trainingTypeOther.trim() || null)
@@ -499,21 +555,35 @@ export function SstCertificateDrawer({
             storage_path: path,
           },
         });
-        // rollback do arquivo — evita órfão no bucket
+        // Rollback APENAS do arquivo recém-enviado — nunca toca o vigente.
         await supabase.storage.from("worker-documents").remove([path]).catch(() => {});
-        const err = new Error(String(rpcErr.message || "Falha ao registrar revisão."));
+        // Concorrência: uma vigente apareceu/mudou entre preflight e RPC.
+        // Refaz o preflight para direcionar a ação correta e preserva o arquivo/campos.
+        const rawMsg = String(rpcErr.message || "");
+        const isCurrentConflict =
+          /qualification_current_version_exists|additional_conflicts_with_current|stale_current_qualification/i.test(rawMsg);
+        if (mode === "create" && isCurrentConflict) {
+          const pf2 = await preflightCurrent(selectedType.documentTypeId);
+          if (pf2) {
+            const sameDates2 =
+              (pf2.issued_at || "") === issuedAt &&
+              ((pf2.expires_at || "") === (hasExpiry ? expiresAt : ""));
+            setPreflightConflict({ row: pf2, sameDates: sameDates2 });
+          }
+        }
+        const err = new Error(rawMsg || "Falha ao registrar revisão.");
         (err as any).diagnostic = bundle;
         throw err;
       }
 
-      // 3) reevaluate_worker_links (retorna contagem)
+      // 4) reevaluate_worker_links (retorna contagem)
       const reeval = await (supabase as any).rpc(
         "reevaluate_worker_links",
         { p_worker_id: workerId, p_event_source: "upload" },
       );
       const reevalError = reeval?.error ?? null;
       const linksProcessed = Number(reeval?.data?.links_processed ?? 0);
-      return { normalized, linksProcessed, reevalError };
+      return { normalized, linksProcessed, reevalError, effectiveOperation };
     },
     onSuccess: (res, vars) => {
       // 4) Invalidação de caches — KPIs, tabela, histórico, vínculos, pendências
@@ -526,9 +596,10 @@ export function SstCertificateDrawer({
       qc.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs", workerId] });
 
       const verb =
-        mode === "renew" ? "renovada" :
-        mode === "replace" ? "substituída" :
+        res.effectiveOperation === "renewal" ? "renovada" :
+        res.effectiveOperation === "correction" ? "substituída" :
         "cadastrada";
+      setPreflightConflict(null);
       if (res.reevalError) {
         // Q-024-D-UI-MULTIPLE — reavaliação falhou: NÃO repetir upload nem revisão.
         toast.warning(
@@ -580,6 +651,13 @@ export function SstCertificateDrawer({
     onError: (e: any) => {
       setUploading(false);
       const raw = String(e?.message || "Falha ao registrar certificado.");
+      // Bloqueio pré-Storage: mesmo período — arquivo ainda não foi enviado.
+      if (raw === "preflight_same_period") {
+        setLastError(
+          "As datas informadas são idênticas à vigência atual. Use Substituir para corrigir o certificado vigente.",
+        );
+        return;
+      }
       // Q-024-D-TRAINING-FIX §7: mapear códigos técnicos para texto claro.
       const friendly = mapRpcError(raw, {
         mode,
