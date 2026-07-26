@@ -2966,6 +2966,10 @@ export type Database = {
         Args: { p_event_source?: string; p_worker_id: string }
         Returns: Json
       }
+      register_bank_document_revision: {
+        Args: { p_payload: Json }
+        Returns: Json
+      }
       register_sst_revision: { Args: { payload: Json }; Returns: Json }
       register_worker_document_revision: {
         Args: { p_payload: Json }
