@@ -19,6 +19,15 @@ interface WorkerFilters {
   search: string;
   city?: string;
   state?: string;
+  /**
+   * Filtro informativo para o banco mestre de pessoas. NUNCA usar como
+   * critério de qualidade — pessoa sem vínculo é válida e permanece na
+   * base como profissional disponível.
+   *   ""|undefined => Todos (padrão)
+   *   "available"  => Somente sem vínculo ativo
+   *   "linked"     => Somente com vínculo ativo
+   */
+  linkStatus?: "" | "available" | "linked";
 }
 
 export function useWorkers(filters: WorkerFilters | string, page: number = 0) {
@@ -27,6 +36,21 @@ export function useWorkers(filters: WorkerFilters | string, page: number = 0) {
   return useQuery({
     queryKey: ["workers", normalizedFilters, page],
     queryFn: async () => {
+      // Filtro informativo por vínculo — resolvemos ANTES da query principal
+      // para poder aplicar via .in()/.not().in(). O banco mestre de pessoas
+      // continua íntegro: nenhum worker é excluído; apenas filtramos a
+      // visualização quando o usuário pediu explicitamente.
+      let linkedIds: string[] | null = null;
+      if (normalizedFilters.linkStatus === "available" || normalizedFilters.linkStatus === "linked") {
+        const { data: linkRows, error: linkErr } = await supabase
+          .from("employment_links")
+          .select("worker_id")
+          .eq("status", "active")
+          .is("deleted_at", null);
+        if (linkErr) throw linkErr;
+        linkedIds = Array.from(new Set((linkRows ?? []).map((r: any) => r.worker_id).filter(Boolean)));
+      }
+
       let query = supabase
         .from("workers")
         .select("id, full_name, nickname, cpf, phone_main, city, state, created_at", { count: "exact" })
@@ -51,6 +75,19 @@ export function useWorkers(filters: WorkerFilters | string, page: number = 0) {
       }
       if (state?.trim()) {
         query = query.eq("state", state.trim());
+      }
+
+      if (linkedIds !== null) {
+        if (normalizedFilters.linkStatus === "linked") {
+          if (linkedIds.length === 0) {
+            return { data: [], count: 0, pageSize: PAGE_SIZE };
+          }
+          query = query.in("id", linkedIds);
+        } else if (normalizedFilters.linkStatus === "available") {
+          if (linkedIds.length > 0) {
+            query = query.not("id", "in", `(${linkedIds.join(",")})`);
+          }
+        }
       }
 
       const from = page * PAGE_SIZE;

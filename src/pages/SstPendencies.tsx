@@ -404,7 +404,7 @@ export default function SstPendencies() {
                 const { worker, pendencies } = group;
                 const allocs = allocations.data?.get(worker.worker_id) || [];
                 const allocLabel = allocs.length === 0
-                  ? "Sem vínculo ativo"
+                  ? "Disponível — sem vínculo atual"
                   : allocs.slice(0, 2).map((a) =>
                       `${a.event_name ?? "—"} · ${a.job_role_name ?? "sem cargo"}`
                     ).join("  |  ") + (allocs.length > 2 ? ` +${allocs.length - 2}` : "");
@@ -434,7 +434,7 @@ export default function SstPendencies() {
                       </Tooltip>
                     </div>
                     <div className="text-[11px] text-muted-foreground truncate">
-                      <span className="font-medium text-foreground/70">Vínculos: </span>
+                      <span className="font-medium text-foreground/70">Vínculo atual: </span>
                       {allocations.isLoading ? "carregando…" : allocLabel}
                     </div>
                     <div className="flex flex-wrap gap-2">

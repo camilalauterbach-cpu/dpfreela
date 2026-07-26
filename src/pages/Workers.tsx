@@ -19,19 +19,21 @@ export default function Workers() {
   const [search, setSearch] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
+  const [linkStatus, setLinkStatus] = useState<"" | "available" | "linked">("");
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(0);
-  const { data: result, isLoading } = useWorkers({ search, city, state }, page);
+  const { data: result, isLoading } = useWorkers({ search, city, state, linkStatus }, page);
   const { hasAnyRole } = useAuth();
   const navigate = useNavigate();
   const canCreate = hasAnyRole(["admin", "manager", "operator"]);
 
   const workers = result?.data;
-  const hasActiveFilters = !!city || !!state;
+  const hasActiveFilters = !!city || !!state || !!linkStatus;
 
   const clearFilters = () => {
     setCity("");
     setState("");
+    setLinkStatus("");
     setPage(0);
   };
 
@@ -49,7 +51,7 @@ export default function Workers() {
             <Filter className="mr-1 h-4 w-4" /> Filtros
             {hasActiveFilters && (
               <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center">
-                {[city, state].filter(Boolean).length}
+                {[city, state, linkStatus].filter(Boolean).length}
               </span>
             )}
           </Button>
@@ -88,6 +90,19 @@ export default function Workers() {
               {UF_OPTIONS.map((uf) => (
                 <SelectItem key={uf} value={uf}>{uf}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={linkStatus || "all"}
+            onValueChange={(v) => { setLinkStatus((v === "all" ? "" : v) as "" | "available" | "linked"); setPage(0); }}
+          >
+            <SelectTrigger className="w-full sm:w-[220px]" title="Filtro informativo — pessoa sem vínculo permanece no banco mestre">
+              <SelectValue placeholder="Vínculo atual" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos (padrão)</SelectItem>
+              <SelectItem value="available">Disponíveis — sem vínculo atual</SelectItem>
+              <SelectItem value="linked">Com vínculo atual</SelectItem>
             </SelectContent>
           </Select>
           {hasActiveFilters && (
