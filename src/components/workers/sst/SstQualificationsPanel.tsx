@@ -44,6 +44,43 @@ function fmtDate(iso: string | null) {
   return new Date(iso + "T12:00:00").toLocaleDateString("pt-BR");
 }
 
+async function runStorageCleanup(
+  paths: string[],
+  jobIds: string[],
+  traceId: string,
+): Promise<{ requested: number; completed: number; failed: number; error?: string }> {
+  if (paths.length === 0) return { requested: 0, completed: 0, failed: 0 };
+  let error: string | undefined;
+  let rmErr: { message: string } | null = null;
+  try {
+    const res = await supabase.storage.from("worker-documents").remove(paths);
+    rmErr = res.error ?? null;
+  } catch (e: any) {
+    rmErr = { message: String(e?.message || e) };
+  }
+  if (rmErr) {
+    error = rmErr.message;
+    // eslint-disable-next-line no-console
+    console.warn("[sst-hard-delete] storage_cleanup_failed", { traceId, error, jobIds });
+  }
+  let completed = 0, failed = 0;
+  await Promise.all(
+    jobIds.map(async (id) => {
+      const { error: mkErr } = await (supabase as any).rpc("mark_storage_cleanup_job_status", {
+        p_id: id,
+        p_status: rmErr ? "failed" : "completed",
+        p_error: rmErr ? rmErr.message : null,
+      });
+      if (mkErr) {
+        // eslint-disable-next-line no-console
+        console.warn("[sst-hard-delete] mark_job_failed", { traceId, id, error: mkErr.message });
+      }
+      if (rmErr) failed += 1; else completed += 1;
+    }),
+  );
+  return { requested: paths.length, completed, failed, error };
+}
+
 function KpiCard({
   label, value, tone, testId,
 }: { label: string; value: number; tone: string; testId?: string }) {
