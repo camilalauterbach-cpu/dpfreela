@@ -1817,6 +1817,51 @@ export type Database = {
           },
         ]
       }
+      worker_document_revision_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          details: Json
+          document_type_id: string
+          event: string
+          id: string
+          idempotency_key: string | null
+          occurred_at: string
+          revision_id: string | null
+          status: string
+          trace_id: string | null
+          worker_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          document_type_id: string
+          event: string
+          id?: string
+          idempotency_key?: string | null
+          occurred_at?: string
+          revision_id?: string | null
+          status?: string
+          trace_id?: string | null
+          worker_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          document_type_id?: string
+          event?: string
+          id?: string
+          idempotency_key?: string | null
+          occurred_at?: string
+          revision_id?: string | null
+          status?: string
+          trace_id?: string | null
+          worker_id?: string
+        }
+        Relationships: []
+      }
       worker_documents: {
         Row: {
           category: string | null
@@ -2941,6 +2986,10 @@ export type Database = {
           p_previous_overall?: string
         }
         Returns: undefined
+      }
+      log_worker_document_revision_event: {
+        Args: { p_payload: Json }
+        Returns: string
       }
       merge_workers: {
         Args: { _confirmation: string; _primary: string; _secondary: string }
