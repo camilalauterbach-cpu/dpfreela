@@ -3,14 +3,13 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import { UpdateGate } from "@/components/UpdateGate";
 import type { Controller, VersionState } from "@/lib/version-check";
 
-function makeCtrl(initial: VersionState): Controller & {
-  emit: (s: VersionState) => void;
-  updateCalls: number;
-} {
+type TestCtrl = Controller & { emit: (s: VersionState) => void; updateCalls: number };
+
+function makeCtrl(initial: VersionState): TestCtrl {
   let state = initial;
   const listeners = new Set<(s: VersionState) => void>();
   let updateCalls = 0;
-  const ctrl = {
+  const ctrl: any = {
     getState: () => state,
     subscribe(l: (s: VersionState) => void) {
       listeners.add(l);
@@ -26,13 +25,13 @@ function makeCtrl(initial: VersionState): Controller & {
       state = { kind: "stale", remote };
       listeners.forEach((l) => l(state));
     },
-  } as Controller & { emit: (s: VersionState) => void; updateCalls: number };
-  (ctrl as any).emit = (s: VersionState) => {
+  };
+  ctrl.emit = (s: VersionState) => {
     state = s;
     listeners.forEach((l) => l(s));
   };
   Object.defineProperty(ctrl, "updateCalls", { get: () => updateCalls });
-  return ctrl;
+  return ctrl as TestCtrl;
 }
 
 beforeEach(() => {
