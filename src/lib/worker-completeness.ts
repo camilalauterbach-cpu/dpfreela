@@ -1,4 +1,12 @@
-// DP-readiness logic for workers
+// DP-readiness logic for workers.
+//
+// IMPORTANT — Canonical source of document completeness:
+// The **only** source of truth for "cadastro completo" is the SQL RPC
+// `public.evaluate_worker_registration_completion(worker_id)`, which reads
+// `document_types.completion_requirement = 'required'` and applies
+// `document_is_valid_for_completion` to the current worker_document revision.
+// The doc-category arrays below are kept ONLY as presentational grouping and
+// label fallbacks. They MUST NOT drive completeness decisions.
 
 export const REQUIRED_FIELDS = [
   "full_name", "nickname", "cpf", "birth_date", "gender", "race_color",
@@ -11,10 +19,13 @@ export const RECOMMENDED_FIELDS = [
   "ctps_number", "ctps_series", "ctps_state", "email",
 ] as const;
 
+/** @deprecated Presentational grouping only — not the source of required truth.
+ *  Use `document_types.completion_requirement === 'required'` from the DB. */
 export const REQUIRED_DOC_CATEGORIES = [
   "cpf", "rg", "proof_of_address", "photo", "bank_document",
 ] as const;
 
+/** @deprecated Presentational grouping only — see note on REQUIRED_DOC_CATEGORIES. */
 export const CONDITIONAL_DOC_CATEGORIES = [
   "ctps", "nis_pis_proof", "voter_id", "military_service", "cnh", "aso", "outros",
 ] as const;
@@ -66,28 +77,10 @@ export function computeFieldCompleteness(worker: Record<string, any>) {
   };
 }
 
-export function computeDocCompleteness(docs: Array<{ category: string | null; status: string }>) {
-  const approvedCategories = new Set(
-    docs.filter((d) => d.status === "approved").map((d) => d.category)
-  );
-  const approvedRequired = REQUIRED_DOC_CATEGORIES.filter((c) => approvedCategories.has(c));
-  const missingRequired = REQUIRED_DOC_CATEGORIES.filter((c) => !approvedCategories.has(c));
-
-  return {
-    requiredTotal: REQUIRED_DOC_CATEGORIES.length,
-    requiredApproved: approvedRequired.length,
-    missingRequired,
-  };
-}
-
-export function isDpReady(
-  worker: Record<string, any>,
-  docs: Array<{ category: string | null; status: string }>
-) {
-  const fields = computeFieldCompleteness(worker);
-  const docStatus = computeDocCompleteness(docs);
-  return fields.missingRequired.length === 0 && docStatus.missingRequired.length === 0;
-}
+// NOTE: `computeDocCompleteness` and `isDpReady` were removed.
+// Consumers must now call the canonical RPC via the
+// `useWorkerCompletion(workerId)` hook (see `src/hooks/useWorkerCompletion.ts`)
+// and combine it with `computeFieldCompleteness(worker)`.
 
 export const FIELD_LABELS: Record<string, string> = {
   full_name: "Nome completo",
