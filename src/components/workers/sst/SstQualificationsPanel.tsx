@@ -386,6 +386,7 @@ interface RowProps {
   onLinks: () => void;
   onTimeline: () => void;
   onManageInDocuments: () => void;
+  onEditValidity?: () => void;
   onDelete?: () => void;
 }
 
@@ -406,7 +407,7 @@ function categoryLabel(c: UnifiedQualificationRow["category"]): string {
   return c;
 }
 
-function QualRow({ q, canEdit, onUpload, onRenew, onReplace, onHistory, onLinks, onTimeline, onManageInDocuments, onDelete }: RowProps) {
+function QualRow({ q, canEdit, onUpload, onRenew, onReplace, onHistory, onLinks, onTimeline, onManageInDocuments, onEditValidity, onDelete }: RowProps) {
   const status = statusToBadge(q.status);
   const days = daysUntil(q.expiresAt);
   const hasCert = !!q.documentUrl;
@@ -455,15 +456,27 @@ function QualRow({ q, canEdit, onUpload, onRenew, onReplace, onHistory, onLinks,
       </TableCell>
       <TableCell className="text-right">
         {isDocFlow ? (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onManageInDocuments}
-            data-testid="manage-in-documents"
-          >
-            <FolderOpen className="mr-1 h-3 w-3" />
-            Gerenciar na aba Documentos
-          </Button>
+          <div className="flex items-center justify-end gap-1 flex-wrap">
+            {onEditValidity && (
+              <Button
+                size="sm"
+                variant="default"
+                onClick={onEditValidity}
+                data-testid="edit-aso-validity"
+              >
+                Corrigir validade
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onManageInDocuments}
+              data-testid="manage-in-documents"
+            >
+              <FolderOpen className="mr-1 h-3 w-3" />
+              Documentos
+            </Button>
+          </div>
         ) : (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
