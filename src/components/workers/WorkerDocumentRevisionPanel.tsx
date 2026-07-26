@@ -293,6 +293,69 @@ export function WorkerDocumentRevisionPanel({ workerId, documentTypeId, onClose 
               <Label htmlFor="wdrp-notes" className="text-xs">Observações</Label>
               <Textarea id="wdrp-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="mt-1" />
             </div>
+            {/* Estado da tentativa atual — visível quando há attempt persistido
+                (retry pendente) ou desfecho recente (sucesso/erro). */}
+            {(persistedAttempt || lastOutcome) && (
+              <div
+                className={
+                  "rounded-md border p-3 text-xs " +
+                  (lastOutcome?.kind === "success"
+                    ? "border-green-200 bg-green-50 text-green-800"
+                    : lastOutcome?.kind === "error"
+                    ? "border-destructive/40 bg-destructive/5 text-destructive"
+                    : "border-amber-200 bg-amber-50 text-amber-800")
+                }
+                data-testid="wdrp-attempt-status"
+              >
+                <div className="flex items-center gap-2 font-medium">
+                  {lastOutcome?.kind === "success" ? (
+                    <>
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {lastOutcome.idempotentHit
+                        ? "Já registrada anteriormente (idempotente)"
+                        : "Revisão registrada"}
+                    </>
+                  ) : lastOutcome?.kind === "error" ? (
+                    <>
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      Falha
+                      {lastOutcome.phase === "storage_upload"
+                        ? " no envio do arquivo"
+                        : lastOutcome.phase === "db_registration"
+                        ? " ao registrar no banco"
+                        : ""}
+                    </>
+                  ) : (
+                    <>
+                      <RotateCw className="h-3.5 w-3.5" />
+                      Tentativa pendente — reenvio disponível
+                    </>
+                  )}
+                </div>
+                <div className="mt-1 space-y-0.5 text-[11px] opacity-90">
+                  {lastOutcome && (
+                    <div>
+                      Tentativas: {lastOutcome.attempts}
+                      {lastOutcome.replay ? " · reenvio" : ""}
+                    </div>
+                  )}
+                  {(lastOutcome?.idempotencyKey || persistedAttempt?.idempotencyKey) && (
+                    <div className="font-mono">
+                      Chave: {(lastOutcome?.idempotencyKey ?? persistedAttempt?.idempotencyKey ?? "").slice(0, 8)}…
+                    </div>
+                  )}
+                  {lastOutcome?.kind === "error" && lastOutcome.message && (
+                    <div className="mt-1 break-words">{lastOutcome.message}</div>
+                  )}
+                  {!lastOutcome && persistedAttempt && (
+                    <div>
+                      A próxima tentativa reusa o mesmo arquivo já enviado e a mesma chave —
+                      sem duplicar registros nem gerar arquivos órfãos.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
@@ -306,13 +369,18 @@ export function WorkerDocumentRevisionPanel({ workerId, documentTypeId, onClose 
                 size="sm"
                 onClick={() => submit.mutate()}
                 disabled={!file || submit.isPending}
+                data-testid="wdrp-submit-button"
               >
                 {submit.isPending ? (
                   <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                ) : persistedAttempt || lastOutcome?.kind === "error" ? (
+                  <RotateCw className="mr-1 h-3 w-3" />
                 ) : (
                   <Upload className="mr-1 h-3 w-3" />
                 )}
-                Registrar revisão
+                {persistedAttempt || lastOutcome?.kind === "error"
+                  ? "Reenviar"
+                  : "Registrar revisão"}
               </Button>
             </div>
           </div>
