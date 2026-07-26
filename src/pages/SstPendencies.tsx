@@ -434,7 +434,7 @@ export default function SstPendencies() {
                       </Tooltip>
                     </div>
                     <div className="text-[11px] text-muted-foreground truncate">
-                      <span className="font-medium text-foreground/70">Vínculos: </span>
+                      <span className="font-medium text-foreground/70">Vínculo atual: </span>
                       {allocations.isLoading ? "carregando…" : allocLabel}
                     </div>
                     <div className="flex flex-wrap gap-2">
