@@ -492,9 +492,24 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     input.accept = "image/*,.pdf";
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
+      const missing: string[] = [];
+      if (!file) missing.push("Arquivo");
+      if (missing.length > 0) {
+        toast({
+          title: "Campos obrigatórios ausentes",
+          description: `Preencha antes de enviar: ${missing.join(", ")}.`,
+          variant: "destructive",
+        });
+        return;
+      }
       if (file) {
-        if (file.size > 10 * 1024 * 1024) {
-          toast({ title: "Arquivo muito grande", description: "Máximo 10MB", variant: "destructive" });
+        const validationError = validateUpload(file);
+        if (validationError) {
+          toast({
+            title: "Arquivo inválido",
+            description: validationError,
+            variant: "destructive",
+          });
           return;
         }
         const docType = resolveTypeForCategory(category);
