@@ -404,7 +404,7 @@ export default function SstPendencies() {
                 const { worker, pendencies } = group;
                 const allocs = allocations.data?.get(worker.worker_id) || [];
                 const allocLabel = allocs.length === 0
-                  ? "Sem vínculo ativo"
+                  ? "Disponível — sem vínculo atual"
                   : allocs.slice(0, 2).map((a) =>
                       `${a.event_name ?? "—"} · ${a.job_role_name ?? "sem cargo"}`
                     ).join("  |  ") + (allocs.length > 2 ? ` +${allocs.length - 2}` : "");
