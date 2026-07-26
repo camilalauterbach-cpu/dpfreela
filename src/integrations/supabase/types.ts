@@ -2781,6 +2781,17 @@ export type Database = {
         Returns: Json
       }
       compute_compliance_state_hash: { Args: { p_eval: Json }; Returns: string }
+      correct_worker_document_validity: {
+        Args: {
+          p_document_id: string
+          p_expected_current_id: string
+          p_expiry_date: string
+          p_issue_date: string
+          p_reason?: string
+          p_trace_id?: string
+        }
+        Returns: Json
+      }
       create_invite_record: {
         Args: {
           _acting_user_id: string

@@ -33,6 +33,7 @@ import { SstHistorySheet } from "./SstHistorySheet";
 import { SstLinksUsingSheet } from "./SstLinksUsingSheet";
 import { SstNrTimeline } from "./SstNrTimeline";
 import { SstCertificateDrawer, type SstDrawerMode } from "./SstCertificateDrawer";
+import { AsoValidityDialog } from "./AsoValidityDialog";
 import { openCertificate } from "@/lib/sst/certificate-url";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { invalidateSstCaches } from "@/hooks/useSstQualifications";
@@ -83,6 +84,16 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
   >(null);
   const [deleteTarget, setDeleteTarget] = useState<
     { id: string; code: string; issuedAt: string | null } | null
+  >(null);
+  const [asoValidity, setAsoValidity] = useState<
+    | {
+        documentId: string;
+        documentTypeId: string;
+        code: string;
+        issuedAt: string | null;
+        expiresAt: string | null;
+      }
+    | null
   >(null);
 
   const deleteMut = useMutation({
@@ -160,6 +171,16 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
 
   const openManageInDocuments = (documentTypeId: string) =>
     navigate(`/workers/${workerId}?tab=documentos&document_type_id=${documentTypeId}`);
+
+  const openAsoValidity = (q: UnifiedQualificationRow) => {
+    setAsoValidity({
+      documentId: q.id,
+      documentTypeId: q.documentTypeId,
+      code: q.code,
+      issuedAt: q.issuedAt,
+      expiresAt: q.expiresAt,
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -245,6 +266,11 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
                     onLinks={() => setLinksOpen({ nr: q.code, docTypeId: q.documentTypeId })}
                     onTimeline={() => setTimelineOpen({ nr: q.code, docTypeId: q.documentTypeId })}
                     onManageInDocuments={() => openManageInDocuments(q.documentTypeId)}
+                    onEditValidity={
+                      q.category === "sst_aso" && q.storageFlow === "worker_documents" && canEdit
+                        ? () => openAsoValidity(q)
+                        : undefined
+                    }
                     onDelete={
                       canDelete && q.source === "sst" && q.sstRaw
                         ? () =>
@@ -313,6 +339,23 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
           }}
         />
       )}
+      {asoValidity && (
+        <AsoValidityDialog
+          open={!!asoValidity}
+          onOpenChange={(v) => !v && setAsoValidity(null)}
+          workerId={workerId}
+          documentId={asoValidity.documentId}
+          documentTypeId={asoValidity.documentTypeId}
+          documentCode={asoValidity.code}
+          currentIssuedAt={asoValidity.issuedAt}
+          currentExpiresAt={asoValidity.expiresAt}
+          onManageInDocuments={() => {
+            const dtId = asoValidity.documentTypeId;
+            setAsoValidity(null);
+            openManageInDocuments(dtId);
+          }}
+        />
+      )}
       <DeleteConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(v) => !v && setDeleteTarget(null)}
@@ -343,6 +386,7 @@ interface RowProps {
   onLinks: () => void;
   onTimeline: () => void;
   onManageInDocuments: () => void;
+  onEditValidity?: () => void;
   onDelete?: () => void;
 }
 
@@ -363,7 +407,7 @@ function categoryLabel(c: UnifiedQualificationRow["category"]): string {
   return c;
 }
 
-function QualRow({ q, canEdit, onUpload, onRenew, onReplace, onHistory, onLinks, onTimeline, onManageInDocuments, onDelete }: RowProps) {
+function QualRow({ q, canEdit, onUpload, onRenew, onReplace, onHistory, onLinks, onTimeline, onManageInDocuments, onEditValidity, onDelete }: RowProps) {
   const status = statusToBadge(q.status);
   const days = daysUntil(q.expiresAt);
   const hasCert = !!q.documentUrl;
@@ -412,15 +456,27 @@ function QualRow({ q, canEdit, onUpload, onRenew, onReplace, onHistory, onLinks,
       </TableCell>
       <TableCell className="text-right">
         {isDocFlow ? (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onManageInDocuments}
-            data-testid="manage-in-documents"
-          >
-            <FolderOpen className="mr-1 h-3 w-3" />
-            Gerenciar na aba Documentos
-          </Button>
+          <div className="flex items-center justify-end gap-1 flex-wrap">
+            {onEditValidity && (
+              <Button
+                size="sm"
+                variant="default"
+                onClick={onEditValidity}
+                data-testid="edit-aso-validity"
+              >
+                Corrigir validade
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onManageInDocuments}
+              data-testid="manage-in-documents"
+            >
+              <FolderOpen className="mr-1 h-3 w-3" />
+              Documentos
+            </Button>
+          </div>
         ) : (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
