@@ -20,6 +20,8 @@ import { Loader2, Upload, FileText, Eye, X } from "lucide-react";
 import { useWorkerQualificationTypes } from "@/hooks/useWorkerQualificationTypes";
 import { validateUpload, getSafeContentType } from "@/lib/upload-validation";
 import { invalidateComplianceCaches } from "@/lib/compliance-cache";
+import { formatSupabaseErrorForUser } from "@/lib/format-error";
+import { registerWorkerDocumentRevision } from "@/lib/worker-document-revisions";
 
 interface Props {
   workerId: string;
@@ -88,29 +90,28 @@ export function WorkerDocumentRevisionPanel({ workerId, documentTypeId, onClose 
         .upload(path, file, { upsert: false, contentType: getSafeContentType(file) });
       if (upErr) throw upErr;
 
-      const { data, error } = await (supabase as any).rpc(
-        "register_worker_document_revision",
-        {
-          p_worker_id: workerId,
-          p_document_type_id: documentTypeId,
-          p_file_path: path,
-          p_file_name: file.name,
-          p_file_size: file.size,
-          p_mime_type: file.type,
-          p_issue_date: issueDate || null,
-          p_expiry_date: expiryDate || null,
-          p_document_number: documentNumber || null,
-          p_issuing_authority: issuingAuthority || null,
-          p_notes: notes || null,
-          p_status: "approved",
-        },
-      );
-      if (error) {
+      try {
+        const data = await registerWorkerDocumentRevision(supabase as any, {
+          workerId,
+          documentTypeId,
+          currentDocumentId: current?.id ?? null,
+          filePath: path,
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: getSafeContentType(file),
+          issuedAt: issueDate || null,
+          explicitExpiresAt: expiryDate || null,
+          documentNumber: documentNumber || null,
+          issuingAuthority: issuingAuthority || null,
+          notes: notes || null,
+          status: "approved",
+        });
+        return data;
+      } catch (error) {
         // rollback storage on RPC failure
         await supabase.storage.from("worker-documents").remove([path]).catch(() => {});
         throw error;
       }
-      return data;
     },
     onSuccess: async () => {
       toast({ title: "Revisão registrada" });
@@ -118,6 +119,7 @@ export function WorkerDocumentRevisionPanel({ workerId, documentTypeId, onClose 
       await queryClient.invalidateQueries({ queryKey: ["worker-doc-revisions", workerId, documentTypeId] });
       await queryClient.invalidateQueries({ queryKey: ["worker-documents", workerId] });
       await queryClient.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs", workerId] });
+      await queryClient.invalidateQueries({ queryKey: ["worker-completion", workerId] });
       invalidateComplianceCaches(queryClient, { workerId, eventSource: "upload" });
       // best-effort reevaluation with retry
       try {
@@ -127,7 +129,7 @@ export function WorkerDocumentRevisionPanel({ workerId, documentTypeId, onClose 
       }
     },
     onError: (err: any) => {
-      const msg = err?.message || String(err);
+      const msg = formatSupabaseErrorForUser(err);
       toast({ title: "Erro ao registrar revisão", description: msg, variant: "destructive" });
     },
   });

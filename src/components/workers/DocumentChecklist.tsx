@@ -28,6 +28,8 @@ import { BankDataForm } from "./BankDataForm";
 import { validateUpload, ALLOWED_FILE_EXTENSIONS, getSafeContentType } from "@/lib/upload-validation";
 import { invalidateComplianceCaches } from "@/lib/compliance-cache";
 import { WorkerDocumentRevisionPanel } from "./WorkerDocumentRevisionPanel";
+import { formatSupabaseErrorForUser } from "@/lib/format-error";
+import { registerWorkerDocumentRevision } from "@/lib/worker-document-revisions";
 
 interface Props {
   workerId: string;
@@ -117,7 +119,41 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
 
   // Extra files attached to a worker document (e.g. RG front + back within a
   // single canonical `rg` row). Keyed by worker_document_id → files[].
-  const rgDoc = docs?.find((d) => d.category === "rg" || (d as any).document_type === "rg");
+  const sortDocsByCurrentRevision = (rows: any[] = []) => {
+    return [...rows].sort((a, b) => {
+      const aCurrent = a.revision_managed && a.is_current ? 1 : 0;
+      const bCurrent = b.revision_managed && b.is_current ? 1 : 0;
+      if (aCurrent !== bCurrent) return bCurrent - aCurrent;
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    });
+  };
+
+  const getDocForCategory = (category: string) => {
+    const docType = resolveTypeForCategory(category);
+    const candidates = sortDocsByCurrentRevision(docs ?? []).filter((d: any) => {
+      if (docType?.id && d.document_type_id === docType.id) return true;
+      return d.category === category || d.document_type === category;
+    });
+    return candidates[0] ?? null;
+  };
+
+  const getDocsForCategory = (category: string) => {
+    const docType = resolveTypeForCategory(category);
+    return sortDocsByCurrentRevision(docs ?? []).filter((d: any) => {
+      if (docType?.id && d.document_type_id === docType.id) return true;
+      return d.category === category || d.document_type === category;
+    });
+  };
+
+  const getCurrentManagedDocForCategory = (category: string) => {
+    const docType = resolveTypeForCategory(category);
+    if (!docType?.id) return null;
+    return sortDocsByCurrentRevision(docs ?? []).find((d: any) =>
+      d.document_type_id === docType.id && d.revision_managed && d.is_current,
+    ) ?? null;
+  };
+
+  const rgDoc = getDocForCategory("rg");
   const { data: rgFiles } = useQuery({
     enabled: !!rgDoc?.id,
     queryKey: ["worker-document-files", rgDoc?.id],
@@ -156,7 +192,11 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
       position: nextPos,
       origin: "attachment",
     });
-    if (error) { toast({ title: "Erro ao anexar", description: error.message, variant: "destructive" }); return; }
+    if (error) {
+      await supabase.storage.from("worker-documents").remove([path]).catch(() => {});
+      toast({ title: "Erro ao anexar", description: formatSupabaseErrorForUser(error), variant: "destructive" });
+      return;
+    }
     queryClient.invalidateQueries({ queryKey: ["worker-document-files", rgDoc.id] });
     toast({ title: "Arquivo anexado ao RG" });
   };
@@ -235,9 +275,9 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
       const docType = resolveTypeForCategory(category);
       const documentTypeId = docType?.id ?? null;
 
-      // Worker-scoped canonical types (currently: ASO / exame toxicológico) go
-      // through register_worker_document_revision. The RPC invalidates the
-      // previous current revision, inserts the new one and emits audit.
+      // Worker-scoped canonical types go through register_worker_document_revision.
+      // The RPC locks (worker_id + document_type_id), invalidates the previous
+      // current revision, inserts the new current row and emits audit.
       const useCanonicalRpc = !!docType && docType.storage_scope === "worker" && !!documentTypeId;
 
       const { error: uploadErr } = await supabase.storage
@@ -246,19 +286,19 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
       if (uploadErr) throw uploadErr;
 
       if (useCanonicalRpc) {
-        const { error: rpcErr } = await (supabase as any).rpc(
-          "register_worker_document_revision",
-          {
-            p_worker_id: workerId,
-            p_document_type_id: documentTypeId,
-            p_file_path: path,
-            p_file_name: file.name,
-            p_file_size: file.size,
-            p_mime_type: file.type,
-            p_status: "uploaded",
-          },
-        );
-        if (rpcErr) {
+        const currentDoc = getCurrentManagedDocForCategory(category);
+        try {
+          await registerWorkerDocumentRevision(supabase as any, {
+            workerId,
+            documentTypeId,
+            currentDocumentId: currentDoc?.id ?? null,
+            filePath: path,
+            fileName: file.name,
+            fileSize: file.size,
+            mimeType: getSafeContentType(file),
+            status: "uploaded",
+          });
+        } catch (rpcErr) {
           await supabase.storage.from("worker-documents").remove([path]).catch(() => {});
           throw rpcErr;
         }
@@ -290,7 +330,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
         return;
       }
 
-      const existing = docs?.find((d) => d.category === category);
+      const existing = getDocForCategory(category);
       if (existing) {
         const { error } = await supabase
           .from("worker_documents")
@@ -334,7 +374,8 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
       toast({ title: "Documento enviado" });
     },
     onError: (err: any) => {
-      toast({ title: "Erro ao enviar", description: err.message, variant: "destructive" });
+      setUploadingCategory(null);
+      toast({ title: "Erro ao enviar", description: formatSupabaseErrorForUser(err), variant: "destructive" });
     },
   });
 
@@ -414,7 +455,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
   };
 
   // Bank document actions with coexistence/replace dialog
-  const bankDocs = docs?.filter((d) => d.category === "bank_document") || [];
+  const bankDocs = getDocsForCategory("bank_document");
   const hasBankDocs = bankDocs.length > 0;
 
   const handleBankUpload = () => {
@@ -452,7 +493,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     // bank_document has its own dedicated section
     if (category === "bank_document") return null;
 
-    const doc = docs?.find((d) => d.category === category);
+    const doc = getDocForCategory(category);
     const status = doc?.status || "pending";
     const isRg = category === "rg";
     const attachments = isRg ? (rgFiles ?? []) : [];
@@ -742,7 +783,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
 
   // Render "Outros" section with multiple files
   const renderOutrosSection = () => {
-    const outrosDocs = docs?.filter((d) => d.category === "outros") || [];
+    const outrosDocs = getDocsForCategory("outros");
 
     return (
       <Card className="overflow-hidden">
