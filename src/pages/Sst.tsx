@@ -223,8 +223,6 @@ export default function Sst() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      </div>
       {(partitioned.test.length > 0 || isAdmin) && (
         <div className="flex flex-wrap items-center gap-2 text-xs -mt-1">
           {partitioned.test.length > 0 && (
@@ -239,6 +237,7 @@ export default function Sst() {
                 id="sst-toggle-test-data"
                 checked={includeTest}
                 onCheckedChange={(v) => setIncludeTest(Boolean(v))}
+                data-testid="sst-toggle-test-data"
               />
               <Label htmlFor="sst-toggle-test-data" className="text-xs">
                 Incluir dados de teste
@@ -247,7 +246,7 @@ export default function Sst() {
           )}
         </div>
       )}
-      <div className="hidden">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {cards.map((c) => (
           <button key={c.label} onClick={c.onClick} className="text-left">
             <Card className="hover:border-primary/30 hover:shadow-sm transition">
