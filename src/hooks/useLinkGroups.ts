@@ -217,6 +217,12 @@ export function useAllocateWorker() {
       queryClient.invalidateQueries({ queryKey: ["sst-summary"] });
       queryClient.invalidateQueries({ queryKey: ["sst-alert-counts"] });
       queryClient.invalidateQueries({ queryKey: ["sst-pendencies"] });
+      // Q-026: Matriz de qualificações depende de resolve_worker_operational_contexts.
+      // Ao trocar cargo/vínculo, refazer imediatamente para não manter falso
+      // "Contexto pendente" servido do cache.
+      queryClient.invalidateQueries({ queryKey: ["worker-qualifications"] });
+      queryClient.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs"] });
+      queryClient.invalidateQueries({ queryKey: ["worker-operational-contexts"] });
       INVALIDATE_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
       // Q-020 hotfix: força reavaliação SST imediatamente após alocar,
       // para que o Controle SST reconheça o vínculo formal correspondente.
