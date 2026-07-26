@@ -78,7 +78,7 @@ describe("AsoValidityDialog", () => {
   });
 
   it("mapeia erro stale_current_document para mensagem clara", async () => {
-    rpcMock.mockResolvedValueOnce({
+    rpcMock.mockResolvedValue({
       data: null,
       error: { message: "stale_current_document" },
     });
