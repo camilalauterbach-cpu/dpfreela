@@ -33,6 +33,26 @@ import { WorkerDocumentRevisionPanel } from "./WorkerDocumentRevisionPanel";
 import { formatSupabaseErrorForUser } from "@/lib/format-error";
 import { registerWorkerDocumentRevision } from "@/lib/worker-document-revisions";
 
+// Marca a fase em que o envio falhou para que o toast diferencie claramente
+// "não subiu o arquivo" (Storage) de "arquivo subiu mas não foi registrado"
+// (banco de dados / RPC). Também usamos para pré-validações.
+type UploadStage = "validation" | "storage_upload" | "db_registration";
+class UploadStageError extends Error {
+  stage: UploadStage;
+  cause?: unknown;
+  constructor(stage: UploadStage, message: string, cause?: unknown) {
+    super(message);
+    this.stage = stage;
+    this.cause = cause;
+  }
+}
+
+const STAGE_TITLES: Record<UploadStage, string> = {
+  validation: "Não foi possível iniciar o envio",
+  storage_upload: "Falha ao enviar o arquivo",
+  db_registration: "Arquivo enviado, mas não foi registrado",
+};
+
 interface Props {
   workerId: string;
   workerName?: string;
@@ -290,7 +310,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
       explicitExpiresAt?: string | null;
     }) => {
       const validationError = validateUpload(file);
-      if (validationError) throw new Error(validationError);
+      if (validationError) throw new UploadStageError("validation", validationError);
       const ext = file.name.split(".").pop();
       const path = `${workerId}/${category}/${Date.now()}.${ext}`;
 
@@ -305,7 +325,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
       const { error: uploadErr } = await supabase.storage
         .from("worker-documents")
         .upload(path, file, { upsert: !useCanonicalRpc, contentType: getSafeContentType(file) });
-      if (uploadErr) throw uploadErr;
+      if (uploadErr) throw new UploadStageError("storage_upload", uploadErr.message || "Falha no upload para o Storage.", uploadErr);
 
       if (useCanonicalRpc) {
         const currentDoc = getCurrentManagedDocForCategory(category);
@@ -324,7 +344,11 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
           });
         } catch (rpcErr) {
           await supabase.storage.from("worker-documents").remove([path]).catch(() => {});
-          throw rpcErr;
+          throw new UploadStageError(
+            "db_registration",
+            (rpcErr as any)?.message || "Falha ao registrar a revisão do documento.",
+            rpcErr,
+          );
         }
         return;
       }
@@ -350,7 +374,10 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
             mime_type: file.type,
             status: "uploaded",
           });
-        if (error) { await cleanupOnFail(); throw error; }
+        if (error) {
+          await cleanupOnFail();
+          throw new UploadStageError("db_registration", error.message || "Falha ao inserir o registro no banco.", error);
+        }
         return;
       }
 
@@ -368,7 +395,10 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
             updated_at: new Date().toISOString(),
           })
           .eq("id", existing.id);
-        if (error) { await cleanupOnFail(); throw error; }
+        if (error) {
+          await cleanupOnFail();
+          throw new UploadStageError("db_registration", error.message || "Falha ao atualizar o registro no banco.", error);
+        }
       } else {
         const { error } = await supabase
           .from("worker_documents")
@@ -383,7 +413,10 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
             mime_type: file.type,
             status: "uploaded",
           });
-        if (error) { await cleanupOnFail(); throw error; }
+        if (error) {
+          await cleanupOnFail();
+          throw new UploadStageError("db_registration", error.message || "Falha ao inserir o registro no banco.", error);
+        }
       }
     },
     onSuccess: () => {
@@ -399,7 +432,20 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     },
     onError: (err: any) => {
       setUploadingCategory(null);
-      toast({ title: "Erro ao enviar", description: formatSupabaseErrorForUser(err), variant: "destructive" });
+      const stage: UploadStage = err instanceof UploadStageError ? err.stage : "storage_upload";
+      const rawCause = err instanceof UploadStageError ? err.cause ?? err : err;
+      const detail = formatSupabaseErrorForUser(rawCause);
+      const hint =
+        stage === "storage_upload"
+          ? "O arquivo não chegou ao servidor. Verifique sua conexão e tente novamente."
+          : stage === "db_registration"
+          ? "O arquivo chegou ao servidor, mas o registro não foi salvo. O arquivo foi descartado; envie novamente."
+          : "Revise os campos obrigatórios antes de continuar.";
+      toast({
+        title: STAGE_TITLES[stage],
+        description: `${hint} Detalhes: ${detail}`,
+        variant: "destructive",
+      });
     },
   });
 
@@ -446,9 +492,24 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     input.accept = "image/*,.pdf";
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
+      const missing: string[] = [];
+      if (!file) missing.push("Arquivo");
+      if (missing.length > 0) {
+        toast({
+          title: "Campos obrigatórios ausentes",
+          description: `Preencha antes de enviar: ${missing.join(", ")}.`,
+          variant: "destructive",
+        });
+        return;
+      }
       if (file) {
-        if (file.size > 10 * 1024 * 1024) {
-          toast({ title: "Arquivo muito grande", description: "Máximo 10MB", variant: "destructive" });
+        const validationError = validateUpload(file);
+        if (validationError) {
+          toast({
+            title: "Arquivo inválido",
+            description: validationError,
+            variant: "destructive",
+          });
           return;
         }
         const docType = resolveTypeForCategory(category);
@@ -1065,9 +1126,21 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
                 Cancelar
               </Button>
               <Button
-                disabled={!pendingIssuedAt || (pendingDatedUpload?.requiresExplicitExpiry && !pendingExplicitExpiresAt)}
                 onClick={() => {
                   if (!pendingDatedUpload) return;
+                  const missing: string[] = [];
+                  if (!pendingIssuedAt) missing.push("Data de emissão/realização");
+                  if (pendingDatedUpload.requiresExplicitExpiry && !pendingExplicitExpiresAt) {
+                    missing.push("Data de validade");
+                  }
+                  if (missing.length > 0) {
+                    toast({
+                      title: "Campos obrigatórios ausentes",
+                      description: `Preencha antes de enviar: ${missing.join(", ")}.`,
+                      variant: "destructive",
+                    });
+                    return;
+                  }
                   uploadMutation.mutate({
                     category: pendingDatedUpload.category,
                     file: pendingDatedUpload.file,
