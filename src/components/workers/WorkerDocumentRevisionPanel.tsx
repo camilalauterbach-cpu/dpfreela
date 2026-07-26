@@ -22,6 +22,8 @@ import { validateUpload, getSafeContentType } from "@/lib/upload-validation";
 import { invalidateComplianceCaches } from "@/lib/compliance-cache";
 import { formatSupabaseErrorForUser } from "@/lib/format-error";
 import { registerWorkerDocumentRevision } from "@/lib/worker-document-revisions";
+import { logWorkerDocumentRevisionEvent } from "@/lib/worker-document-revision-events";
+import { RevisionAuditTrail } from "@/components/workers/RevisionAuditTrail";
 
 interface Props {
   workerId: string;
@@ -85,10 +87,32 @@ export function WorkerDocumentRevisionPanel({ workerId, documentTypeId, onClose 
       const ext = file.name.split(".").pop() ?? "bin";
       const path = `${workerId}/${documentTypeId}/${Date.now()}.${ext}`;
 
+      await logWorkerDocumentRevisionEvent(supabase as any, {
+        workerId,
+        documentTypeId,
+        event: "upload_started",
+        details: { file_name: file.name, file_size: file.size, mime_type: file.type },
+      });
+
       const { error: upErr } = await supabase.storage
         .from("worker-documents")
         .upload(path, file, { upsert: false, contentType: getSafeContentType(file) });
-      if (upErr) throw upErr;
+      if (upErr) {
+        await logWorkerDocumentRevisionEvent(supabase as any, {
+          workerId,
+          documentTypeId,
+          event: "storage_upload_failed",
+          status: "error",
+          details: { file_name: file.name, error: upErr.message ?? String(upErr) },
+        });
+        throw upErr;
+      }
+      await logWorkerDocumentRevisionEvent(supabase as any, {
+        workerId,
+        documentTypeId,
+        event: "storage_uploaded",
+        details: { file_name: file.name, file_size: file.size, file_path: path },
+      });
 
       try {
         const data = await registerWorkerDocumentRevision(supabase as any, {
@@ -110,6 +134,17 @@ export function WorkerDocumentRevisionPanel({ workerId, documentTypeId, onClose 
       } catch (error) {
         // rollback storage on RPC failure
         await supabase.storage.from("worker-documents").remove([path]).catch(() => {});
+        await logWorkerDocumentRevisionEvent(supabase as any, {
+          workerId,
+          documentTypeId,
+          event: "db_persist_failed",
+          status: "error",
+          details: {
+            file_name: file.name,
+            file_path: path,
+            error: (error as any)?.message ?? String(error),
+          },
+        });
         throw error;
       }
     },
@@ -148,6 +183,7 @@ export function WorkerDocumentRevisionPanel({ workerId, documentTypeId, onClose 
   }
 
   return (
+    <div className="space-y-3">
     <Card className="border-primary/40">
       <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
         <div>
@@ -287,5 +323,7 @@ export function WorkerDocumentRevisionPanel({ workerId, documentTypeId, onClose 
         )}
       </CardContent>
     </Card>
+      <RevisionAuditTrail workerId={workerId} documentTypeId={documentTypeId} />
+    </div>
   );
 }

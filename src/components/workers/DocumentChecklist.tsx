@@ -32,6 +32,7 @@ import { invalidateComplianceCaches } from "@/lib/compliance-cache";
 import { WorkerDocumentRevisionPanel } from "./WorkerDocumentRevisionPanel";
 import { formatSupabaseErrorForUser } from "@/lib/format-error";
 import { registerWorkerDocumentRevision } from "@/lib/worker-document-revisions";
+import { logWorkerDocumentRevisionEvent } from "@/lib/worker-document-revision-events";
 
 // Marca a fase em que o envio falhou para que o toast diferencie claramente
 // "não subiu o arquivo" (Storage) de "arquivo subiu mas não foi registrado"
@@ -322,10 +323,38 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
       // current revision, inserts the new current row and emits audit.
       const useCanonicalRpc = !!docType && docType.storage_scope === "worker" && !!documentTypeId;
 
+      if (documentTypeId) {
+        await logWorkerDocumentRevisionEvent(supabase as any, {
+          workerId,
+          documentTypeId,
+          event: "upload_started",
+          details: { category, file_name: file.name, file_size: file.size, mime_type: file.type },
+        });
+      }
+
       const { error: uploadErr } = await supabase.storage
         .from("worker-documents")
         .upload(path, file, { upsert: !useCanonicalRpc, contentType: getSafeContentType(file) });
-      if (uploadErr) throw new UploadStageError("storage_upload", uploadErr.message || "Falha no upload para o Storage.", uploadErr);
+      if (uploadErr) {
+        if (documentTypeId) {
+          await logWorkerDocumentRevisionEvent(supabase as any, {
+            workerId,
+            documentTypeId,
+            event: "storage_upload_failed",
+            status: "error",
+            details: { category, file_name: file.name, error: uploadErr.message ?? String(uploadErr) },
+          });
+        }
+        throw new UploadStageError("storage_upload", uploadErr.message || "Falha no upload para o Storage.", uploadErr);
+      }
+      if (documentTypeId) {
+        await logWorkerDocumentRevisionEvent(supabase as any, {
+          workerId,
+          documentTypeId,
+          event: "storage_uploaded",
+          details: { category, file_name: file.name, file_size: file.size, file_path: path },
+        });
+      }
 
       if (useCanonicalRpc) {
         const currentDoc = getCurrentManagedDocForCategory(category);
@@ -344,6 +373,15 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
           });
         } catch (rpcErr) {
           await supabase.storage.from("worker-documents").remove([path]).catch(() => {});
+          if (documentTypeId) {
+            await logWorkerDocumentRevisionEvent(supabase as any, {
+              workerId,
+              documentTypeId,
+              event: "db_persist_failed",
+              status: "error",
+              details: { category, file_name: file.name, file_path: path, error: (rpcErr as any)?.message ?? String(rpcErr) },
+            });
+          }
           throw new UploadStageError(
             "db_registration",
             (rpcErr as any)?.message || "Falha ao registrar a revisão do documento.",
