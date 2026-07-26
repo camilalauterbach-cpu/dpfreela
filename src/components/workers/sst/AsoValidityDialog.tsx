@@ -101,21 +101,25 @@ export function AsoValidityDialog({
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Validade do ASO atualizada.");
+      // Aguarda todas as invalidações + reavaliação canônica antes de fechar
+      // o diálogo, para o operador ver as datas já atualizadas sem "flash".
       invalidateSstCaches(qc);
-      invalidateComplianceCaches(qc, { workerId, eventSource: "admin_update" });
-      qc.invalidateQueries({ queryKey: ["worker-documents", workerId] });
-      qc.invalidateQueries({ queryKey: ["worker-completion", workerId] });
-      qc.invalidateQueries({ queryKey: ["worker-sst-current", workerId] });
-      qc.invalidateQueries({ queryKey: ["worker-sst-summary", workerId] });
-      qc.invalidateQueries({ queryKey: ["worker-sst-history", workerId] });
-      qc.invalidateQueries({ queryKey: ["worker-sst-links-using", workerId] });
-      qc.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs", workerId] });
-      qc.invalidateQueries({ queryKey: ["worker-qualifications", workerId] });
-      qc.invalidateQueries({ queryKey: ["sst-pendencies"] });
-      qc.invalidateQueries({ queryKey: ["worker-links", workerId] });
-      qc.invalidateQueries({ queryKey: ["employment-links", workerId] });
+      await Promise.all([
+        invalidateComplianceCaches(qc, { workerId, eventSource: "admin_update" }),
+        qc.invalidateQueries({ queryKey: ["worker-documents", workerId] }),
+        qc.invalidateQueries({ queryKey: ["worker-completion", workerId] }),
+        qc.invalidateQueries({ queryKey: ["worker-sst-current", workerId] }),
+        qc.invalidateQueries({ queryKey: ["worker-sst-summary", workerId] }),
+        qc.invalidateQueries({ queryKey: ["worker-sst-history", workerId] }),
+        qc.invalidateQueries({ queryKey: ["worker-sst-links-using", workerId] }),
+        qc.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs", workerId] }),
+        qc.invalidateQueries({ queryKey: ["worker-qualifications", workerId] }),
+        qc.invalidateQueries({ queryKey: ["sst-pendencies"] }),
+        qc.invalidateQueries({ queryKey: ["worker-links", workerId] }),
+        qc.invalidateQueries({ queryKey: ["employment-links", workerId] }),
+      ]);
       onOpenChange(false);
     },
     onError: (e: any) => {
