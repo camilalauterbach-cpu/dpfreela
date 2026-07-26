@@ -122,6 +122,7 @@ beforeEach(() => {
   removeMock.mockReset();
   preflightMaybeSingle.mockReset();
   uploadMock.mockResolvedValue({ error: null });
+  removeMock.mockResolvedValue({ error: null });
   rpcMock.mockImplementation(async (name: string) => {
     if (name === "register_sst_revision") return { data: null, error: null };
     if (name === "reevaluate_worker_links") return { data: { links_processed: 0 }, error: null };
@@ -223,14 +224,6 @@ describe("SstCertificateDrawer — preflight autoritativo", () => {
 
     // Rollback do arquivo recém-enviado
     await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.queryByTestId("sst-drawer-error")).toBeTruthy());
-    // eslint-disable-next-line no-console
-    const html = document.body.innerHTML;
-    // eslint-disable-next-line no-console
-    console.log("HAS-error?", html.includes("sst-drawer-error"), "HAS-renew?", html.includes("renew-now"), "HAS-replace?", html.includes("replace-now"));
-    const idx = html.indexOf("sst-drawer-error");
-    // eslint-disable-next-line no-console
-    console.log("errBox slice:", html.slice(Math.max(0, idx - 50), idx + 800));
     // CTA de renovar aparece (período diferente da vigente descoberta)
     await screen.findByTestId("sst-drawer-renew-now");
     // Nunca vaza jargão SQL / 23505
