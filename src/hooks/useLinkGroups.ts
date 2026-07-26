@@ -288,6 +288,7 @@ export function useLinkGroupWorker(groupId: string | undefined, workerId: string
   });
 }
 
+// (patched above by Q-026 — see useCreateGroupWorker for identical rationale)
 export function useRemoveGroupWorker() {
   const queryClient = useQueryClient();
   return useMutation({
