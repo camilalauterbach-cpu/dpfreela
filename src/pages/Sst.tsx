@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  useSstOverview, useSstSummary, useSstAlertCounts,
+  useSstOverview,
   ExpirationStatus, DocumentStatus, ValidityStatus, SstCurrentRow,
 } from "@/hooks/useSstQualifications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,10 @@ import { Link } from "react-router-dom";
 import { AddSstDialog } from "@/components/sst/AddSstDialog";
 import { SstPendenciesPanel } from "@/components/sst/SstPendenciesPanel";
 import { flattenWorkers, exportCsv, exportXlsx, exportPdfSummary } from "@/lib/sst/export";
+import { partitionByTestData } from "@/lib/sst/test-data";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { FlaskConical } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -72,6 +76,7 @@ function NrChip({ q }: { q: SstCurrentRow }) {
 export default function Sst() {
   const { hasAnyRole } = useAuth();
   const canWrite = hasAnyRole(["admin", "manager", "operator"]);
+  const isAdmin = hasAnyRole(["admin", "manager"]);
 
   const [sp, setSp] = useSearchParams();
   const [search, setSearch] = useState(sp.get("q") ?? "");
@@ -81,13 +86,12 @@ export default function Sst() {
   const [validity, setValidity] = useState<"" | ValidityStatus>((sp.get("validity") as ValidityStatus) || "");
   const [daysUntil, setDaysUntil] = useState<number | null>(sp.get("days") ? Number(sp.get("days")) : null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [includeTest, setIncludeTest] = useState(false);
 
   const filters = useMemo(
     () => ({ search, nr: nr || undefined, expiration: expiration || undefined, doc: doc || undefined, validity: validity || undefined, daysUntil }),
     [search, nr, expiration, doc, validity, daysUntil],
   );
-  const summary = useSstSummary();
-  const alerts = useSstAlertCounts();
   const overview = useSstOverview(filters);
 
   // Sincroniza filtros ↔ URL
@@ -109,15 +113,42 @@ export default function Sst() {
 
   const nrOptions = useMemo(() => {
     const set = new Set<string>();
-    for (const w of overview.data?.workers || []) for (const q of w.qualifications) set.add(q.nr_code);
+    for (const w of (overview.data?.workers || [])) {
+      for (const q of w.qualifications) set.add(q.nr_code);
+    }
     return Array.from(set).sort();
   }, [overview.data]);
 
+  // Q-027: Partição canônica de fixtures E2E. Por padrão, todos os cálculos
+  // (lista, painel, cards, filtros e exportação) usam apenas dados operacionais.
+  // Admin/manager pode ligar o switch para incluir dados de teste.
+  const partitioned = useMemo(
+    () => partitionByTestData(overview.data?.workers || []),
+    [overview.data],
+  );
+  const currentWorkers = includeTest
+    ? (overview.data?.workers || [])
+    : partitioned.operational;
+
+  const derivedCounts = useMemo(() => {
+    const wSet = new Set<string>();
+    let expired = 0, expiring = 0, pending = 0;
+    for (const w of currentWorkers) {
+      wSet.add(w.worker_id);
+      for (const q of w.qualifications) {
+        if (q.expiration_status === "expired") expired++;
+        else if (q.expiration_status === "expiring_soon") expiring++;
+        if (q.document_status === "pending") pending++;
+      }
+    }
+    return { totalWorkers: wSet.size, expired, expiring, pending };
+  }, [currentWorkers]);
+
   const cards = [
-    { label: "Trabalhadores no SST", value: summary.data?.totalWorkers, icon: ShieldCheck, tone: "", onClick: () => clearFilters() },
-    { label: "Vencendo em 30d", value: (alerts.data?.expiringSoonOk ?? 0) + (alerts.data?.expiringSoonPending ?? 0), icon: Clock, tone: "text-amber-700", onClick: () => { clearFilters(); setExpiration("expiring_soon"); } },
-    { label: "Vencidos", value: (alerts.data?.expiredOk ?? 0) + (alerts.data?.expiredPending ?? 0), icon: AlertTriangle, tone: "text-red-700", onClick: () => { clearFilters(); setExpiration("expired"); } },
-    { label: "Docs pendentes", value: alerts.data?.pending, icon: FileWarning, tone: "text-amber-700", onClick: () => { clearFilters(); setDoc("pending"); } },
+    { label: "Trabalhadores no SST", value: derivedCounts.totalWorkers, icon: ShieldCheck, tone: "", onClick: () => clearFilters() },
+    { label: "Vencendo em 30d", value: derivedCounts.expiring, icon: Clock, tone: "text-amber-700", onClick: () => { clearFilters(); setExpiration("expiring_soon"); } },
+    { label: "Vencidos", value: derivedCounts.expired, icon: AlertTriangle, tone: "text-red-700", onClick: () => { clearFilters(); setExpiration("expired"); } },
+    { label: "Docs pendentes", value: derivedCounts.pending, icon: FileWarning, tone: "text-amber-700", onClick: () => { clearFilters(); setDoc("pending"); } },
   ];
 
   const shortcuts: Array<{ label: string; onClick: () => void }> = [
@@ -132,7 +163,6 @@ export default function Sst() {
     { label: "Validade desconhecida", onClick: () => { clearFilters(); setValidity("unknown"); } },
   ];
 
-  const currentWorkers = overview.data?.workers || [];
   const flat = useMemo(() => flattenWorkers(currentWorkers), [currentWorkers]);
 
   async function runExport(kind: "csv" | "xlsx" | "pdf") {
@@ -193,6 +223,29 @@ export default function Sst() {
         </div>
       </div>
 
+      {(partitioned.test.length > 0 || isAdmin) && (
+        <div className="flex flex-wrap items-center gap-2 text-xs -mt-1">
+          {partitioned.test.length > 0 && (
+            <span className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-slate-700">
+              <FlaskConical className="h-3 w-3" />
+              {partitioned.test.length} dado{partitioned.test.length === 1 ? "" : "s"} de teste detectado{partitioned.test.length === 1 ? "" : "s"}
+            </span>
+          )}
+          {isAdmin && (
+            <div className="ml-auto inline-flex items-center gap-2">
+              <Switch
+                id="sst-toggle-test-data"
+                checked={includeTest}
+                onCheckedChange={(v) => setIncludeTest(Boolean(v))}
+                data-testid="sst-toggle-test-data"
+              />
+              <Label htmlFor="sst-toggle-test-data" className="text-xs">
+                Incluir dados de teste
+              </Label>
+            </div>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {cards.map((c) => (
           <button key={c.label} onClick={c.onClick} className="text-left">
