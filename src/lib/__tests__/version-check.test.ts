@@ -139,7 +139,6 @@ describe("createVersionController", () => {
 describe("performUpdate reload guard", () => {
   it("reloads at most once per session", async () => {
     const reload = vi.fn();
-    // @ts-expect-error test override
     delete (globalThis as any).location;
     (globalThis as any).location = { reload };
     await performUpdate();
