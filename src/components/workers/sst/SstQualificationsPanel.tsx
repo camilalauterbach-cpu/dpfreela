@@ -105,6 +105,7 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
   const qc = useQueryClient();
   const canEdit = hasAnyRole(["admin", "manager", "operator"]);
   const canDelete = hasAnyRole(["admin", "manager", "operator"]);
+  const isAdmin = hasAnyRole(["admin"]);
   const { data: unified, isLoading } = useWorkerQualificationsUnified(workerId);
   const { data: summary, isLoading: loadingSummary } = useWorkerSstSummary(workerId);
 
@@ -289,6 +290,44 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
     onError: (e: any) => toast.error(String(e?.message || "Falha ao reprocessar limpeza.")),
   });
 
+  // Status de ativação da limpeza automática (Vault + cron ativo). Nunca lê o valor do segredo.
+  const activationQuery = useQuery({
+    queryKey: ["storage-cleanup-activation"],
+    enabled: canDelete,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("get_cleanup_cron_activation_status");
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      return {
+        vaultPresent: !!row?.vault_present,
+        cronActive: !!row?.cron_active,
+      };
+    },
+  });
+  const automationActive =
+    !!activationQuery.data?.vaultPresent && !!activationQuery.data?.cronActive;
+
+  const activateMut = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("storage-cleanup-process", {
+        body: { activateCron: true },
+      });
+      if (error) throw error;
+      return data as { activated: boolean; cronActive: boolean };
+    },
+    onSuccess: async (res) => {
+      await qc.invalidateQueries({ queryKey: ["storage-cleanup-activation"] });
+      if (res?.activated && res?.cronActive) {
+        toast.success("Limpeza automática ativada.");
+      } else {
+        toast.warning("Ativação concluída, aguardando propagação do cron.");
+      }
+    },
+    onError: (e: any) =>
+      toast.error(String(e?.message || "Falha ao ativar a limpeza automática.")),
+  });
+
   const rows = unified ?? [];
   const sstRawRows: SstCurrentRow[] = useMemo(
     () => rows.filter((r) => r.source === "sst" && r.sstRaw).map((r) => r.sstRaw as SstCurrentRow),
@@ -379,6 +418,26 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
             >
               Dry-run
             </Button>
+            {isAdmin && (
+              automationActive ? (
+                <span
+                  data-testid="storage-cleanup-automation-active"
+                  className="inline-flex items-center rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+                >
+                  Automação ativa
+                </span>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={activateMut.isPending}
+                  onClick={() => activateMut.mutate()}
+                  data-testid="storage-cleanup-activate"
+                >
+                  {activateMut.isPending ? "Ativando…" : "Ativar limpeza automática"}
+                </Button>
+              )
+            )}
           </div>
         </div>
       )}

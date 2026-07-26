@@ -53,6 +53,7 @@ Deno.serve(async (req) => {
 
     let callerId = "cron";
     let client;
+    let callerRoles: string[] = [];
 
     if (isCron) {
       // Service role — a checagem de auth.role()='service_role' acontece dentro das RPCs.
@@ -68,15 +69,60 @@ Deno.serve(async (req) => {
       callerId = userData.user.id;
       // Verificação de papel — a checagem final ocorre dentro das RPCs também.
       const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
-      const { data: canAct } = await admin.rpc("has_any_role", {
-        _user_id: callerId,
-        _roles: ["admin", "manager", "operator"],
-      });
+      const { data: rolesData } = await admin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", callerId);
+      callerRoles = (rolesData ?? []).map((r: { role: string }) => r.role);
+      const canAct = callerRoles.some((r) => ["admin", "manager", "operator"].includes(r));
       if (!canAct) return json(403, { error: "Forbidden" });
       client = userClient;
     }
 
     const body = await req.json().catch(() => ({}));
+
+    // ---------- ATIVAÇÃO INTERNA (admin somente) ----------
+    // Sincroniza o segredo do ambiente da Edge Function para o Vault do banco,
+    // idempotente. Nunca retorna nem loga o valor.
+    if (body?.activateCron === true) {
+      if (isCron) return json(403, { error: "forbidden_cron_activation" });
+      if (!callerRoles.includes("admin")) return json(403, { error: "admin_required" });
+      if (!CRON_SECRET || CRON_SECRET.length < 16) {
+        return json(500, { error: "cleanup_cron_secret_missing_in_env" });
+      }
+      const svc = createClient(SUPABASE_URL, SERVICE_ROLE);
+      const { error: setErr } = await svc.rpc("set_cleanup_cron_secret", { p_value: CRON_SECRET });
+      if (setErr) return json(500, { error: "activation_failed" });
+      const { data: statusRows, error: stErr } = await svc.rpc(
+        "get_cleanup_cron_activation_status",
+      );
+      if (stErr) return json(500, { error: "status_unavailable" });
+      const status = Array.isArray(statusRows) ? statusRows[0] : statusRows;
+      console.log(
+        JSON.stringify({
+          event: "storage_cleanup_activation",
+          caller_id: callerId,
+          vault_present: !!status?.vault_present,
+          cron_active: !!status?.cron_active,
+        }),
+      );
+      return json(200, {
+        activated: !!status?.vault_present,
+        cronActive: !!status?.cron_active,
+      });
+    }
+
+    // ---------- STATUS READ-ONLY ----------
+    if (body?.status === true) {
+      const svc = createClient(SUPABASE_URL, SERVICE_ROLE);
+      const { data: statusRows } = await svc.rpc("get_cleanup_cron_activation_status");
+      const status = Array.isArray(statusRows) ? statusRows[0] : statusRows;
+      return json(200, {
+        vaultPresent: !!status?.vault_present,
+        cronActive: !!status?.cron_active,
+      });
+    }
+
     const limit: number = Math.min(Math.max(Number(body?.limit ?? 50), 1), 200);
     const dryRun: boolean = Boolean(body?.dryRun ?? body?.dry_run ?? false);
 
