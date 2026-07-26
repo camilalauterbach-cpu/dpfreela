@@ -142,44 +142,53 @@ export function LinkDocumentsTab({ workerId, employmentLinkId, linkGroupWorkerId
         .upload(storagePath, file, { contentType: getSafeContentType(file) });
       if (uploadErr) throw uploadErr;
 
+      const cleanupOnFail = async () => {
+        await supabase.storage.from("link-documents").remove([storagePath]).catch(() => {});
+      };
+
       const existing = linkDocs?.find((d: any) => d.category === category);
       let docId: string | undefined;
-      if (existing) {
-        const { error } = await supabase
-          .from("employment_link_documents")
-          .update({
+      try {
+        if (existing) {
+          const { error } = await supabase
+            .from("employment_link_documents")
+            .update({
+              file_path: storagePath,
+              file_name: file.name,
+              mime_type: file.type,
+              file_size: file.size,
+              status: "uploaded",
+            } as any)
+            .eq("id", existing.id);
+          if (error) throw error;
+          docId = existing.id;
+        } else {
+          const insertPayload: Record<string, any> = {
+            worker_id: workerId,
+            document_type: "operacional_vinculo",
+            category,
             file_path: storagePath,
             file_name: file.name,
             mime_type: file.type,
             file_size: file.size,
             status: "uploaded",
-          } as any)
-          .eq("id", existing.id);
-        if (error) throw error;
-        docId = existing.id;
-      } else {
-        const insertPayload: Record<string, any> = {
-          worker_id: workerId,
-          document_type: "operacional_vinculo",
-          category,
-          file_path: storagePath,
-          file_name: file.name,
-          mime_type: file.type,
-          file_size: file.size,
-          status: "uploaded",
-        };
-        if (useNewModel) {
-          insertPayload.link_group_worker_id = linkGroupWorkerId;
-        } else {
-          insertPayload.employment_link_id = employmentLinkId;
+          };
+          if (useNewModel) {
+            insertPayload.link_group_worker_id = linkGroupWorkerId;
+          } else {
+            insertPayload.employment_link_id = employmentLinkId;
+          }
+          const { data: inserted, error } = await supabase
+            .from("employment_link_documents")
+            .insert(insertPayload as any)
+            .select("id")
+            .single();
+          if (error) throw error;
+          docId = (inserted as any)?.id;
         }
-        const { data: inserted, error } = await supabase
-          .from("employment_link_documents")
-          .insert(insertPayload as any)
-          .select("id")
-          .single();
-        if (error) throw error;
-        docId = (inserted as any)?.id;
+      } catch (error) {
+        await cleanupOnFail();
+        throw error;
       }
       return { category, docId };
     },

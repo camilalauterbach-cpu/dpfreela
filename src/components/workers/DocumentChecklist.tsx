@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Upload, FileText, Image as ImageIcon, CheckCircle2, XCircle, AlertCircle, Clock, RefreshCw, Loader2, Eye, Plus, CreditCard, ExternalLink, FileDown, Trash2,
@@ -20,6 +21,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -28,6 +30,8 @@ import { BankDataForm } from "./BankDataForm";
 import { validateUpload, ALLOWED_FILE_EXTENSIONS, getSafeContentType } from "@/lib/upload-validation";
 import { invalidateComplianceCaches } from "@/lib/compliance-cache";
 import { WorkerDocumentRevisionPanel } from "./WorkerDocumentRevisionPanel";
+import { formatSupabaseErrorForUser } from "@/lib/format-error";
+import { registerWorkerDocumentRevision } from "@/lib/worker-document-revisions";
 
 interface Props {
   workerId: string;
@@ -74,9 +78,9 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("document_types")
-        .select("id, code, category, storage_scope, is_active, completion_requirement");
+        .select("id, code, category, storage_scope, is_active, completion_requirement, validity_mode");
       if (error) throw error;
-      const map = new Map<string, { id: string; code: string; category: string | null; storage_scope: string | null; completion_requirement: string | null }>();
+      const map = new Map<string, { id: string; code: string; category: string | null; storage_scope: string | null; completion_requirement: string | null; validity_mode: string | null }>();
       for (const r of data ?? []) {
         const key = (r as any).code?.toLowerCase();
         if (key && !map.has(key)) map.set(key, r as any);
@@ -117,7 +121,41 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
 
   // Extra files attached to a worker document (e.g. RG front + back within a
   // single canonical `rg` row). Keyed by worker_document_id → files[].
-  const rgDoc = docs?.find((d) => d.category === "rg" || (d as any).document_type === "rg");
+  const sortDocsByCurrentRevision = (rows: any[] = []) => {
+    return [...rows].sort((a, b) => {
+      const aCurrent = a.revision_managed && a.is_current ? 1 : 0;
+      const bCurrent = b.revision_managed && b.is_current ? 1 : 0;
+      if (aCurrent !== bCurrent) return bCurrent - aCurrent;
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    });
+  };
+
+  const getDocForCategory = (category: string) => {
+    const docType = resolveTypeForCategory(category);
+    const candidates = sortDocsByCurrentRevision(docs ?? []).filter((d: any) => {
+      if (docType?.id && d.document_type_id === docType.id) return true;
+      return d.category === category || d.document_type === category;
+    });
+    return candidates[0] ?? null;
+  };
+
+  const getDocsForCategory = (category: string) => {
+    const docType = resolveTypeForCategory(category);
+    return sortDocsByCurrentRevision(docs ?? []).filter((d: any) => {
+      if (docType?.id && d.document_type_id === docType.id) return true;
+      return d.category === category || d.document_type === category;
+    });
+  };
+
+  const getCurrentManagedDocForCategory = (category: string) => {
+    const docType = resolveTypeForCategory(category);
+    if (!docType?.id) return null;
+    return sortDocsByCurrentRevision(docs ?? []).find((d: any) =>
+      d.document_type_id === docType.id && d.revision_managed && d.is_current,
+    ) ?? null;
+  };
+
+  const rgDoc = getDocForCategory("rg");
   const { data: rgFiles } = useQuery({
     enabled: !!rgDoc?.id,
     queryKey: ["worker-document-files", rgDoc?.id],
@@ -156,7 +194,11 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
       position: nextPos,
       origin: "attachment",
     });
-    if (error) { toast({ title: "Erro ao anexar", description: error.message, variant: "destructive" }); return; }
+    if (error) {
+      await supabase.storage.from("worker-documents").remove([path]).catch(() => {});
+      toast({ title: "Erro ao anexar", description: formatSupabaseErrorForUser(error), variant: "destructive" });
+      return;
+    }
     queryClient.invalidateQueries({ queryKey: ["worker-document-files", rgDoc.id] });
     toast({ title: "Arquivo anexado ao RG" });
   };
@@ -196,6 +238,14 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
   const [showBankForm, setShowBankForm] = useState(false);
   const [bankReplaceAction, setBankReplaceAction] = useState<"upload" | "form" | null>(null);
   const [deleteConfirmDoc, setDeleteConfirmDoc] = useState<any | null>(null);
+  const [pendingDatedUpload, setPendingDatedUpload] = useState<{
+    category: string;
+    file: File;
+    alwaysInsert?: boolean;
+    requiresExplicitExpiry: boolean;
+  } | null>(null);
+  const [pendingIssuedAt, setPendingIssuedAt] = useState(new Date().toISOString().slice(0, 10));
+  const [pendingExplicitExpiresAt, setPendingExplicitExpiresAt] = useState("");
 
   // When arriving with ?document_type_id=…, scroll to the card, ring-highlight
   // it and open the file picker so the user reaches the action in one click.
@@ -226,7 +276,19 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
   }, [focusedDocumentTypeId, focusedCategory, canEdit]);
 
   const uploadMutation = useMutation({
-   mutationFn: async ({ category, file, alwaysInsert }: { category: string; file: File; alwaysInsert?: boolean }) => {
+   mutationFn: async ({
+      category,
+      file,
+      alwaysInsert,
+      issuedAt,
+      explicitExpiresAt,
+    }: {
+      category: string;
+      file: File;
+      alwaysInsert?: boolean;
+      issuedAt?: string | null;
+      explicitExpiresAt?: string | null;
+    }) => {
       const validationError = validateUpload(file);
       if (validationError) throw new Error(validationError);
       const ext = file.name.split(".").pop();
@@ -235,9 +297,9 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
       const docType = resolveTypeForCategory(category);
       const documentTypeId = docType?.id ?? null;
 
-      // Worker-scoped canonical types (currently: ASO / exame toxicológico) go
-      // through register_worker_document_revision. The RPC invalidates the
-      // previous current revision, inserts the new one and emits audit.
+      // Worker-scoped canonical types go through register_worker_document_revision.
+      // The RPC locks (worker_id + document_type_id), invalidates the previous
+      // current revision, inserts the new current row and emits audit.
       const useCanonicalRpc = !!docType && docType.storage_scope === "worker" && !!documentTypeId;
 
       const { error: uploadErr } = await supabase.storage
@@ -246,19 +308,21 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
       if (uploadErr) throw uploadErr;
 
       if (useCanonicalRpc) {
-        const { error: rpcErr } = await (supabase as any).rpc(
-          "register_worker_document_revision",
-          {
-            p_worker_id: workerId,
-            p_document_type_id: documentTypeId,
-            p_file_path: path,
-            p_file_name: file.name,
-            p_file_size: file.size,
-            p_mime_type: file.type,
-            p_status: "uploaded",
-          },
-        );
-        if (rpcErr) {
+        const currentDoc = getCurrentManagedDocForCategory(category);
+        try {
+          await registerWorkerDocumentRevision(supabase as any, {
+            workerId,
+            documentTypeId,
+            currentDocumentId: currentDoc?.id ?? null,
+            filePath: path,
+            fileName: file.name,
+            fileSize: file.size,
+            mimeType: getSafeContentType(file),
+            status: "uploaded",
+            issuedAt: issuedAt ?? null,
+            explicitExpiresAt: explicitExpiresAt ?? null,
+          });
+        } catch (rpcErr) {
           await supabase.storage.from("worker-documents").remove([path]).catch(() => {});
           throw rpcErr;
         }
@@ -290,7 +354,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
         return;
       }
 
-      const existing = docs?.find((d) => d.category === category);
+      const existing = getDocForCategory(category);
       if (existing) {
         const { error } = await supabase
           .from("worker_documents")
@@ -334,7 +398,8 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
       toast({ title: "Documento enviado" });
     },
     onError: (err: any) => {
-      toast({ title: "Erro ao enviar", description: err.message, variant: "destructive" });
+      setUploadingCategory(null);
+      toast({ title: "Erro ao enviar", description: formatSupabaseErrorForUser(err), variant: "destructive" });
     },
   });
 
@@ -386,6 +451,20 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
           toast({ title: "Arquivo muito grande", description: "Máximo 10MB", variant: "destructive" });
           return;
         }
+        const docType = resolveTypeForCategory(category);
+        const requiresIssuedAt = docType?.storage_scope === "worker"
+          && (docType.validity_mode === "fixed_duration" || docType.validity_mode === "explicit_date");
+        if (requiresIssuedAt) {
+          setPendingIssuedAt(new Date().toISOString().slice(0, 10));
+          setPendingExplicitExpiresAt("");
+          setPendingDatedUpload({
+            category,
+            file,
+            alwaysInsert,
+            requiresExplicitExpiry: docType?.validity_mode === "explicit_date",
+          });
+          return;
+        }
         uploadMutation.mutate({ category, file, alwaysInsert });
         setUploadingCategory(category);
       }
@@ -414,7 +493,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
   };
 
   // Bank document actions with coexistence/replace dialog
-  const bankDocs = docs?.filter((d) => d.category === "bank_document") || [];
+  const bankDocs = getDocsForCategory("bank_document");
   const hasBankDocs = bankDocs.length > 0;
 
   const handleBankUpload = () => {
@@ -437,10 +516,9 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     const action = bankReplaceAction;
     setBankReplaceAction(null);
 
-    if (mode === "replace") {
-      await softDeleteMutation.mutateAsync(bankDocs.map((d) => ({ id: d.id, file_path: d.file_path })));
-    }
-
+    // Não desativa o comprovante anterior antes do novo registro existir.
+    // Upload manual e formulário bancário passam por RPCs canônicas que promovem
+    // a nova revisão de forma atômica; se falharem, o documento vigente segue intacto.
     if (action === "upload") {
       handleFileSelect("bank_document", true);
     } else {
@@ -452,7 +530,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     // bank_document has its own dedicated section
     if (category === "bank_document") return null;
 
-    const doc = docs?.find((d) => d.category === category);
+    const doc = getDocForCategory(category);
     const status = doc?.status || "pending";
     const isRg = category === "rg";
     const attachments = isRg ? (rgFiles ?? []) : [];
@@ -742,7 +820,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
 
   // Render "Outros" section with multiple files
   const renderOutrosSection = () => {
-    const outrosDocs = docs?.filter((d) => d.category === "outros") || [];
+    const outrosDocs = getDocsForCategory("outros");
 
     return (
       <Card className="overflow-hidden">
@@ -956,22 +1034,74 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
         </Dialog>
       )}
 
+      <Dialog open={!!pendingDatedUpload} onOpenChange={(open) => !open && setPendingDatedUpload(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Data do documento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="doc-issued-at">Emissão / realização</Label>
+              <Input
+                id="doc-issued-at"
+                type="date"
+                value={pendingIssuedAt}
+                onChange={(e) => setPendingIssuedAt(e.target.value)}
+              />
+            </div>
+            {pendingDatedUpload?.requiresExplicitExpiry && (
+              <div className="space-y-1.5">
+                <Label htmlFor="doc-explicit-expires-at">Validade</Label>
+                <Input
+                  id="doc-explicit-expires-at"
+                  type="date"
+                  value={pendingExplicitExpiresAt}
+                  onChange={(e) => setPendingExplicitExpiresAt(e.target.value)}
+                />
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setPendingDatedUpload(null)}>
+                Cancelar
+              </Button>
+              <Button
+                disabled={!pendingIssuedAt || (pendingDatedUpload?.requiresExplicitExpiry && !pendingExplicitExpiresAt)}
+                onClick={() => {
+                  if (!pendingDatedUpload) return;
+                  uploadMutation.mutate({
+                    category: pendingDatedUpload.category,
+                    file: pendingDatedUpload.file,
+                    alwaysInsert: pendingDatedUpload.alwaysInsert,
+                    issuedAt: pendingIssuedAt,
+                    explicitExpiresAt: pendingDatedUpload.requiresExplicitExpiry ? pendingExplicitExpiresAt : null,
+                  });
+                  setUploadingCategory(pendingDatedUpload.category);
+                  setPendingDatedUpload(null);
+                }}
+              >
+                Continuar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Replace/Add confirmation dialog */}
       <AlertDialog open={!!bankReplaceAction} onOpenChange={() => setBankReplaceAction(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Já existe comprovante bancário</AlertDialogTitle>
             <AlertDialogDescription>
-              Este trabalhador já possui {bankDocs.length} comprovante(s) bancário(s) ativo(s). O que deseja fazer?
+              Este trabalhador já possui {bankDocs.length} comprovante(s) bancário(s) ativo(s). O novo envio só assume como vigente depois que arquivo e banco forem salvos com sucesso.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction className="border border-input bg-background text-foreground hover:bg-accent" onClick={() => handleBankReplaceConfirm("add")}>
-              Adicionar (manter existentes)
+                Enviar nova versão
             </AlertDialogAction>
             <AlertDialogAction onClick={() => handleBankReplaceConfirm("replace")}>
-              Substituir (desativar anteriores)
+              Substituir com segurança
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
