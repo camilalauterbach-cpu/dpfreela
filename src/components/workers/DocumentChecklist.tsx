@@ -31,8 +31,12 @@ import { validateUpload, ALLOWED_FILE_EXTENSIONS, getSafeContentType } from "@/l
 import { invalidateComplianceCaches } from "@/lib/compliance-cache";
 import { WorkerDocumentRevisionPanel } from "./WorkerDocumentRevisionPanel";
 import { formatSupabaseErrorForUser } from "@/lib/format-error";
-import { registerWorkerDocumentRevision } from "@/lib/worker-document-revisions";
 import { logWorkerDocumentRevisionEvent } from "@/lib/worker-document-revision-events";
+import {
+  getOrCreateAttempt,
+  performIdempotentWorkerDocumentUpload,
+  IdempotentUploadStageError,
+} from "@/lib/worker-document-upload-attempt";
 
 // Marca a fase em que o envio falhou para que o toast diferencie claramente
 // "não subiu o arquivo" (Storage) de "arquivo subiu mas não foi registrado"
