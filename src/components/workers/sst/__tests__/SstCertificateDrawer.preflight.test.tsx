@@ -225,7 +225,12 @@ describe("SstCertificateDrawer — preflight autoritativo", () => {
     await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.queryByTestId("sst-drawer-error")).toBeTruthy());
     // eslint-disable-next-line no-console
-    console.log("DOM after error:", document.body.innerHTML.slice(0, 4000));
+    const html = document.body.innerHTML;
+    // eslint-disable-next-line no-console
+    console.log("HAS-error?", html.includes("sst-drawer-error"), "HAS-renew?", html.includes("renew-now"), "HAS-replace?", html.includes("replace-now"));
+    const idx = html.indexOf("sst-drawer-error");
+    // eslint-disable-next-line no-console
+    console.log("errBox slice:", html.slice(Math.max(0, idx - 50), idx + 800));
     // CTA de renovar aparece (período diferente da vigente descoberta)
     await screen.findByTestId("sst-drawer-renew-now");
     // Nunca vaza jargão SQL / 23505
