@@ -104,7 +104,7 @@ export function AsoValidityDialog({
     onSuccess: () => {
       toast.success("Validade do ASO atualizada.");
       invalidateSstCaches(qc);
-      invalidateComplianceCaches(qc, { workerId, eventSource: "aso_validity_correction" });
+      invalidateComplianceCaches(qc, { workerId, eventSource: "admin_update" });
       qc.invalidateQueries({ queryKey: ["worker-documents", workerId] });
       qc.invalidateQueries({ queryKey: ["worker-completion", workerId] });
       qc.invalidateQueries({ queryKey: ["worker-sst-current", workerId] });
