@@ -31,7 +31,7 @@ export function UpdateGate({ controller }: { controller?: Controller } = {}) {
     setUpdating(true);
     setErrorMsg(null);
     const result = await ctrl.triggerUpdate();
-    if (!result.reloaded) {
+    if (result.reloaded === false) {
       // Failure or guard hit — surface a human message and let the user retry.
       setUpdating(false);
       setErrorMsg(result.message ?? "Não foi possível atualizar. Tente novamente.");
