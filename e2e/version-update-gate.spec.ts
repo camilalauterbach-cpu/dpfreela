@@ -36,12 +36,25 @@ async function installVersionMock(page: Page, mock: Mock) {
   });
 }
 
-function attachLoadCounter(page: Page): { count: () => number } {
-  let n = 0;
-  page.on("load", () => {
-    n += 1;
+// Robust per-tab load counter: an init script runs on every navigation and
+// increments a sessionStorage counter (survives reloads within the same
+// origin/tab). Reading it via page.evaluate is deterministic.
+async function installLoadCounter(page: Page) {
+  await page.addInitScript(() => {
+    try {
+      const k = "__e2e_load_count__";
+      const n = Number(sessionStorage.getItem(k) ?? "0") + 1;
+      sessionStorage.setItem(k, String(n));
+    } catch {
+      /* noop */
+    }
   });
-  return { count: () => n };
+  return {
+    read: async () =>
+      Number(
+        await page.evaluate(() => sessionStorage.getItem("__e2e_load_count__") ?? "0"),
+      ),
+  };
 }
 
 test.describe("Version update gate", () => {
@@ -49,13 +62,15 @@ test.describe("Version update gate", () => {
     page,
   }) => {
     const mock: Mock = { current: LOCAL };
+    const loads = await installLoadCounter(page);
     await installVersionMock(page, mock);
-    const loads = attachLoadCounter(page);
 
     await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
     // Give the initial /version.json check time to settle.
     await page.waitForTimeout(500);
     await expect(page.getByTestId("update-gate")).toHaveCount(0);
+    const loadsAfterInitial = await loads.read();
+    expect(loadsAfterInitial).toBe(1);
 
     // Flip the mock to a new remote version and force an immediate re-check
     // by dispatching a real `online` event (contractual poll trigger).
@@ -69,28 +84,29 @@ test.describe("Version update gate", () => {
     await expect(gate).toBeVisible();
 
     // Click "Atualizar agora" → single reload for target v-remote-1.
-    const loadsBefore = loads.count();
-    await page.getByTestId("update-gate-action").click();
-    await page.waitForLoadState("domcontentloaded");
-    // Exactly one navigation triggered by the click.
-    expect(loads.count()).toBe(loadsBefore + 1);
+    await Promise.all([
+      page.waitForEvent("load"),
+      page.getByTestId("update-gate-action").click(),
+    ]);
+    expect(await loads.read()).toBe(2);
 
     // After reload, the bundle is still "dev" (dev mode) but the mock still
     // reports v-remote-1 → gate re-appears. The auto attempt (15s timer)
     // must be blocked by the target-scoped guard → "Atualizando…" clears
     // and an error is shown. No further reload happens without a click.
     await expect(page.getByTestId("update-gate")).toBeVisible();
-    const loadsAfterReload = loads.count();
     // Wait past the auto-update timer (15s).
     await page.waitForTimeout(16_000);
     await expect(page.getByTestId("update-gate-error")).toBeVisible();
     await expect(page.getByTestId("update-gate-action")).toHaveText(/Atualizar agora/);
-    expect(loads.count()).toBe(loadsAfterReload); // no auto reload
+    expect(await loads.read()).toBe(2); // no auto reload
 
     // Manual retry click → exactly one additional reload.
-    await page.getByTestId("update-gate-action").click();
-    await page.waitForLoadState("domcontentloaded");
-    expect(loads.count()).toBe(loadsAfterReload + 1);
+    await Promise.all([
+      page.waitForEvent("load"),
+      page.getByTestId("update-gate-action").click(),
+    ]);
+    expect(await loads.read()).toBe(3);
 
     // Now confirm remote === local: guard must be cleared so a NEW target
     // reloads once again.
@@ -101,10 +117,11 @@ test.describe("Version update gate", () => {
     mock.current = "v-remote-2";
     await page.evaluate(() => window.dispatchEvent(new Event("online")));
     await expect(page.getByTestId("update-gate")).toBeVisible();
-    const loadsBeforeSecondTarget = loads.count();
-    await page.getByTestId("update-gate-action").click();
-    await page.waitForLoadState("domcontentloaded");
-    expect(loads.count()).toBe(loadsBeforeSecondTarget + 1);
+    await Promise.all([
+      page.waitForEvent("load"),
+      page.getByTestId("update-gate-action").click(),
+    ]);
+    expect(await loads.read()).toBe(4);
   });
 
   test("cross-tab: stale detected in tab A blocks tab B", async ({ browser }) => {
