@@ -1862,6 +1862,54 @@ export type Database = {
         }
         Relationships: []
       }
+      worker_document_storage_cleanup_jobs: {
+        Row: {
+          attempts: number
+          bucket: string
+          completed_at: string | null
+          created_at: string
+          document_type_id: string | null
+          id: string
+          last_error: string | null
+          path: string
+          source: string
+          status: string
+          trace_id: string | null
+          updated_at: string
+          worker_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          bucket: string
+          completed_at?: string | null
+          created_at?: string
+          document_type_id?: string | null
+          id?: string
+          last_error?: string | null
+          path: string
+          source?: string
+          status?: string
+          trace_id?: string | null
+          updated_at?: string
+          worker_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          bucket?: string
+          completed_at?: string | null
+          created_at?: string
+          document_type_id?: string | null
+          id?: string
+          last_error?: string | null
+          path?: string
+          source?: string
+          status?: string
+          trace_id?: string | null
+          updated_at?: string
+          worker_id?: string | null
+        }
+        Relationships: []
+      }
       worker_documents: {
         Row: {
           category: string | null
@@ -2944,6 +2992,30 @@ export type Database = {
         }
         Returns: Json
       }
+      list_pending_storage_cleanup_jobs: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          bucket: string
+          completed_at: string | null
+          created_at: string
+          document_type_id: string | null
+          id: string
+          last_error: string | null
+          path: string
+          source: string
+          status: string
+          trace_id: string | null
+          updated_at: string
+          worker_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "worker_document_storage_cleanup_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       list_worker_duplicate_candidates: { Args: never; Returns: Json }
       list_worker_qualification_types: {
         Args: { p_include_inactive?: boolean }
@@ -3005,6 +3077,30 @@ export type Database = {
       log_worker_document_revision_event: {
         Args: { p_payload: Json }
         Returns: string
+      }
+      mark_storage_cleanup_job_status: {
+        Args: { p_error?: string; p_id: string; p_status: string }
+        Returns: {
+          attempts: number
+          bucket: string
+          completed_at: string | null
+          created_at: string
+          document_type_id: string | null
+          id: string
+          last_error: string | null
+          path: string
+          source: string
+          status: string
+          trace_id: string | null
+          updated_at: string
+          worker_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "worker_document_storage_cleanup_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       merge_workers: {
         Args: { _confirmation: string; _primary: string; _secondary: string }
