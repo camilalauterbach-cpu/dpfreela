@@ -74,9 +74,9 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("document_types")
-        .select("id, code, category, storage_scope, is_active");
+        .select("id, code, category, storage_scope, is_active, completion_requirement");
       if (error) throw error;
-      const map = new Map<string, { id: string; code: string; category: string | null; storage_scope: string | null }>();
+      const map = new Map<string, { id: string; code: string; category: string | null; storage_scope: string | null; completion_requirement: string | null }>();
       for (const r of data ?? []) {
         const key = (r as any).code?.toLowerCase();
         if (key && !map.has(key)) map.set(key, r as any);
@@ -265,6 +265,13 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
         return;
       }
 
+      // Compensable write: if the DB row fails to persist, remove the just-
+      // uploaded storage object. The PREVIOUS storage object (if any) is
+      // preserved — we only commit removal via soft-delete flows elsewhere.
+      const cleanupOnFail = async () => {
+        await supabase.storage.from("worker-documents").remove([path]).catch(() => {});
+      };
+
       if (alwaysInsert) {
         const { error } = await supabase
           .from("worker_documents")
@@ -279,7 +286,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
             mime_type: file.type,
             status: "uploaded",
           });
-        if (error) throw error;
+        if (error) { await cleanupOnFail(); throw error; }
         return;
       }
 
@@ -297,7 +304,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
             updated_at: new Date().toISOString(),
           })
           .eq("id", existing.id);
-        if (error) throw error;
+        if (error) { await cleanupOnFail(); throw error; }
       } else {
         const { error } = await supabase
           .from("worker_documents")
@@ -312,13 +319,16 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
             mime_type: file.type,
             status: "uploaded",
           });
-        if (error) throw error;
+        if (error) { await cleanupOnFail(); throw error; }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["worker-documents", workerId] });
       queryClient.invalidateQueries({ queryKey: ["worker-doc-revisions", workerId] });
       queryClient.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs", workerId] });
+      // Canonical completion cache — badge, checklist and link-activation
+      // gates all subscribe to this key.
+      queryClient.invalidateQueries({ queryKey: ["worker-completion", workerId] });
       invalidateComplianceCaches(queryClient, { workerId, eventSource: "upload" });
       setUploadingCategory(null);
       toast({ title: "Documento enviado" });
@@ -338,6 +348,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["worker-documents", workerId] });
+      queryClient.invalidateQueries({ queryKey: ["worker-completion", workerId] });
       invalidateComplianceCaches(queryClient, { workerId, eventSource: "admin_update" });
       toast({ title: "Status atualizado" });
     },
@@ -359,6 +370,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["worker-documents", workerId] });
+      queryClient.invalidateQueries({ queryKey: ["worker-completion", workerId] });
       invalidateComplianceCaches(queryClient, { workerId, eventSource: "admin_update" });
     },
   });
@@ -436,7 +448,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     }
   };
 
-  const renderDocCard = (category: string, required: boolean) => {
+  const renderDocCard = (category: string, _legacyRequiredFlag: boolean) => {
     // bank_document has its own dedicated section
     if (category === "bank_document") return null;
 
@@ -444,6 +456,12 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     const status = doc?.status || "pending";
     const isRg = category === "rg";
     const attachments = isRg ? (rgFiles ?? []) : [];
+    // Canonical required = document_types.completion_requirement === 'required'.
+    // Fall back to false while types are loading so we never mislabel optional
+    // documents (PIS, reservista, CNH…) with a mandatory asterisk.
+    const docType = resolveTypeForCategory(category);
+    const required = docType?.completion_requirement === "required";
+    const optional = docType?.completion_requirement === "optional";
 
     return (
       <Card
@@ -461,7 +479,12 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
                 <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
               )}
               <span className="text-sm font-medium truncate">{DOC_CATEGORY_LABELS[category]}</span>
-              {required && <span className="text-destructive text-xs">*</span>}
+              {required && <span className="text-destructive text-xs" aria-label="Obrigatório">*</span>}
+              {optional && (
+                <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0 text-muted-foreground border-muted">
+                  Opcional
+                </Badge>
+              )}
             </div>
             <Badge variant="outline" className={`text-xs shrink-0 ${STATUS_VARIANT[status]}`}>
               {STATUS_ICON[status]}

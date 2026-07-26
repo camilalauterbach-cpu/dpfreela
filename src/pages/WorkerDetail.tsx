@@ -89,7 +89,7 @@ export default function WorkerDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <DpReadinessBadge worker={w} docs={docs || []} />
+          <DpReadinessBadge worker={w} />
           {canEdit && (
             <Button size="sm" variant="outline" onClick={() => navigate(`/workers/${id}/edit`)}>
               <Pencil className="mr-1 h-3 w-3" /> Editar
@@ -137,7 +137,7 @@ export default function WorkerDetail() {
           <Card>
             <CardHeader><CardTitle className="text-base">Completude para DP</CardTitle></CardHeader>
             <CardContent>
-              <DpReadinessBadge worker={w} docs={docs || []} showDetail />
+              <DpReadinessBadge worker={w} showDetail />
             </CardContent>
           </Card>
 
