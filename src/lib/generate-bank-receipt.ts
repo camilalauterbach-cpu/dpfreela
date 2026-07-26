@@ -18,12 +18,16 @@ export interface BankReceiptData {
 
 const PIX_KEY_TYPE_LABELS: Record<string, string> = {
   cpf: "CPF",
+  phone: "Telefone",
   telefone: "Telefone",
   email: "E-mail",
+  random: "Chave aleatória",
   aleatoria: "Chave aleatória",
 };
 
 const ACCOUNT_TYPE_LABELS: Record<string, string> = {
+  checking: "Conta Corrente",
+  savings: "Conta Poupança",
   corrente: "Conta Corrente",
   poupanca: "Conta Poupança",
 };
