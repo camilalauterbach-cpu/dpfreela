@@ -21,8 +21,11 @@ import { useWorkerQualificationTypes } from "@/hooks/useWorkerQualificationTypes
 import { validateUpload, getSafeContentType } from "@/lib/upload-validation";
 import { invalidateComplianceCaches } from "@/lib/compliance-cache";
 import { formatSupabaseErrorForUser } from "@/lib/format-error";
-import { registerWorkerDocumentRevision } from "@/lib/worker-document-revisions";
-import { logWorkerDocumentRevisionEvent } from "@/lib/worker-document-revision-events";
+import {
+  getOrCreateAttempt,
+  performIdempotentWorkerDocumentUpload,
+  IdempotentUploadStageError,
+} from "@/lib/worker-document-upload-attempt";
 import { RevisionAuditTrail } from "@/components/workers/RevisionAuditTrail";
 
 interface Props {
@@ -85,67 +88,32 @@ export function WorkerDocumentRevisionPanel({ workerId, documentTypeId, onClose 
       if (verr) throw new Error(verr);
 
       const ext = file.name.split(".").pop() ?? "bin";
-      const path = `${workerId}/${documentTypeId}/${Date.now()}.${ext}`;
-
-      await logWorkerDocumentRevisionEvent(supabase as any, {
-        workerId,
-        documentTypeId,
-        event: "upload_started",
-        details: { file_name: file.name, file_size: file.size, mime_type: file.type },
-      });
-
-      const { error: upErr } = await supabase.storage
-        .from("worker-documents")
-        .upload(path, file, { upsert: false, contentType: getSafeContentType(file) });
-      if (upErr) {
-        await logWorkerDocumentRevisionEvent(supabase as any, {
-          workerId,
-          documentTypeId,
-          event: "storage_upload_failed",
-          status: "error",
-          details: { file_name: file.name, error: upErr.message ?? String(upErr) },
-        });
-        throw upErr;
-      }
-      await logWorkerDocumentRevisionEvent(supabase as any, {
-        workerId,
-        documentTypeId,
-        event: "storage_uploaded",
-        details: { file_name: file.name, file_size: file.size, file_path: path },
-      });
-
+      // Reenvio seguro: mesma chave de idempotência e mesmo storage path
+      // enquanto o attempt viver na session. Ver worker-document-upload-attempt.ts.
+      const { attempt } = getOrCreateAttempt(workerId, documentTypeId, file, () =>
+        `${workerId}/${documentTypeId}/${Date.now()}.${ext}`,
+      );
       try {
-        const data = await registerWorkerDocumentRevision(supabase as any, {
+        const { result } = await performIdempotentWorkerDocumentUpload(supabase as any, {
           workerId,
           documentTypeId,
           currentDocumentId: current?.id ?? null,
-          filePath: path,
-          fileName: file.name,
-          fileSize: file.size,
-          mimeType: getSafeContentType(file),
+          file,
+          storagePath: attempt.storagePath,
+          contentType: getSafeContentType(file),
+          status: "approved",
           issuedAt: issueDate || null,
           explicitExpiresAt: docType?.validityMode === "explicit_date" ? expiryDate || null : null,
           documentNumber: documentNumber || null,
           issuingAuthority: issuingAuthority || null,
           notes: notes || null,
-          status: "approved",
         });
-        return data;
-      } catch (error) {
-        // rollback storage on RPC failure
-        await supabase.storage.from("worker-documents").remove([path]).catch(() => {});
-        await logWorkerDocumentRevisionEvent(supabase as any, {
-          workerId,
-          documentTypeId,
-          event: "db_persist_failed",
-          status: "error",
-          details: {
-            file_name: file.name,
-            file_path: path,
-            error: (error as any)?.message ?? String(error),
-          },
-        });
-        throw error;
+        return result;
+      } catch (err) {
+        if (err instanceof IdempotentUploadStageError) {
+          throw new Error(err.message);
+        }
+        throw err;
       }
     },
     onSuccess: async () => {
