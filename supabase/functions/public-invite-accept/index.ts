@@ -150,32 +150,26 @@ Deno.serve(async (req: Request) => {
 
     // 8. criar ou reutilizar usuário no Auth
     let authUserId: string | null = null;
-    const { data: existingList } = await admin.auth.admin.listUsers({
-      page: 1,
-      perPage: 1,
-      // filtro por email não é oficialmente exposto; buscamos e filtramos manualmente
-    });
-    if (existingList?.users?.length) {
-      // fallback: getUserByEmail via listUsers paginado
-    }
-    const { data: byEmail } = await admin.auth.admin.listUsers({ perPage: 200 });
-    const found = byEmail?.users?.find((u) => (u.email ?? "").toLowerCase() === claim.email.toLowerCase());
+    // Segurança: convites servem APENAS para provisionar contas novas.
+    // Se o e-mail já pertence a um usuário existente, rejeitamos o claim
+    // para impedir account takeover (um manager convidando o e-mail de um
+    // admin e trocando a senha ao aceitar). O fluxo de recuperação de
+    // senha deve ser feito via "Esqueci minha senha".
+    const { data: byEmail, error: listErr } = await admin.auth.admin.listUsers({ perPage: 200 });
+    if (listErr) return await releaseAndFail("auth_lookup_failed");
+    const normalizedEmail = claim.email.toLowerCase();
+    const found = byEmail?.users?.find((u) => (u.email ?? "").toLowerCase() === normalizedEmail);
     if (found) {
-      authUserId = found.id;
-      // atualizar senha e confirmar email idempotentemente
-      await admin.auth.admin.updateUserById(authUserId, {
-        password,
-        email_confirm: true,
-      });
-    } else {
-      const { data: created, error: createErr } = await admin.auth.admin.createUser({
-        email: claim.email,
-        password,
-        email_confirm: true,
-      });
-      if (createErr || !created?.user) return await releaseAndFail("auth_create_failed");
-      authUserId = created.user.id;
+      // Não sobrescrever credenciais de conta existente sob nenhuma hipótese.
+      return await releaseAndFail("email_already_registered");
     }
+    const { data: created, error: createErr } = await admin.auth.admin.createUser({
+      email: claim.email,
+      password,
+      email_confirm: true,
+    });
+    if (createErr || !created?.user) return await releaseAndFail("auth_create_failed");
+    authUserId = created.user.id;
 
     // 9. localizar/criar profile e obter profiles.id real
     let profileId: string | null = null;
