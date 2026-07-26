@@ -7,6 +7,12 @@ import {
   type BroadcastChannelLike,
 } from "@/lib/version-check";
 
+const flush = async () => {
+  for (let i = 0; i < 5; i += 1) {
+    await Promise.resolve();
+  }
+};
+
 function jsonResponse(body: unknown, ok = true, status = 200) {
   return {
     ok,
@@ -59,7 +65,7 @@ describe("createVersionController", () => {
   it("same version does not block", async () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ version: "v1" })) as any;
     const c = createVersionController({ fetchImpl, localVersion: "v1" });
-    await vi.runOnlyPendingTimersAsync();
+    await flush();
     expect(c.getState().kind).toBe("ok");
     c.stop();
   });
@@ -67,7 +73,7 @@ describe("createVersionController", () => {
   it("different version blocks with stale state", async () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ version: "v2" })) as any;
     const c = createVersionController({ fetchImpl, localVersion: "v1" });
-    await vi.runOnlyPendingTimersAsync();
+    await flush();
     expect(c.getState()).toEqual({ kind: "stale", remote: "v2" });
     c.stop();
   });
@@ -77,7 +83,7 @@ describe("createVersionController", () => {
       throw new Error("boom");
     }) as any;
     const c = createVersionController({ fetchImpl, localVersion: "v1" });
-    await vi.runOnlyPendingTimersAsync();
+    await flush();
     expect(c.getState().kind).toBe("offline");
     c.stop();
   });
@@ -90,7 +96,7 @@ describe("createVersionController", () => {
       return jsonResponse({ version: "v1" });
     }) as any;
     const c = createVersionController({ fetchImpl, localVersion: "v1" });
-    await vi.runOnlyPendingTimersAsync();
+    await flush();
     expect(c.getState().kind).toBe("offline");
     await c.checkNow();
     expect(c.getState().kind).toBe("ok");
@@ -105,7 +111,7 @@ describe("createVersionController", () => {
       localVersion: "v1",
       createChannel: () => ch,
     });
-    await vi.runOnlyPendingTimersAsync();
+    await flush();
     expect(c.getState().kind).toBe("ok");
     receive({ type: "stale", remote: "v9" });
     expect(c.getState()).toEqual({ kind: "stale", remote: "v9" });
@@ -120,7 +126,7 @@ describe("createVersionController", () => {
       localVersion: "v1",
       createChannel: () => ch,
     });
-    await vi.runOnlyPendingTimersAsync();
+    await flush();
     expect(posted).toContainEqual({ type: "stale", remote: "v2" });
     c.stop();
   });
@@ -128,7 +134,7 @@ describe("createVersionController", () => {
   it("polls every 60s", async () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ version: "v1" })) as any;
     const c = createVersionController({ fetchImpl, localVersion: "v1" });
-    await vi.runOnlyPendingTimersAsync();
+    await flush();
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(60_000);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
