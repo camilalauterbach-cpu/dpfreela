@@ -108,28 +108,53 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
           }
         : null;
       // eslint-disable-next-line no-console
-      console.info("[sst-delete] start", {
+      console.info("[sst-hard-delete] start", {
         traceId, workerId, qualificationId: id, summaryBefore: before,
       });
       const t0 = performance.now();
-      const { error } = await (supabase as any).rpc("delete_sst_revision", {
+      const { data, error } = await (supabase as any).rpc("hard_delete_sst_chain", {
         p_qualification_id: id,
       });
       if (error) {
         // eslint-disable-next-line no-console
-        console.error("[sst-delete] rpc_error", {
+        console.error("[sst-hard-delete] rpc_error", {
           traceId, qualificationId: id, error: error.message, code: (error as any).code,
         });
         throw error;
       }
+      // Limpeza best-effort do Storage; falha nunca ressuscita a NR.
+      const storagePaths: string[] = Array.isArray((data as any)?.storage_paths)
+        ? ((data as any).storage_paths as string[]).filter((p) => typeof p === "string" && p.length > 0)
+        : [];
+      if (storagePaths.length > 0) {
+        try {
+          const { error: rmErr } = await supabase.storage
+            .from("worker-documents")
+            .remove(storagePaths);
+          if (rmErr) {
+            // eslint-disable-next-line no-console
+            console.warn("[sst-hard-delete] storage_cleanup_pending", {
+              traceId, paths: storagePaths, error: rmErr.message,
+            });
+          }
+        } catch (e: any) {
+          // eslint-disable-next-line no-console
+          console.warn("[sst-hard-delete] storage_cleanup_exception", {
+            traceId, paths: storagePaths, error: String(e?.message || e),
+          });
+        }
+      }
       // Reavalia vínculos após exclusão para recalcular indicadores.
       await (supabase as any).rpc("reevaluate_worker_links", {
         p_worker_id: workerId,
-        p_event_source: "delete_sst_revision",
+        p_event_source: "hard_delete_sst_chain",
       });
       // eslint-disable-next-line no-console
-      console.info("[sst-delete] rpc_ok", {
+      console.info("[sst-hard-delete] rpc_ok", {
         traceId, qualificationId: id, elapsedMs: Math.round(performance.now() - t0),
+        deleted_qualification_ids: (data as any)?.deleted_qualification_ids,
+        deleted_worker_document_ids: (data as any)?.deleted_worker_document_ids,
+        storage_paths_removed: storagePaths.length,
       });
       return { traceId, before };
     },
@@ -141,10 +166,10 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
       qc.invalidateQueries({ queryKey: ["worker-sst-history", workerId] });
       qc.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs", workerId] });
       // eslint-disable-next-line no-console
-      console.info("[sst-delete] caches_invalidated", {
+      console.info("[sst-hard-delete] caches_invalidated", {
         traceId: ctx?.traceId, workerId, summaryBefore: ctx?.before,
       });
-      toast.success("Certificado excluído.");
+      toast.success("Certificado excluído definitivamente.");
       setDeleteTarget(null);
     },
     onError: (e: any) => {
@@ -359,14 +384,14 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
       <DeleteConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(v) => !v && setDeleteTarget(null)}
-        title="Excluir certificado"
+        title="Exclusão permanente"
         description={
           deleteTarget
-            ? `Excluir o certificado ${deleteTarget.code}${
+            ? `Exclusão permanente. Esta NR (${deleteTarget.code}${
                 deleteTarget.issuedAt
                   ? ` de ${new Date(deleteTarget.issuedAt + "T12:00:00").toLocaleDateString("pt-BR")}`
                   : ""
-              }? Apenas este registro será removido. Outros certificados e o trabalhador não serão afetados. Os indicadores serão recalculados.`
+              }) e todo o histórico desta cadeia serão apagados e não poderão ser recuperados. Outras NRs, outros trabalhadores e o ASO não serão afetados.`
             : ""
         }
         onConfirm={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
