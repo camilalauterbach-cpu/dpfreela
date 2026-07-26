@@ -97,4 +97,45 @@ describe("AsoValidityDialog", () => {
     fireEvent.click(screen.getByText(/Gerenciar arquivo na aba Documentos/i));
     expect(onManageInDocuments).toHaveBeenCalled();
   });
+
+  it("aguarda invalidações antes de fechar o diálogo", async () => {
+    // reevaluate_worker_links é a RPC compartilhada disparada pelo
+    // invalidateComplianceCaches; controlamos a resolução manualmente para
+    // provar que onOpenChange(false) só ocorre depois dela.
+    let resolveReeval: (v: unknown) => void = () => {};
+    const reevalPromise = new Promise((r) => {
+      resolveReeval = r;
+    });
+    rpcMock.mockImplementation((name: string) => {
+      if (name === "correct_worker_document_validity") {
+        return Promise.resolve({ data: { ok: true }, error: null });
+      }
+      if (name === "reevaluate_worker_links") {
+        return reevalPromise.then(() => ({ data: null, error: null }));
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+    const { onOpenChange } = renderDialog();
+    fireEvent.change(screen.getByTestId("aso-validity-expires-at"), {
+      target: { value: "2027-01-10" },
+    });
+    fireEvent.click(screen.getByTestId("aso-validity-save"));
+
+    // Espera a RPC de correção terminar; o diálogo AINDA não pode fechar
+    // porque a reavaliação compartilhada continua pendente.
+    await waitFor(() =>
+      expect(rpcMock).toHaveBeenCalledWith(
+        "reevaluate_worker_links",
+        expect.any(Object),
+      ),
+    );
+    // Micro-tarefas processadas — se o código NÃO awaitasse, já teria fechado.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+
+    // Libera a reavaliação; agora o diálogo deve fechar.
+    resolveReeval(undefined);
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+  });
 });
