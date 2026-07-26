@@ -5,10 +5,16 @@ import type { Controller, VersionState } from "@/lib/version-check";
 
 type TestCtrl = Controller & { emit: (s: VersionState) => void; updateCalls: number };
 
-function makeCtrl(initial: VersionState): TestCtrl {
+function makeCtrl(
+  initial: VersionState,
+  triggerImpl?: (opts?: { manualRetry?: boolean }) => Promise<
+    { reloaded: true } | { reloaded: false; reason: string; message?: string }
+  >,
+): TestCtrl & { calls: Array<{ manualRetry?: boolean } | undefined> } {
   let state = initial;
   const listeners = new Set<(s: VersionState) => void>();
   let updateCalls = 0;
+  const calls: Array<{ manualRetry?: boolean } | undefined> = [];
   const ctrl: any = {
     getState: () => state,
     subscribe(l: (s: VersionState) => void) {
@@ -17,8 +23,10 @@ function makeCtrl(initial: VersionState): TestCtrl {
       return () => listeners.delete(l);
     },
     async checkNow() {},
-    async triggerUpdate() {
+    async triggerUpdate(opts?: { manualRetry?: boolean }) {
       updateCalls += 1;
+      calls.push(opts);
+      if (triggerImpl) return triggerImpl(opts);
       return { reloaded: true } as const;
     },
     stop() {},
@@ -32,7 +40,8 @@ function makeCtrl(initial: VersionState): TestCtrl {
     listeners.forEach((l) => l(s));
   };
   Object.defineProperty(ctrl, "updateCalls", { get: () => updateCalls });
-  return ctrl as TestCtrl;
+  Object.defineProperty(ctrl, "calls", { get: () => calls });
+  return ctrl as TestCtrl & { calls: Array<{ manualRetry?: boolean } | undefined> };
 }
 
 beforeEach(() => {
@@ -72,6 +81,63 @@ describe("UpdateGate", () => {
     const ctrl = makeCtrl({ kind: "stale", remote: "v2" });
     render(<UpdateGate controller={ctrl} />);
     fireEvent.click(screen.getByTestId("update-gate-action"));
+    expect(ctrl.updateCalls).toBe(1);
+  });
+
+  it("already-attempted result clears 'Atualizando…' and shows error; next click retries manually", async () => {
+    let call = 0;
+    const ctrl = makeCtrl({ kind: "stale", remote: "v2" }, async (opts) => {
+      call += 1;
+      if (call === 1) {
+        return {
+          reloaded: false,
+          reason: "already-attempted",
+          message: "guard hit",
+        } as const;
+      }
+      // Second call: must be a manual retry.
+      expect(opts?.manualRetry).toBe(true);
+      return { reloaded: true } as const;
+    });
+    render(<UpdateGate controller={ctrl} />);
+
+    // Auto timer fires -> already-attempted response.
+    await act(async () => {
+      vi.advanceTimersByTime(15_000);
+      await Promise.resolve();
+    });
+    // Button is no longer stuck in "Atualizando…", error is shown.
+    const btn = screen.getByTestId("update-gate-action");
+    expect(btn.textContent).toContain("Atualizar agora");
+    expect(screen.getByTestId("update-gate-error").textContent).toContain("guard hit");
+    expect(ctrl.calls[0]).toEqual({ manualRetry: false });
+
+    // Manual click retries with manualRetry: true.
+    await act(async () => {
+      fireEvent.click(btn);
+      await Promise.resolve();
+    });
+    expect(ctrl.updateCalls).toBe(2);
+    expect(ctrl.calls[1]).toEqual({ manualRetry: true });
+  });
+
+  it("auto timer never re-attempts the same target after first auto call", async () => {
+    const ctrl = makeCtrl({ kind: "stale", remote: "v2" }, async () => ({
+      reloaded: false,
+      reason: "already-attempted",
+      message: "x",
+    }));
+    render(<UpdateGate controller={ctrl} />);
+    await act(async () => {
+      vi.advanceTimersByTime(15_000);
+      await Promise.resolve();
+    });
+    expect(ctrl.updateCalls).toBe(1);
+    // Additional time passing does not produce another auto call.
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+      await Promise.resolve();
+    });
     expect(ctrl.updateCalls).toBe(1);
   });
 });
