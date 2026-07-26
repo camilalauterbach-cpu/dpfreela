@@ -1098,7 +1098,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction className="border border-input bg-background text-foreground hover:bg-accent" onClick={() => handleBankReplaceConfirm("add")}>
-              Adicionar (manter existentes)
+                Enviar nova versão
             </AlertDialogAction>
             <AlertDialogAction onClick={() => handleBankReplaceConfirm("replace")}>
               Substituir com segurança
