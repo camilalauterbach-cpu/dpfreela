@@ -16,15 +16,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Upload, FileText, Eye, X } from "lucide-react";
+import { Loader2, Upload, FileText, Eye, X, RotateCw, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useWorkerQualificationTypes } from "@/hooks/useWorkerQualificationTypes";
 import { validateUpload, getSafeContentType } from "@/lib/upload-validation";
 import { invalidateComplianceCaches } from "@/lib/compliance-cache";
 import { formatSupabaseErrorForUser } from "@/lib/format-error";
 import {
+  clearAttempt,
   getOrCreateAttempt,
+  loadAttempt,
   performIdempotentWorkerDocumentUpload,
   IdempotentUploadStageError,
+  type IdempotentUploadOutcome,
 } from "@/lib/worker-document-upload-attempt";
 import { RevisionAuditTrail } from "@/components/workers/RevisionAuditTrail";
 
@@ -71,18 +74,36 @@ export function WorkerDocumentRevisionPanel({ workerId, documentTypeId, onClose 
   const [documentNumber, setDocumentNumber] = useState("");
   const [issuingAuthority, setIssuingAuthority] = useState("");
   const [notes, setNotes] = useState("");
+  // Rerender-trigger para reavaliar `loadAttempt(...)` após mudanças de sessão
+  // (submit success/failure). Contador simples; não é necessário memoizar.
+  const [attemptTick, setAttemptTick] = useState(0);
+  const [lastOutcome, setLastOutcome] = useState<
+    | null
+    | { kind: "success"; attempts: number; replay: boolean; idempotencyKey: string; idempotentHit: boolean }
+    | { kind: "error"; attempts: number; replay: boolean; idempotencyKey: string | null; phase: string | null; message: string }
+  >(null);
+
+  const persistedAttempt = useMemo(() => {
+    if (!file) return null;
+    return loadAttempt(workerId, documentTypeId, file);
+    // attemptTick force-invalidates the memo after submit finishes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file, workerId, documentTypeId, attemptTick]);
 
   const resetForm = () => {
+    if (file) clearAttempt(workerId, documentTypeId, file);
     setFile(null);
     setIssueDate("");
     setExpiryDate("");
     setDocumentNumber("");
     setIssuingAuthority("");
     setNotes("");
+    setLastOutcome(null);
+    setAttemptTick((v) => v + 1);
   };
 
   const submit = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<IdempotentUploadOutcome> => {
       if (!file) throw new Error("Selecione um arquivo.");
       const verr = validateUpload(file);
       if (verr) throw new Error(verr);
@@ -94,7 +115,7 @@ export function WorkerDocumentRevisionPanel({ workerId, documentTypeId, onClose 
         `${workerId}/${documentTypeId}/${Date.now()}.${ext}`,
       );
       try {
-        const { result } = await performIdempotentWorkerDocumentUpload(supabase as any, {
+        const outcome = await performIdempotentWorkerDocumentUpload(supabase as any, {
           workerId,
           documentTypeId,
           currentDocumentId: current?.id ?? null,
@@ -108,17 +129,39 @@ export function WorkerDocumentRevisionPanel({ workerId, documentTypeId, onClose 
           issuingAuthority: issuingAuthority || null,
           notes: notes || null,
         });
-        return result;
+        return outcome;
       } catch (err) {
         if (err instanceof IdempotentUploadStageError) {
-          throw new Error(err.message);
+          const wrapped = new Error(err.message) as Error & {
+            phase?: string;
+            idempotencyKey?: string;
+            attempts?: number;
+          };
+          wrapped.phase = err.phase;
+          wrapped.idempotencyKey = attempt.idempotencyKey;
+          wrapped.attempts = attempt.attempts;
+          throw wrapped;
         }
         throw err;
       }
     },
-    onSuccess: async () => {
-      toast({ title: "Revisão registrada" });
-      resetForm();
+    onSuccess: async (outcome) => {
+      setLastOutcome({
+        kind: "success",
+        attempts: outcome.attempts,
+        replay: outcome.replay,
+        idempotencyKey: outcome.idempotencyKey,
+        idempotentHit: !!outcome.result.idempotent_hit,
+      });
+      setAttemptTick((v) => v + 1);
+      toast({
+        title: outcome.result.idempotent_hit
+          ? "Revisão já registrada (idempotente)"
+          : "Revisão registrada",
+        description: outcome.replay
+          ? `Reenvio bem-sucedido após ${outcome.attempts} tentativa(s).`
+          : undefined,
+      });
       await queryClient.invalidateQueries({ queryKey: ["worker-doc-revisions", workerId, documentTypeId] });
       await queryClient.invalidateQueries({ queryKey: ["worker-documents", workerId] });
       await queryClient.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs", workerId] });
@@ -133,6 +176,16 @@ export function WorkerDocumentRevisionPanel({ workerId, documentTypeId, onClose 
     },
     onError: (err: any) => {
       const msg = formatSupabaseErrorForUser(err);
+      const persisted = file ? loadAttempt(workerId, documentTypeId, file) : null;
+      setLastOutcome({
+        kind: "error",
+        attempts: err?.attempts ?? persisted?.attempts ?? 1,
+        replay: !!persisted,
+        idempotencyKey: err?.idempotencyKey ?? persisted?.idempotencyKey ?? null,
+        phase: err?.phase ?? null,
+        message: msg,
+      });
+      setAttemptTick((v) => v + 1);
       toast({ title: "Erro ao registrar revisão", description: msg, variant: "destructive" });
     },
   });
