@@ -138,4 +138,47 @@ describe("AsoValidityDialog", () => {
     resolveReeval(undefined);
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   });
+
+  it("exibe indicador de carregamento e desabilita ações durante invalidações", async () => {
+    let resolveReeval: (v: unknown) => void = () => {};
+    const reevalPromise = new Promise((r) => {
+      resolveReeval = r;
+    });
+    rpcMock.mockImplementation((name: string) => {
+      if (name === "correct_worker_document_validity") {
+        return Promise.resolve({ data: { ok: true }, error: null });
+      }
+      if (name === "reevaluate_worker_links") {
+        return reevalPromise.then(() => ({ data: null, error: null }));
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+    const { onOpenChange } = renderDialog();
+    fireEvent.change(screen.getByTestId("aso-validity-expires-at"), {
+      target: { value: "2027-01-10" },
+    });
+    fireEvent.click(screen.getByTestId("aso-validity-save"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("aso-validity-invalidating-overlay")).toBeInTheDocument(),
+    );
+
+    // Durante invalidações todos os controles devem estar desabilitados e
+    // o botão deve indicar o novo estágio.
+    expect((screen.getByTestId("aso-validity-issued-at") as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByTestId("aso-validity-expires-at") as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByTestId("aso-validity-invalidating-overlay")).toBeInTheDocument();
+    expect((screen.getByTestId("aso-validity-save") as HTMLButtonElement).textContent).toMatch(
+      /Atualizando consultas/i,
+    );
+
+    // Clique fora/fechar via botão Cancelar deve ser bloqueado.
+    fireEvent.click(screen.getByText(/Cancelar/i));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+
+    resolveReeval(undefined);
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+  });
 });
