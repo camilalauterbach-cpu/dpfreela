@@ -19,6 +19,7 @@ function makeCtrl(initial: VersionState): TestCtrl {
     async checkNow() {},
     async triggerUpdate() {
       updateCalls += 1;
+      return { reloaded: true } as const;
     },
     stop() {},
     markStale(remote: string) {
