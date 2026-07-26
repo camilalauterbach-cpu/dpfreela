@@ -10,6 +10,37 @@ import {
   type PendencyRow,
 } from "@/lib/sst/export";
 import { isTestDataWorker } from "@/lib/sst/test-data";
+import { supabase } from "@/integrations/supabase/client";
+
+/**
+ * Busca uma etiqueta informativa do(s) vínculo(s) ativo(s) por trabalhador.
+ * NUNCA gera pendência — ausência de vínculo é rotulada como
+ * "Disponível — sem vínculo atual" (estado neutro).
+ */
+async function fetchCurrentLinksByWorker(workerIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (workerIds.length === 0) return out;
+  const { data, error } = await (supabase as any)
+    .from("link_group_workers")
+    .select("worker_id, job_roles:job_role_id(name), link_groups!inner(group_name, events(name))")
+    .in("worker_id", workerIds)
+    .is("deleted_at", null);
+  if (error) return out;
+  const byWorker = new Map<string, string[]>();
+  for (const row of (data || []) as any[]) {
+    const evt = row.link_groups?.events?.name ?? row.link_groups?.group_name ?? "—";
+    const role = row.job_roles?.name ?? "sem cargo";
+    const label = `${evt} · ${role}`;
+    const arr = byWorker.get(row.worker_id) || [];
+    if (!arr.includes(label)) arr.push(label);
+    byWorker.set(row.worker_id, arr);
+  }
+  for (const [wid, labels] of byWorker) {
+    const head = labels.slice(0, 2).join("  |  ");
+    out.set(wid, labels.length > 2 ? `${head} +${labels.length - 2}` : head);
+  }
+  return out;
+}
 
 function fmtBR(iso: string | null): string {
   if (!iso) return "";
@@ -98,7 +129,7 @@ function buildResumo(input: PendenciesExportInput, pendencies: PendencyRow[]) {
   return rows;
 }
 
-function pendencyRowValues(p: PendencyRow, base: string) {
+function pendencyRowValues(p: PendencyRow, base: string, linkLabel: string) {
   const q = p.q;
   const dr = daysRemaining(q.expires_at);
   return {
@@ -115,6 +146,7 @@ function pendencyRowValues(p: PendencyRow, base: string) {
     days: dr == null ? "" : dr,
     has_file: q.document_url ? "Sim" : "Não",
     action: actionFor(p.rank),
+    current_link: linkLabel,
     worker_link: base ? `${base}/workers/${p.worker.worker_id}` : "",
     evaluated_at: new Date().toLocaleString("pt-BR"),
   };
@@ -165,6 +197,8 @@ export async function exportPendenciesXlsx(input: PendenciesExportInput): Promis
 
   const pendencies = input.filteredPendencies ?? collectPendencies(input.operationalWorkers);
   const base = siteBase(input.workerLinkBase);
+  const workerIds = Array.from(new Set(pendencies.map((p) => p.worker.worker_id)));
+  const linksByWorker = await fetchCurrentLinksByWorker(workerIds);
 
   // --- Aba A: Resumo ---
   const resumo = wb.addWorksheet("Resumo");
@@ -192,13 +226,17 @@ export async function exportPendenciesXlsx(input: PendenciesExportInput): Promis
     { key: "days", header: "Dias p/ vencer", width: 14 },
     { key: "has_file", header: "Arquivo?", width: 10 },
     { key: "action", header: "Ação necessária", width: 30 },
+    { key: "current_link", header: "Vínculo atual (informativo)", width: 36 },
     { key: "worker_link", header: "Link do trabalhador", width: 44 },
     { key: "evaluated_at", header: "Avaliado em", width: 20 },
   ];
   const shB = wb.addWorksheet("Pendências SST");
   shB.columns = HEADERS_B;
   shB.getRow(1).font = { bold: true };
-  for (const p of pendencies) shB.addRow(pendencyRowValues(p, base));
+  for (const p of pendencies) {
+    const link = linksByWorker.get(p.worker.worker_id) || "Disponível — sem vínculo atual";
+    shB.addRow(pendencyRowValues(p, base, link));
+  }
   shB.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: HEADERS_B.length } };
   shB.views = [{ state: "frozen", ySplit: 1 }];
 
