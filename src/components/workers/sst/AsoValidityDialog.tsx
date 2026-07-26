@@ -104,23 +104,35 @@ export function AsoValidityDialog({
     },
     onSuccess: async () => {
       toast.success("Validade do ASO atualizada.");
-      // Aguarda todas as invalidações + reavaliação canônica antes de fechar
-      // o diálogo, para o operador ver as datas já atualizadas sem "flash".
-      invalidateSstCaches(qc);
-      await Promise.all([
-        invalidateComplianceCaches(qc, { workerId, eventSource: "admin_update" }),
-        qc.invalidateQueries({ queryKey: ["worker-documents", workerId] }),
-        qc.invalidateQueries({ queryKey: ["worker-completion", workerId] }),
-        qc.invalidateQueries({ queryKey: ["worker-sst-current", workerId] }),
-        qc.invalidateQueries({ queryKey: ["worker-sst-summary", workerId] }),
-        qc.invalidateQueries({ queryKey: ["worker-sst-history", workerId] }),
-        qc.invalidateQueries({ queryKey: ["worker-sst-links-using", workerId] }),
-        qc.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs", workerId] }),
-        qc.invalidateQueries({ queryKey: ["worker-qualifications", workerId] }),
-        qc.invalidateQueries({ queryKey: ["sst-pendencies"] }),
-        qc.invalidateQueries({ queryKey: ["worker-links", workerId] }),
-        qc.invalidateQueries({ queryKey: ["employment-links", workerId] }),
-      ]);
+      // Entra em estado de invalidação: bloqueia ações e exibe indicador de
+      // carregamento enquanto refresca todos os caches dependentes.
+      setIsInvalidating(true);
+      try {
+        // invalidateSstCaches não retorna Promise, então replicamos as query
+        // keys dele explicitamente no Promise.all para garantir aguardamento.
+        await Promise.all([
+          invalidateComplianceCaches(qc, { workerId, eventSource: "admin_update" }),
+          qc.invalidateQueries({ queryKey: ["sst-qualifications"] }),
+          qc.invalidateQueries({ queryKey: ["sst-summary"] }),
+          qc.invalidateQueries({ queryKey: ["sst-alert-counts"] }),
+          qc.invalidateQueries({ queryKey: ["sst-worker-details"] }),
+          qc.invalidateQueries({ queryKey: ["dashboard-counts"] }),
+          qc.invalidateQueries({ queryKey: ["link-docs"] }),
+          qc.invalidateQueries({ queryKey: ["worker-documents", workerId] }),
+          qc.invalidateQueries({ queryKey: ["worker-completion", workerId] }),
+          qc.invalidateQueries({ queryKey: ["worker-sst-current", workerId] }),
+          qc.invalidateQueries({ queryKey: ["worker-sst-summary", workerId] }),
+          qc.invalidateQueries({ queryKey: ["worker-sst-history", workerId] }),
+          qc.invalidateQueries({ queryKey: ["worker-sst-links-using", workerId] }),
+          qc.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs", workerId] }),
+          qc.invalidateQueries({ queryKey: ["worker-qualifications", workerId] }),
+          qc.invalidateQueries({ queryKey: ["sst-pendencies"] }),
+          qc.invalidateQueries({ queryKey: ["worker-links", workerId] }),
+          qc.invalidateQueries({ queryKey: ["employment-links", workerId] }),
+        ]);
+      } finally {
+        setIsInvalidating(false);
+      }
       onOpenChange(false);
     },
     onError: (e: any) => {
@@ -130,7 +142,7 @@ export function AsoValidityDialog({
     },
   });
 
-  const pending = submit.isPending;
+  const pending = submit.isPending || isInvalidating;
   const canSubmit = errors.length === 0 && !unchanged && !pending;
 
   return (
