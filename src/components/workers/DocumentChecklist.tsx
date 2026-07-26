@@ -516,10 +516,9 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     const action = bankReplaceAction;
     setBankReplaceAction(null);
 
-    if (mode === "replace") {
-      await softDeleteMutation.mutateAsync(bankDocs.map((d) => ({ id: d.id, file_path: d.file_path })));
-    }
-
+    // Não desativa o comprovante anterior antes do novo registro existir.
+    // Upload manual e formulário bancário passam por RPCs canônicas que promovem
+    // a nova revisão de forma atômica; se falharem, o documento vigente segue intacto.
     if (action === "upload") {
       handleFileSelect("bank_document", true);
     } else {
@@ -1093,7 +1092,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>Já existe comprovante bancário</AlertDialogTitle>
             <AlertDialogDescription>
-              Este trabalhador já possui {bankDocs.length} comprovante(s) bancário(s) ativo(s). O que deseja fazer?
+              Este trabalhador já possui {bankDocs.length} comprovante(s) bancário(s) ativo(s). O novo envio só assume como vigente depois que arquivo e banco forem salvos com sucesso.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1102,7 +1101,7 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
               Adicionar (manter existentes)
             </AlertDialogAction>
             <AlertDialogAction onClick={() => handleBankReplaceConfirm("replace")}>
-              Substituir (desativar anteriores)
+              Substituir com segurança
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
