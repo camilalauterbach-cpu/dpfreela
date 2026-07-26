@@ -130,6 +130,39 @@ export interface SaveResult {
 }
 
 /**
+ * Cache keys touched by a successful bank data save. Kept here so that
+ * BankDataForm and its regression tests use the exact same list, and so
+ * DpReadinessBadge / WorkerCompletionChecklist can share the canonical
+ * `worker-completion` key without drifting.
+ */
+export const BANK_SAVE_INVALIDATION_KEYS = [
+  "worker-completion",
+  "worker-documents",
+  "worker-payment-methods",
+] as const;
+
+export interface QueryClientLike {
+  invalidateQueries: (args: { queryKey: readonly unknown[] }) => Promise<unknown>;
+}
+
+/**
+ * Invalidate (and await refetch of) every query that the bank flow can affect
+ * for a given worker. Returns only after react-query has settled the active
+ * queries, so callers can close their dialog with confidence that the badge
+ * and checklist already reflect the new state.
+ */
+export async function invalidateWorkerAfterBankSave(
+  qc: QueryClientLike,
+  workerId: string,
+): Promise<void> {
+  await Promise.all(
+    BANK_SAVE_INVALIDATION_KEYS.map((k) =>
+      qc.invalidateQueries({ queryKey: [k, workerId] }),
+    ),
+  );
+}
+
+/**
  * Orchestrate the atomic save: payment_method → PDF → upload → worker_documents.
  * On any failure after the payment_method insert, rolls back the storage object
  * and the payment_method row so nothing is orphaned.
