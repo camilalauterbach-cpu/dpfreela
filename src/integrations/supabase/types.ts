@@ -2953,6 +2953,13 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_cleanup_cron_activation_status: {
+        Args: never
+        Returns: {
+          cron_active: boolean
+          vault_present: boolean
+        }[]
+      }
       get_link_compliance_timeline: {
         Args: { p_limit?: number; p_link_id: string }
         Returns: Json
