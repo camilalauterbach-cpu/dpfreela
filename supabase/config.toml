@@ -17,3 +17,6 @@ verify_jwt = true
 
 [functions.invite-resend]
 verify_jwt = true
+
+[functions.storage-cleanup-process]
+verify_jwt = true
