@@ -1872,7 +1872,7 @@ export type Database = {
           id: string
           last_error: string | null
           max_attempts: number
-          next_attempt_at: string
+          next_attempt_at: string | null
           path: string
           source: string
           status: string
@@ -1889,7 +1889,7 @@ export type Database = {
           id?: string
           last_error?: string | null
           max_attempts?: number
-          next_attempt_at?: string
+          next_attempt_at?: string | null
           path: string
           source?: string
           status?: string
@@ -1906,7 +1906,7 @@ export type Database = {
           id?: string
           last_error?: string | null
           max_attempts?: number
-          next_attempt_at?: string
+          next_attempt_at?: string | null
           path?: string
           source?: string
           status?: string
@@ -2821,6 +2821,32 @@ export type Database = {
         }
         Returns: string
       }
+      claim_due_storage_cleanup_jobs: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          bucket: string
+          completed_at: string | null
+          created_at: string
+          document_type_id: string | null
+          id: string
+          last_error: string | null
+          max_attempts: number
+          next_attempt_at: string | null
+          path: string
+          source: string
+          status: string
+          trace_id: string | null
+          updated_at: string
+          worker_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "worker_document_storage_cleanup_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       claim_public_invite: {
         Args: { _ip_hash: string; _token_hash: string }
         Returns: Json
@@ -3009,7 +3035,7 @@ export type Database = {
           id: string
           last_error: string | null
           max_attempts: number
-          next_attempt_at: string
+          next_attempt_at: string | null
           path: string
           source: string
           status: string
@@ -3097,7 +3123,7 @@ export type Database = {
           id: string
           last_error: string | null
           max_attempts: number
-          next_attempt_at: string
+          next_attempt_at: string | null
           path: string
           source: string
           status: string
@@ -3119,6 +3145,32 @@ export type Database = {
       merge_workers_preview: {
         Args: { _primary: string; _secondary: string }
         Returns: Json
+      }
+      peek_due_storage_cleanup_jobs: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          bucket: string
+          completed_at: string | null
+          created_at: string
+          document_type_id: string | null
+          id: string
+          last_error: string | null
+          max_attempts: number
+          next_attempt_at: string | null
+          path: string
+          source: string
+          status: string
+          trace_id: string | null
+          updated_at: string
+          worker_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "worker_document_storage_cleanup_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       recompute_all_workers_registration_status: {
         Args: never
