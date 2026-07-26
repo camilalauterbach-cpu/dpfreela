@@ -255,8 +255,8 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
 
   const retryMut = useMutation({
     mutationFn: async (opts: { dryRun?: boolean } = {}) => {
-      const jobs = pendingJobsQuery.data ?? [];
-      if (jobs.length === 0) return { completed: 0, failed: 0, dryRun: !!opts.dryRun, requested: 0, jobs: [] as any[] };
+      // Elegibilidade real é decidida no banco (claim atômico); evitamos short-circuit
+      // no cliente para não ignorar jobs elegíveis que apareceram após a última query.
       // Backend Edge Function usa service_role para remover objetos do Storage
       // e atualizar o status dos jobs em worker_document_storage_cleanup_jobs.
       const { data, error } = await supabase.functions.invoke("storage-cleanup-process", {
