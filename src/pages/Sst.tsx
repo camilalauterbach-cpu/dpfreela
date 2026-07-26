@@ -224,6 +224,30 @@ export default function Sst() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      </div>
+      {(partitioned.test.length > 0 || isAdmin) && (
+        <div className="flex flex-wrap items-center gap-2 text-xs -mt-1">
+          {partitioned.test.length > 0 && (
+            <span className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-slate-700">
+              <FlaskConical className="h-3 w-3" />
+              {partitioned.test.length} dado{partitioned.test.length === 1 ? "" : "s"} de teste detectado{partitioned.test.length === 1 ? "" : "s"}
+            </span>
+          )}
+          {isAdmin && (
+            <div className="ml-auto inline-flex items-center gap-2">
+              <Switch
+                id="sst-toggle-test-data"
+                checked={includeTest}
+                onCheckedChange={(v) => setIncludeTest(Boolean(v))}
+              />
+              <Label htmlFor="sst-toggle-test-data" className="text-xs">
+                Incluir dados de teste
+              </Label>
+            </div>
+          )}
+        </div>
+      )}
+      <div className="hidden">
         {cards.map((c) => (
           <button key={c.label} onClick={c.onClick} className="text-left">
             <Card className="hover:border-primary/30 hover:shadow-sm transition">
