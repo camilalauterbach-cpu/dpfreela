@@ -316,8 +316,6 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     }) => {
       const validationError = validateUpload(file);
       if (validationError) throw new UploadStageError("validation", validationError);
-      const ext = file.name.split(".").pop();
-      const path = `${workerId}/${category}/${Date.now()}.${ext}`;
 
       const docType = resolveTypeForCategory(category);
       const documentTypeId = docType?.id ?? null;
@@ -327,72 +325,46 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
       // current revision, inserts the new current row and emits audit.
       const useCanonicalRpc = !!docType && docType.storage_scope === "worker" && !!documentTypeId;
 
-      if (documentTypeId) {
-        await logWorkerDocumentRevisionEvent(supabase as any, {
-          workerId,
-          documentTypeId,
-          event: "upload_started",
-          details: { category, file_name: file.name, file_size: file.size, mime_type: file.type },
-        });
-      }
-
-      const { error: uploadErr } = await supabase.storage
-        .from("worker-documents")
-        .upload(path, file, { upsert: !useCanonicalRpc, contentType: getSafeContentType(file) });
-      if (uploadErr) {
-        if (documentTypeId) {
-          await logWorkerDocumentRevisionEvent(supabase as any, {
-            workerId,
-            documentTypeId,
-            event: "storage_upload_failed",
-            status: "error",
-            details: { category, file_name: file.name, error: uploadErr.message ?? String(uploadErr) },
-          });
-        }
-        throw new UploadStageError("storage_upload", uploadErr.message || "Falha no upload para o Storage.", uploadErr);
-      }
-      if (documentTypeId) {
-        await logWorkerDocumentRevisionEvent(supabase as any, {
-          workerId,
-          documentTypeId,
-          event: "storage_uploaded",
-          details: { category, file_name: file.name, file_size: file.size, file_path: path },
-        });
-      }
-
-      if (useCanonicalRpc) {
+      if (useCanonicalRpc && documentTypeId) {
+        // Reenvio seguro: se já existe attempt em sessão para (worker,type,arquivo),
+        // reusamos idempotency_key e storagePath — a RPC devolve idempotent_hit
+        // caso a revisão já tenha sido persistida numa tentativa anterior.
+        const ext = file.name.split(".").pop() ?? "bin";
+        const { attempt } = getOrCreateAttempt(workerId, documentTypeId, file, () =>
+          `${workerId}/${category}/${Date.now()}.${ext}`,
+        );
         const currentDoc = getCurrentManagedDocForCategory(category);
         try {
-          await registerWorkerDocumentRevision(supabase as any, {
+          await performIdempotentWorkerDocumentUpload(supabase as any, {
             workerId,
             documentTypeId,
             currentDocumentId: currentDoc?.id ?? null,
-            filePath: path,
-            fileName: file.name,
-            fileSize: file.size,
-            mimeType: getSafeContentType(file),
+            file,
+            storagePath: attempt.storagePath,
+            contentType: getSafeContentType(file),
+            category,
             status: "uploaded",
             issuedAt: issuedAt ?? null,
             explicitExpiresAt: explicitExpiresAt ?? null,
           });
-        } catch (rpcErr) {
-          await supabase.storage.from("worker-documents").remove([path]).catch(() => {});
-          if (documentTypeId) {
-            await logWorkerDocumentRevisionEvent(supabase as any, {
-              workerId,
-              documentTypeId,
-              event: "db_persist_failed",
-              status: "error",
-              details: { category, file_name: file.name, file_path: path, error: (rpcErr as any)?.message ?? String(rpcErr) },
-            });
+        } catch (err) {
+          if (err instanceof IdempotentUploadStageError) {
+            throw new UploadStageError(err.phase, err.message, err.cause);
           }
-          throw new UploadStageError(
-            "db_registration",
-            (rpcErr as any)?.message || "Falha ao registrar a revisão do documento.",
-            rpcErr,
-          );
+          throw err;
         }
         return;
+      }
+
+      // Fluxo legado (link-scoped ou tipos sem cadastro canônico) — mantém
+      // compensação via remove-on-fail, sem idempotência de sessão.
+      const ext = file.name.split(".").pop();
+      const path = `${workerId}/${category}/${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from("worker-documents")
+        .upload(path, file, { upsert: true, contentType: getSafeContentType(file) });
+      if (uploadErr) {
+        throw new UploadStageError("storage_upload", uploadErr.message || "Falha no upload para o Storage.", uploadErr);
       }
 
       // Compensable write: if the DB row fails to persist, remove the just-
