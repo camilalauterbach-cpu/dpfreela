@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  useSstOverview, useSstSummary, useSstAlertCounts,
+  useSstOverview,
   ExpirationStatus, DocumentStatus, ValidityStatus, SstCurrentRow,
 } from "@/hooks/useSstQualifications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
