@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import {
   Upload, Plus, RefreshCw, Replace, History, Users, MoreHorizontal, GitBranch,
-  FileText, ExternalLink, ShieldCheck, FolderOpen, Trash2,
+  FileText, ExternalLink, ShieldCheck, FolderOpen, Trash2, AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -122,28 +122,15 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
         });
         throw error;
       }
-      // Limpeza best-effort do Storage; falha nunca ressuscita a NR.
       const storagePaths: string[] = Array.isArray((data as any)?.storage_paths)
         ? ((data as any).storage_paths as string[]).filter((p) => typeof p === "string" && p.length > 0)
         : [];
-      if (storagePaths.length > 0) {
-        try {
-          const { error: rmErr } = await supabase.storage
-            .from("worker-documents")
-            .remove(storagePaths);
-          if (rmErr) {
-            // eslint-disable-next-line no-console
-            console.warn("[sst-hard-delete] storage_cleanup_pending", {
-              traceId, paths: storagePaths, error: rmErr.message,
-            });
-          }
-        } catch (e: any) {
-          // eslint-disable-next-line no-console
-          console.warn("[sst-hard-delete] storage_cleanup_exception", {
-            traceId, paths: storagePaths, error: String(e?.message || e),
-          });
-        }
-      }
+      const cleanupJobIds: string[] = Array.isArray((data as any)?.cleanup_job_ids)
+        ? ((data as any).cleanup_job_ids as string[]).filter((s) => typeof s === "string" && s.length > 0)
+        : [];
+      // Limpeza best-effort do Storage. Falha NUNCA ressuscita a NR — os jobs
+      // permanecem pending/failed na fila e podem ser reprocessados.
+      const cleanupOutcome = await runStorageCleanup(storagePaths, cleanupJobIds, traceId);
       // Reavalia vínculos após exclusão para recalcular indicadores.
       await (supabase as any).rpc("reevaluate_worker_links", {
         p_worker_id: workerId,
@@ -154,17 +141,23 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
         traceId, qualificationId: id, elapsedMs: Math.round(performance.now() - t0),
         deleted_qualification_ids: (data as any)?.deleted_qualification_ids,
         deleted_worker_document_ids: (data as any)?.deleted_worker_document_ids,
-        storage_paths_removed: storagePaths.length,
+        storage_paths_total: storagePaths.length,
+        storage_cleanup: cleanupOutcome,
       });
       return { traceId, before };
     },
-    onSuccess: (ctx) => {
-      invalidateSstCaches(qc);
-      invalidateComplianceCaches(qc, { workerId, eventSource: "admin_update" });
-      qc.invalidateQueries({ queryKey: ["worker-sst-current", workerId] });
-      qc.invalidateQueries({ queryKey: ["worker-sst-summary", workerId] });
-      qc.invalidateQueries({ queryKey: ["worker-sst-history", workerId] });
-      qc.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs", workerId] });
+    onSuccess: async (ctx) => {
+      // Aguarda TODAS as invalidações/refetches antes de fechar o diálogo,
+      // garantindo que a UI só sinaliza conclusão após a atualização real.
+      await Promise.all([
+        invalidateSstCaches(qc),
+        invalidateComplianceCaches(qc, { workerId, eventSource: "admin_update" }),
+        qc.invalidateQueries({ queryKey: ["worker-sst-current", workerId] }),
+        qc.invalidateQueries({ queryKey: ["worker-sst-summary", workerId] }),
+        qc.invalidateQueries({ queryKey: ["worker-sst-history", workerId] }),
+        qc.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs", workerId] }),
+        qc.invalidateQueries({ queryKey: ["storage-cleanup-jobs-pending"] }),
+      ]);
       // eslint-disable-next-line no-console
       console.info("[sst-hard-delete] caches_invalidated", {
         traceId: ctx?.traceId, workerId, summaryBefore: ctx?.before,
@@ -175,6 +168,66 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
     onError: (e: any) => {
       toast.error(String(e?.message || "Falha ao excluir certificado."));
     },
+  });
+
+  // Jobs de limpeza pendentes (visível para admin/manager/operator)
+  const pendingJobsQuery = useQuery({
+    queryKey: ["storage-cleanup-jobs-pending"],
+    enabled: canDelete,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc(
+        "list_pending_storage_cleanup_jobs",
+        { p_limit: 200 },
+      );
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string; bucket: string; path: string; status: string;
+        attempts: number; last_error: string | null; trace_id: string | null;
+      }>;
+    },
+  });
+  const pendingCount = pendingJobsQuery.data?.length ?? 0;
+
+  const retryMut = useMutation({
+    mutationFn: async () => {
+      const jobs = pendingJobsQuery.data ?? [];
+      if (jobs.length === 0) return { completed: 0, failed: 0 };
+      // Agrupa por bucket para chamadas em lote.
+      const byBucket = new Map<string, typeof jobs>();
+      for (const j of jobs) {
+        const list = byBucket.get(j.bucket) ?? [];
+        list.push(j);
+        byBucket.set(j.bucket, list);
+      }
+      let completed = 0, failed = 0;
+      for (const [bucket, list] of byBucket) {
+        const { error: rmErr } = await supabase.storage.from(bucket).remove(list.map((j) => j.path));
+        for (const j of list) {
+          if (rmErr) {
+            await (supabase as any).rpc("mark_storage_cleanup_job_status", {
+              p_id: j.id, p_status: "failed", p_error: rmErr.message,
+            });
+            failed += 1;
+          } else {
+            await (supabase as any).rpc("mark_storage_cleanup_job_status", {
+              p_id: j.id, p_status: "completed", p_error: null,
+            });
+            completed += 1;
+          }
+        }
+      }
+      return { completed, failed };
+    },
+    onSuccess: async (res) => {
+      await qc.invalidateQueries({ queryKey: ["storage-cleanup-jobs-pending"] });
+      if (res.failed === 0) {
+        toast.success(`Limpeza concluída (${res.completed}).`);
+      } else {
+        toast.warning(`Limpeza parcial: ${res.completed} ok, ${res.failed} falharam.`);
+      }
+    },
+    onError: (e: any) => toast.error(String(e?.message || "Falha ao reprocessar limpeza.")),
   });
 
   const rows = unified ?? [];
@@ -227,6 +280,29 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
           </>
         )}
       </div>
+
+      {canDelete && pendingCount > 0 && (
+        <div
+          data-testid="storage-cleanup-alert"
+          className="flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          <div className="flex items-center gap-2 text-sm">
+            <AlertTriangle className="h-4 w-4" />
+            <span>
+              <strong>{pendingCount}</strong> arquivo(s) de exclusões definitivas aguardam remoção do Storage.
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={retryMut.isPending}
+            onClick={() => retryMut.mutate()}
+            data-testid="storage-cleanup-retry"
+          >
+            {retryMut.isPending ? "Reprocessando…" : "Reprocessar limpeza"}
+          </Button>
+        </div>
+      )}
 
       {/* Tabela */}
       <Card>
