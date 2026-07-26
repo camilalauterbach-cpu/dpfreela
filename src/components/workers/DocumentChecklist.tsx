@@ -20,6 +20,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -76,9 +77,9 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("document_types")
-        .select("id, code, category, storage_scope, is_active, completion_requirement");
+        .select("id, code, category, storage_scope, is_active, completion_requirement, validity_mode");
       if (error) throw error;
-      const map = new Map<string, { id: string; code: string; category: string | null; storage_scope: string | null; completion_requirement: string | null }>();
+      const map = new Map<string, { id: string; code: string; category: string | null; storage_scope: string | null; completion_requirement: string | null; validity_mode: string | null }>();
       for (const r of data ?? []) {
         const key = (r as any).code?.toLowerCase();
         if (key && !map.has(key)) map.set(key, r as any);
@@ -236,6 +237,14 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
   const [showBankForm, setShowBankForm] = useState(false);
   const [bankReplaceAction, setBankReplaceAction] = useState<"upload" | "form" | null>(null);
   const [deleteConfirmDoc, setDeleteConfirmDoc] = useState<any | null>(null);
+  const [pendingDatedUpload, setPendingDatedUpload] = useState<{
+    category: string;
+    file: File;
+    alwaysInsert?: boolean;
+    requiresExplicitExpiry: boolean;
+  } | null>(null);
+  const [pendingIssuedAt, setPendingIssuedAt] = useState(new Date().toISOString().slice(0, 10));
+  const [pendingExplicitExpiresAt, setPendingExplicitExpiresAt] = useState("");
 
   // When arriving with ?document_type_id=…, scroll to the card, ring-highlight
   // it and open the file picker so the user reaches the action in one click.
@@ -266,7 +275,19 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
   }, [focusedDocumentTypeId, focusedCategory, canEdit]);
 
   const uploadMutation = useMutation({
-   mutationFn: async ({ category, file, alwaysInsert }: { category: string; file: File; alwaysInsert?: boolean }) => {
+   mutationFn: async ({
+      category,
+      file,
+      alwaysInsert,
+      issuedAt,
+      explicitExpiresAt,
+    }: {
+      category: string;
+      file: File;
+      alwaysInsert?: boolean;
+      issuedAt?: string | null;
+      explicitExpiresAt?: string | null;
+    }) => {
       const validationError = validateUpload(file);
       if (validationError) throw new Error(validationError);
       const ext = file.name.split(".").pop();
@@ -297,6 +318,8 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
             fileSize: file.size,
             mimeType: getSafeContentType(file),
             status: "uploaded",
+            issuedAt: issuedAt ?? null,
+            explicitExpiresAt: explicitExpiresAt ?? null,
           });
         } catch (rpcErr) {
           await supabase.storage.from("worker-documents").remove([path]).catch(() => {});
@@ -425,6 +448,20 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
       if (file) {
         if (file.size > 10 * 1024 * 1024) {
           toast({ title: "Arquivo muito grande", description: "Máximo 10MB", variant: "destructive" });
+          return;
+        }
+        const docType = resolveTypeForCategory(category);
+        const requiresIssuedAt = docType?.storage_scope === "worker"
+          && (docType.validity_mode === "fixed_duration" || docType.validity_mode === "explicit_date");
+        if (requiresIssuedAt) {
+          setPendingIssuedAt(new Date().toISOString().slice(0, 10));
+          setPendingExplicitExpiresAt("");
+          setPendingDatedUpload({
+            category,
+            file,
+            alwaysInsert,
+            requiresExplicitExpiry: docType?.validity_mode === "explicit_date",
+          });
           return;
         }
         uploadMutation.mutate({ category, file, alwaysInsert });
@@ -996,6 +1033,60 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
           </DialogContent>
         </Dialog>
       )}
+
+      <Dialog open={!!pendingDatedUpload} onOpenChange={(open) => !open && setPendingDatedUpload(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Data do documento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="doc-issued-at">Emissão / realização</Label>
+              <input
+                id="doc-issued-at"
+                type="date"
+                value={pendingIssuedAt}
+                onChange={(e) => setPendingIssuedAt(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+            {pendingDatedUpload?.requiresExplicitExpiry && (
+              <div className="space-y-1.5">
+                <Label htmlFor="doc-explicit-expires-at">Validade</Label>
+                <input
+                  id="doc-explicit-expires-at"
+                  type="date"
+                  value={pendingExplicitExpiresAt}
+                  onChange={(e) => setPendingExplicitExpiresAt(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setPendingDatedUpload(null)}>
+                Cancelar
+              </Button>
+              <Button
+                disabled={!pendingIssuedAt || (pendingDatedUpload?.requiresExplicitExpiry && !pendingExplicitExpiresAt)}
+                onClick={() => {
+                  if (!pendingDatedUpload) return;
+                  uploadMutation.mutate({
+                    category: pendingDatedUpload.category,
+                    file: pendingDatedUpload.file,
+                    alwaysInsert: pendingDatedUpload.alwaysInsert,
+                    issuedAt: pendingIssuedAt,
+                    explicitExpiresAt: pendingDatedUpload.requiresExplicitExpiry ? pendingExplicitExpiresAt : null,
+                  });
+                  setUploadingCategory(pendingDatedUpload.category);
+                  setPendingDatedUpload(null);
+                }}
+              >
+                Continuar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Replace/Add confirmation dialog */}
       <AlertDialog open={!!bankReplaceAction} onOpenChange={() => setBankReplaceAction(null)}>

@@ -100,7 +100,7 @@ export function WorkerDocumentRevisionPanel({ workerId, documentTypeId, onClose 
           fileSize: file.size,
           mimeType: getSafeContentType(file),
           issuedAt: issueDate || null,
-          explicitExpiresAt: expiryDate || null,
+          explicitExpiresAt: docType?.validityMode === "explicit_date" ? expiryDate || null : null,
           documentNumber: documentNumber || null,
           issuingAuthority: issuingAuthority || null,
           notes: notes || null,
