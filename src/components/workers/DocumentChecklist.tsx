@@ -1126,9 +1126,21 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
                 Cancelar
               </Button>
               <Button
-                disabled={!pendingIssuedAt || (pendingDatedUpload?.requiresExplicitExpiry && !pendingExplicitExpiresAt)}
                 onClick={() => {
                   if (!pendingDatedUpload) return;
+                  const missing: string[] = [];
+                  if (!pendingIssuedAt) missing.push("Data de emissão/realização");
+                  if (pendingDatedUpload.requiresExplicitExpiry && !pendingExplicitExpiresAt) {
+                    missing.push("Data de validade");
+                  }
+                  if (missing.length > 0) {
+                    toast({
+                      title: "Campos obrigatórios ausentes",
+                      description: `Preencha antes de enviar: ${missing.join(", ")}.`,
+                      variant: "destructive",
+                    });
+                    return;
+                  }
                   uploadMutation.mutate({
                     category: pendingDatedUpload.category,
                     file: pendingDatedUpload.file,
