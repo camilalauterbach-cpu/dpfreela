@@ -155,12 +155,13 @@ export function AsoValidityDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
+        <div className="space-y-3 relative">
           <div>
             <Label>Data de emissão *</Label>
             <Input
               type="date" max={today} value={issuedAt}
               onChange={(e) => setIssuedAt(e.target.value)}
+              disabled={pending}
               data-testid="aso-validity-issued-at"
             />
           </div>
@@ -170,6 +171,7 @@ export function AsoValidityDialog({
               type="date" min={issuedAt || undefined}
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
+              disabled={pending}
               data-testid="aso-validity-expires-at"
             />
           </div>
@@ -179,6 +181,7 @@ export function AsoValidityDialog({
               rows={2} value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Ex.: correção de digitação, ajuste conforme documento físico."
+              disabled={pending}
             />
           </div>
 
@@ -193,6 +196,18 @@ export function AsoValidityDialog({
               data-testid="aso-validity-error"
             >
               {lastError}
+            </div>
+          )}
+
+          {isInvalidating && (
+            <div
+              className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-md bg-background/90 backdrop-blur-sm"
+              data-testid="aso-validity-invalidating-overlay"
+            >
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">
+                Atualizando consultas, aguarde…
+              </p>
             </div>
           )}
         </div>
@@ -211,7 +226,7 @@ export function AsoValidityDialog({
             data-testid="aso-validity-save"
           >
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Salvar validade
+            {isInvalidating ? "Atualizando consultas…" : "Salvar validade"}
           </Button>
         </DialogFooter>
       </DialogContent>
