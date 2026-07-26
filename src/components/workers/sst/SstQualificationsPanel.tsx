@@ -33,6 +33,7 @@ import { SstHistorySheet } from "./SstHistorySheet";
 import { SstLinksUsingSheet } from "./SstLinksUsingSheet";
 import { SstNrTimeline } from "./SstNrTimeline";
 import { SstCertificateDrawer, type SstDrawerMode } from "./SstCertificateDrawer";
+import { AsoValidityDialog } from "./AsoValidityDialog";
 import { openCertificate } from "@/lib/sst/certificate-url";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { invalidateSstCaches } from "@/hooks/useSstQualifications";
@@ -83,6 +84,16 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
   >(null);
   const [deleteTarget, setDeleteTarget] = useState<
     { id: string; code: string; issuedAt: string | null } | null
+  >(null);
+  const [asoValidity, setAsoValidity] = useState<
+    | {
+        documentId: string;
+        documentTypeId: string;
+        code: string;
+        issuedAt: string | null;
+        expiresAt: string | null;
+      }
+    | null
   >(null);
 
   const deleteMut = useMutation({
@@ -160,6 +171,16 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
 
   const openManageInDocuments = (documentTypeId: string) =>
     navigate(`/workers/${workerId}?tab=documentos&document_type_id=${documentTypeId}`);
+
+  const openAsoValidity = (q: UnifiedQualificationRow) => {
+    setAsoValidity({
+      documentId: q.id,
+      documentTypeId: q.documentTypeId,
+      code: q.code,
+      issuedAt: q.issuedAt,
+      expiresAt: q.expiresAt,
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -245,6 +266,11 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
                     onLinks={() => setLinksOpen({ nr: q.code, docTypeId: q.documentTypeId })}
                     onTimeline={() => setTimelineOpen({ nr: q.code, docTypeId: q.documentTypeId })}
                     onManageInDocuments={() => openManageInDocuments(q.documentTypeId)}
+                    onEditValidity={
+                      q.category === "sst_aso" && q.storageFlow === "worker_documents" && canEdit
+                        ? () => openAsoValidity(q)
+                        : undefined
+                    }
                     onDelete={
                       canDelete && q.source === "sst" && q.sstRaw
                         ? () =>
@@ -310,6 +336,23 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
           onManageInDocuments={(documentTypeId) => {
             setDrawer(null);
             openManageInDocuments(documentTypeId);
+          }}
+        />
+      )}
+      {asoValidity && (
+        <AsoValidityDialog
+          open={!!asoValidity}
+          onOpenChange={(v) => !v && setAsoValidity(null)}
+          workerId={workerId}
+          documentId={asoValidity.documentId}
+          documentTypeId={asoValidity.documentTypeId}
+          documentCode={asoValidity.code}
+          currentIssuedAt={asoValidity.issuedAt}
+          currentExpiresAt={asoValidity.expiresAt}
+          onManageInDocuments={() => {
+            const dtId = asoValidity.documentTypeId;
+            setAsoValidity(null);
+            openManageInDocuments(dtId);
           }}
         />
       )}
