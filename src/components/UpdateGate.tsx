@@ -17,20 +17,24 @@ export function UpdateGate({ controller }: { controller?: Controller } = {}) {
   const [countdown, setCountdown] = useState(Math.ceil(AUTO_UPDATE_MS_EXPORT / 1000));
   const [updating, setUpdating] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  // Track the last version we tried, so we don't hammer the same target in a
-  // tight loop from the auto-timer, but we DO allow the user to retry.
-  const attemptedRef = useRef<string | null>(null);
+  // Track the last version the AUTO timer already handled. The auto timer
+  // must never retry the same target — subsequent reloads for the same
+  // target require an explicit user click.
+  const autoAttemptedRef = useRef<string | null>(null);
 
   const staleRemote = state.kind === "stale" ? state.remote : null;
 
   const runUpdate = async (auto: boolean) => {
     if (!staleRemote) return;
     if (updating) return;
-    if (auto && attemptedRef.current === staleRemote) return; // no auto-retry loop
-    attemptedRef.current = staleRemote;
+    if (auto && autoAttemptedRef.current === staleRemote) return; // no auto-retry loop
+    if (auto) autoAttemptedRef.current = staleRemote;
     setUpdating(true);
     setErrorMsg(null);
-    const result = await ctrl.triggerUpdate();
+    // Manual retry only kicks in when the user clicks after a previous
+    // failure/guard-hit for the same target. Auto never retries.
+    const manualRetry = !auto && errorMsg !== null;
+    const result = await ctrl.triggerUpdate({ manualRetry });
     if (result.reloaded === false) {
       // Failure or guard hit — surface a human message and let the user retry.
       setUpdating(false);
