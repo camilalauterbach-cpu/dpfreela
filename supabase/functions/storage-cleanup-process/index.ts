@@ -41,6 +41,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const limit: number = Math.min(Math.max(Number(body?.limit ?? 200), 1), 500);
+    const dryRun: boolean = Boolean(body?.dryRun ?? body?.dry_run ?? false);
 
     const { data: jobs, error: listErr } = await admin.rpc(
       "list_pending_storage_cleanup_jobs",
@@ -54,7 +55,7 @@ Deno.serve(async (req) => {
       path: string;
     }>;
     if (pending.length === 0) {
-      return json(200, { requested: 0, completed: 0, failed: 0, jobs: [] });
+      return json(200, { dryRun, requested: 0, completed: 0, failed: 0, jobs: [] });
     }
 
     // Group by bucket for batched removal via service_role.
@@ -63,6 +64,35 @@ Deno.serve(async (req) => {
       const list = byBucket.get(j.bucket) ?? [];
       list.push(j);
       byBucket.set(j.bucket, list);
+    }
+
+    // Dry-run: report what WOULD be removed without touching Storage or job status.
+    if (dryRun) {
+      const preview = pending.map((j) => ({
+        id: j.id,
+        bucket: j.bucket,
+        path: j.path,
+        status: "would_remove" as const,
+      }));
+      const byBucketCount: Record<string, number> = {};
+      for (const [bucket, list] of byBucket) byBucketCount[bucket] = list.length;
+      console.log(
+        JSON.stringify({
+          event: "storage_cleanup_dry_run",
+          caller_id: callerId,
+          requested: pending.length,
+          buckets: byBucketCount,
+          paths: preview.map((p) => `${p.bucket}/${p.path}`),
+        }),
+      );
+      return json(200, {
+        dryRun: true,
+        requested: pending.length,
+        completed: 0,
+        failed: 0,
+        buckets: byBucketCount,
+        jobs: preview,
+      });
     }
 
     let completed = 0;
@@ -99,6 +129,7 @@ Deno.serve(async (req) => {
     }
 
     return json(200, {
+      dryRun: false,
       requested: pending.length,
       completed,
       failed,
