@@ -19,4 +19,8 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.storage-cleanup-process]
-verify_jwt = true
+# verify_jwt disabled: this function is called by pg_cron with only an
+# `x-cron-secret` header (no user JWT). Authentication is enforced INSIDE
+# the function (fail-closed): valid cron secret OR valid user JWT via
+# auth.getUser(). Anything else returns 401.
+verify_jwt = false

@@ -296,12 +296,15 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
     enabled: canDelete,
     staleTime: 60_000,
     queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc("get_cleanup_cron_activation_status");
+      // Consulta o status via Edge Function (ramo {status:true}) para não expor
+      // metadados de infraestrutura (Vault/cron) diretamente via RPC a papéis comuns.
+      const { data, error } = await supabase.functions.invoke("storage-cleanup-process", {
+        body: { status: true },
+      });
       if (error) throw error;
-      const row = Array.isArray(data) ? data[0] : data;
       return {
-        vaultPresent: !!row?.vault_present,
-        cronActive: !!row?.cron_active,
+        vaultPresent: !!(data as any)?.vaultPresent,
+        cronActive: !!(data as any)?.cronActive,
       };
     },
   });
