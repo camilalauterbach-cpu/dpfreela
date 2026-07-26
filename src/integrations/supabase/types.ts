@@ -2914,6 +2914,10 @@ export type Database = {
         }[]
       }
       get_user_id_by_email: { Args: { _email: string }; Returns: string }
+      hard_delete_sst_chain: {
+        Args: { p_qualification_id: string }
+        Returns: Json
+      }
       has_any_role: {
         Args: {
           _roles: Database["public"]["Enums"]["app_role"][]
