@@ -434,19 +434,25 @@ export function SstCertificateDrawer({
   // Preflight autoritativo — consulta a fonte canônica antes de qualquer upload.
   // Retorna null quando não há vigente para (worker_id, document_type_id).
   async function preflightCurrent(documentTypeId: string): Promise<SstCurrentRow | null> {
-    const { data, error } = await (supabase as any)
-      .from("worker_sst_qualifications_current")
-      .select("*")
-      .eq("worker_id", workerId)
-      .eq("document_type_id", documentTypeId)
-      .maybeSingle();
-    if (error) {
+    try {
+      const { data, error } = await (supabase as any)
+        .from("worker_sst_qualifications_current")
+        .select("*")
+        .eq("worker_id", workerId)
+        .eq("document_type_id", documentTypeId)
+        .maybeSingle();
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.warn("[sst-preflight] falhou:", error);
+        return null;
+      }
+      return (data as SstCurrentRow | null) ?? null;
+    } catch (err) {
       // Não bloquear em erro de leitura — a RPC ainda protege por índice único.
       // eslint-disable-next-line no-console
-      console.warn("[sst-preflight] falhou:", error);
+      console.warn("[sst-preflight] exception:", err);
       return null;
     }
-    return (data as SstCurrentRow | null) ?? null;
   }
 
   const submit = useMutation({
