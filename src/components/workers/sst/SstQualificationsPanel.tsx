@@ -207,24 +207,51 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
     },
   });
 
-  // Jobs de limpeza pendentes (visível para admin/manager/operator)
-  const pendingJobsQuery = useQuery({
-    queryKey: ["storage-cleanup-jobs-pending"],
+  // Jobs de limpeza pendentes (visível para admin/manager/operator).
+  // Consulta direta à tabela (RLS restringe leitura por papel) para derivar
+  // as fases humanas: aguardando janela, elegível, esgotado, concluído, falhou.
+  type CleanupJobRow = {
+    id: string;
+    bucket: string;
+    path: string;
+    status: string;
+    attempts: number;
+    max_attempts: number;
+    next_attempt_at: string | null;
+    completed_at: string | null;
+    last_error: string | null;
+  };
+  type CleanupPhase = "due" | "waiting" | "exhausted" | "completed" | "failed";
+  const cleanupJobsQuery = useQuery({
+    queryKey: ["storage-cleanup-jobs"],
     enabled: canDelete,
     staleTime: 30_000,
     queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc(
-        "list_pending_storage_cleanup_jobs",
-        { p_limit: 200 },
-      );
+      const { data, error } = await (supabase as any)
+        .from("worker_document_storage_cleanup_jobs")
+        .select("id,bucket,path,status,attempts,max_attempts,next_attempt_at,completed_at,last_error")
+        .order("created_at", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as Array<{
-        id: string; bucket: string; path: string; status: string;
-        attempts: number; last_error: string | null; trace_id: string | null;
-      }>;
+      return (data ?? []) as CleanupJobRow[];
     },
   });
-  const pendingCount = pendingJobsQuery.data?.length ?? 0;
+  const phaseOf = (j: CleanupJobRow, nowMs: number): CleanupPhase => {
+    if (j.status === "completed") return "completed";
+    if (j.attempts >= j.max_attempts || j.next_attempt_at === null) {
+      return j.status === "failed" || j.attempts >= j.max_attempts ? "exhausted" : "failed";
+    }
+    const nextMs = new Date(j.next_attempt_at).getTime();
+    if (Number.isFinite(nextMs) && nextMs > nowMs) return "waiting";
+    return "due";
+  };
+  const nowMs = Date.now();
+  const phaseCounts = useMemo(() => {
+    const acc: Record<CleanupPhase, number> = { due: 0, waiting: 0, exhausted: 0, completed: 0, failed: 0 };
+    for (const j of cleanupJobsQuery.data ?? []) acc[phaseOf(j, nowMs)] += 1;
+    return acc;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cleanupJobsQuery.data]);
+  const pendingCount = phaseCounts.due + phaseCounts.waiting + phaseCounts.exhausted;
 
   const retryMut = useMutation({
     mutationFn: async (opts: { dryRun?: boolean } = {}) => {
@@ -233,7 +260,7 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
       // Backend Edge Function usa service_role para remover objetos do Storage
       // e atualizar o status dos jobs em worker_document_storage_cleanup_jobs.
       const { data, error } = await supabase.functions.invoke("storage-cleanup-process", {
-        body: { limit: 200, dryRun: !!opts.dryRun },
+        body: { limit: 50, dryRun: !!opts.dryRun },
       });
       if (error) throw error;
       return {
@@ -252,7 +279,7 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
         );
         return;
       }
-      await qc.invalidateQueries({ queryKey: ["storage-cleanup-jobs-pending"] });
+      await qc.invalidateQueries({ queryKey: ["storage-cleanup-jobs"] });
       if (res.failed === 0) {
         toast.success(`Limpeza concluída (${res.completed}).`);
       } else {
@@ -316,32 +343,43 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
       {canDelete && pendingCount > 0 && (
         <div
           data-testid="storage-cleanup-alert"
-          className="flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          className="flex flex-col gap-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
         >
           <div className="flex items-center gap-2 text-sm">
             <AlertTriangle className="h-4 w-4" />
             <span>
-              <strong>{pendingCount}</strong> arquivo(s) de exclusões definitivas aguardam remoção do Storage.
+              <strong>{pendingCount}</strong> arquivo(s) aguardando limpeza no Storage.
             </span>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={retryMut.isPending}
-            onClick={() => retryMut.mutate({})}
-            data-testid="storage-cleanup-retry"
-          >
-            {retryMut.isPending ? "Reprocessando…" : "Reprocessar limpeza"}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={retryMut.isPending}
-            onClick={() => retryMut.mutate({ dryRun: true })}
-            data-testid="storage-cleanup-dry-run"
-          >
-            Dry-run
-          </Button>
+          <div className="flex flex-wrap gap-2 text-xs" data-testid="storage-cleanup-phases">
+            <span data-testid="phase-due">Elegíveis agora: <strong>{phaseCounts.due}</strong></span>
+            <span data-testid="phase-waiting">Aguardando janela de retry: <strong>{phaseCounts.waiting}</strong></span>
+            <span data-testid="phase-exhausted">Tentativas esgotadas: <strong>{phaseCounts.exhausted}</strong></span>
+            {phaseCounts.completed > 0 && (
+              <span data-testid="phase-completed">Concluídos: <strong>{phaseCounts.completed}</strong></span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={retryMut.isPending || phaseCounts.due === 0}
+              onClick={() => retryMut.mutate({})}
+              data-testid="storage-cleanup-retry"
+              title={phaseCounts.due === 0 ? "Nenhum job elegível na janela atual" : "Processa jobs elegíveis"}
+            >
+              {retryMut.isPending ? "Reprocessando…" : "Reprocessar limpeza"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={retryMut.isPending}
+              onClick={() => retryMut.mutate({ dryRun: true })}
+              data-testid="storage-cleanup-dry-run"
+            >
+              Dry-run
+            </Button>
+          </div>
         </div>
       )}
 
