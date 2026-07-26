@@ -227,21 +227,31 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
   const pendingCount = pendingJobsQuery.data?.length ?? 0;
 
   const retryMut = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (opts: { dryRun?: boolean } = {}) => {
       const jobs = pendingJobsQuery.data ?? [];
-      if (jobs.length === 0) return { completed: 0, failed: 0 };
+      if (jobs.length === 0) return { completed: 0, failed: 0, dryRun: !!opts.dryRun, requested: 0, jobs: [] as any[] };
       // Backend Edge Function usa service_role para remover objetos do Storage
       // e atualizar o status dos jobs em worker_document_storage_cleanup_jobs.
       const { data, error } = await supabase.functions.invoke("storage-cleanup-process", {
-        body: { limit: 200 },
+        body: { limit: 200, dryRun: !!opts.dryRun },
       });
       if (error) throw error;
       return {
         completed: (data as any)?.completed ?? 0,
         failed: (data as any)?.failed ?? 0,
+        dryRun: !!(data as any)?.dryRun,
+        requested: (data as any)?.requested ?? 0,
+        jobs: ((data as any)?.jobs ?? []) as Array<{ bucket?: string; path?: string; status: string }>,
       };
     },
     onSuccess: async (res) => {
+      if (res.dryRun) {
+        console.log("[storage-cleanup dry-run]", res);
+        toast.info(
+          `Dry-run: ${res.requested} caminho(s) seriam removidos. Nenhum dado alterado.`,
+        );
+        return;
+      }
       await qc.invalidateQueries({ queryKey: ["storage-cleanup-jobs-pending"] });
       if (res.failed === 0) {
         toast.success(`Limpeza concluída (${res.completed}).`);
@@ -318,10 +328,19 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
             size="sm"
             variant="outline"
             disabled={retryMut.isPending}
-            onClick={() => retryMut.mutate()}
+            onClick={() => retryMut.mutate({})}
             data-testid="storage-cleanup-retry"
           >
             {retryMut.isPending ? "Reprocessando…" : "Reprocessar limpeza"}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={retryMut.isPending}
+            onClick={() => retryMut.mutate({ dryRun: true })}
+            data-testid="storage-cleanup-dry-run"
+          >
+            Dry-run
           </Button>
         </div>
       )}
