@@ -1,6 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -12,27 +10,9 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { CheckCircle2, AlertTriangle, Loader2, Upload, FileX, XCircle, CalendarX } from "lucide-react";
+import { useWorkerCompletion } from "@/hooks/useWorkerCompletion";
 
-interface Missing {
-  document_type_id: string;
-  code: string;
-  name: string;
-  reason: "ausente" | "vencido" | "rejeitado" | string;
-  status?: string | null;
-  expiry_date?: string | null;
-  rejected_at?: string | null;
-  last_update_at?: string | null;
-  worker_document_id?: string | null;
-  file_name?: string | null;
-  file_path?: string | null;
-}
-
-interface Result {
-  worker_id: string;
-  status: "complete" | "incomplete";
-  missing: Missing[];
-  evaluated_at: string;
-}
+type Missing = import("@/hooks/useWorkerCompletion").WorkerCompletionMissing;
 
 const REASON_LABEL: Record<string, string> = {
   ausente: "Não enviado",
@@ -77,18 +57,9 @@ const REASON_ICON: Record<string, JSX.Element> = {
 export function WorkerCompletionChecklist({ workerId }: { workerId: string }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const q = useQuery({
-    queryKey: ["worker-completion", workerId],
-    enabled: !!workerId,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc(
-        "evaluate_worker_registration_completion" as any,
-        { p_worker_id: workerId } as any,
-      );
-      if (error) throw error;
-      return data as unknown as Result;
-    },
-  });
+  // Shares the canonical ["worker-completion", workerId] cache with
+  // DpReadinessBadge — single source of truth, no duplicated fetches.
+  const q = useWorkerCompletion(workerId);
 
   if (q.isLoading) {
     return (
