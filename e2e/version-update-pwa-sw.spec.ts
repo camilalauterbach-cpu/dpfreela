@@ -98,15 +98,14 @@ async function installServiceWorkerMock(page: Page) {
       /* noop */
     }
 
-    // Neutralize location.reload so we can assert on the recorded trace
-    // WITHOUT actually navigating away. Record the call instead.
+    // Count real page loads so we can prove performUpdate actually reloaded
+    // after the controllerchange resolved (window.location.reload is
+    // non-configurable in Chromium, so we cannot stub it).
     try {
-      Object.defineProperty(window.location, "reload", {
-        configurable: true,
-        value: () => {
-          push({ kind: "location.reload" });
-        },
-      });
+      const K = "__e2e_load_count__";
+      const n = Number(sessionStorage.getItem(K) ?? "0") + 1;
+      sessionStorage.setItem(K, String(n));
+      push({ kind: "load", n });
     } catch {
       /* noop */
     }
@@ -140,32 +139,45 @@ test.describe("Version update gate — PWA service worker coordination", () => {
     await page.evaluate(() => window.dispatchEvent(new Event("online")));
     await expect(page.getByTestId("update-gate")).toBeVisible();
 
-    // Click "Atualizar agora" -> triggers performUpdate().
-    await page.getByTestId("update-gate-action").click();
+    // Click "Atualizar agora" -> performUpdate() runs and then triggers a
+    // real reload. Wait for the load event to confirm the reload happened.
+    await Promise.all([
+      page.waitForEvent("load"),
+      page.getByTestId("update-gate-action").click(),
+    ]);
 
-    // Wait for the recorded reload marker (last step of performUpdate).
-    await expect
-      .poll(async () => (await readTrace(page)).some((e) => e.kind === "location.reload"), {
-        timeout: 5_000,
-      })
-      .toBe(true);
-
+    // sessionStorage survives the reload in the same tab, so the SW trace
+    // recorded during performUpdate is still readable here.
     const trace = await readTrace(page);
     const kinds = trace.map((e) => e.kind);
 
-    // Ordering contract: getRegistration -> registration.update ->
-    // waiting.postMessage(SKIP_WAITING) -> controllerchange -> location.reload.
+    // Two page loads must have been observed: initial + one triggered by
+    // performUpdate (proving location.reload actually executed after the
+    // controllerchange resolved).
+    const loadCount = await page.evaluate(() =>
+      Number(sessionStorage.getItem("__e2e_load_count__") ?? "0"),
+    );
+    expect(loadCount).toBe(2);
+
+    // Ordering contract during the update, all BEFORE the second load:
+    //   getRegistration -> registration.update ->
+    //   waiting.postMessage(SKIP_WAITING) -> controllerchange.fired ->
+    //   (then) second `load`.
     const iGet = kinds.indexOf("getRegistration");
     const iUpdate = kinds.indexOf("registration.update");
     const iPost = kinds.indexOf("waiting.postMessage");
     const iCtrl = kinds.indexOf("controllerchange.fired");
-    const iReload = kinds.indexOf("location.reload");
+    // Index of the SECOND load marker (the first is the initial navigation).
+    const loadIdxs = kinds
+      .map((k, i) => (k === "load" ? i : -1))
+      .filter((i) => i >= 0);
+    const iSecondLoad = loadIdxs[1] ?? -1;
 
     expect(iGet).toBeGreaterThanOrEqual(0);
     expect(iUpdate).toBeGreaterThan(iGet);
     expect(iPost).toBeGreaterThan(iUpdate);
     expect(iCtrl).toBeGreaterThan(iPost);
-    expect(iReload).toBeGreaterThan(iCtrl);
+    expect(iSecondLoad).toBeGreaterThan(iCtrl);
 
     // The message posted to the waiting worker must be SKIP_WAITING.
     const postEntry = trace.find((e) => e.kind === "waiting.postMessage");
