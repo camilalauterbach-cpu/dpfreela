@@ -105,6 +105,7 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
   const qc = useQueryClient();
   const canEdit = hasAnyRole(["admin", "manager", "operator"]);
   const canDelete = hasAnyRole(["admin", "manager", "operator"]);
+  const isAdmin = hasAnyRole(["admin"]);
   const { data: unified, isLoading } = useWorkerQualificationsUnified(workerId);
   const { data: summary, isLoading: loadingSummary } = useWorkerSstSummary(workerId);
 
