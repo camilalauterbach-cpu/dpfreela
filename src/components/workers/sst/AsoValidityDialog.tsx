@@ -59,6 +59,7 @@ export function AsoValidityDialog({
   const [expiresAt, setExpiresAt] = useState<string>(currentExpiresAt ?? "");
   const [reason, setReason] = useState<string>("");
   const [lastError, setLastError] = useState<string | null>(null);
+  const [isInvalidating, setIsInvalidating] = useState(false);
 
   useEffect(() => {
     if (!open) return;
