@@ -118,6 +118,14 @@ export default function Qualifications() {
     onlyActiveContexts,
   });
 
+  useEffect(() => {
+    if (error && import.meta.env.DEV) {
+      // Detalhes técnicos ficam somente em desenvolvimento — a UI mostra mensagem humana.
+      // eslint-disable-next-line no-console
+      console.error("[qualifications] RPC falhou:", error);
+    }
+  }, [error]);
+
   const columns = data?.columns ?? [];
   const items = data?.items ?? [];
 
