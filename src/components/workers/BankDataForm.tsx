@@ -18,6 +18,7 @@ import {
   BANK_DOCUMENT_TYPE_ID,
   buildPayload,
   collectMissing as collectMissingPure,
+  invalidateWorkerAfterBankSave,
   saveBankDataFlow,
   type Modality,
 } from "@/lib/bank-form-logic";
@@ -106,9 +107,11 @@ export function BankDataForm({ workerId, workerName, workerCpf, onSuccess }: Pro
         },
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["worker-documents", workerId] });
-      queryClient.invalidateQueries({ queryKey: ["worker-payment-methods", workerId] });
+    onSuccess: async () => {
+      // Await refetch of the canonical worker-completion query (shared with
+      // DpReadinessBadge / WorkerCompletionChecklist) BEFORE closing the
+      // dialog so the UI reflects the new state without a hard reload.
+      await invalidateWorkerAfterBankSave(queryClient, workerId);
       onSuccess();
     },
   });
