@@ -109,19 +109,29 @@ test.describe("Version update gate", () => {
     expect(await loads.read()).toBe(3);
 
     // Now confirm remote === local: guard must be cleared so a NEW target
-    // reloads once again.
+    // reloads once again. A fresh navigation is required because the
+    // controller short-circuits checkNow() while in the `stale` state
+    // (by design — the gate is the only way out).
     mock.current = LOCAL;
-    await page.evaluate(() => window.dispatchEvent(new Event("online")));
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(500);
     await expect(page.getByTestId("update-gate")).toHaveCount(0);
+    // Guard cleared after remote===local confirmation.
+    expect(
+      await page.evaluate(() =>
+        sessionStorage.getItem("__dpfreela_reload_for_version__"),
+      ),
+    ).toBeNull();
 
     mock.current = "v-remote-2";
     await page.evaluate(() => window.dispatchEvent(new Event("online")));
     await expect(page.getByTestId("update-gate")).toBeVisible();
+    const beforeSecondTarget = await loads.read();
     await Promise.all([
       page.waitForEvent("load"),
       page.getByTestId("update-gate-action").click(),
     ]);
-    expect(await loads.read()).toBe(4);
+    expect(await loads.read()).toBe(beforeSecondTarget + 1);
   });
 
   test("cross-tab: stale detected in tab A blocks tab B", async ({ browser }) => {
