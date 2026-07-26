@@ -230,31 +230,16 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
     mutationFn: async () => {
       const jobs = pendingJobsQuery.data ?? [];
       if (jobs.length === 0) return { completed: 0, failed: 0 };
-      // Agrupa por bucket para chamadas em lote.
-      const byBucket = new Map<string, typeof jobs>();
-      for (const j of jobs) {
-        const list = byBucket.get(j.bucket) ?? [];
-        list.push(j);
-        byBucket.set(j.bucket, list);
-      }
-      let completed = 0, failed = 0;
-      for (const [bucket, list] of byBucket) {
-        const { error: rmErr } = await supabase.storage.from(bucket).remove(list.map((j) => j.path));
-        for (const j of list) {
-          if (rmErr) {
-            await (supabase as any).rpc("mark_storage_cleanup_job_status", {
-              p_id: j.id, p_status: "failed", p_error: rmErr.message,
-            });
-            failed += 1;
-          } else {
-            await (supabase as any).rpc("mark_storage_cleanup_job_status", {
-              p_id: j.id, p_status: "completed", p_error: null,
-            });
-            completed += 1;
-          }
-        }
-      }
-      return { completed, failed };
+      // Backend Edge Function usa service_role para remover objetos do Storage
+      // e atualizar o status dos jobs em worker_document_storage_cleanup_jobs.
+      const { data, error } = await supabase.functions.invoke("storage-cleanup-process", {
+        body: { limit: 200 },
+      });
+      if (error) throw error;
+      return {
+        completed: (data as any)?.completed ?? 0,
+        failed: (data as any)?.failed ?? 0,
+      };
     },
     onSuccess: async (res) => {
       await qc.invalidateQueries({ queryKey: ["storage-cleanup-jobs-pending"] });
