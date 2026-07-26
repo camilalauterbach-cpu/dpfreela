@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Upload, FileText, Image as ImageIcon, CheckCircle2, XCircle, AlertCircle, Clock, RefreshCw, Loader2, Eye, Plus, CreditCard, ExternalLink, FileDown, Trash2,
@@ -1042,23 +1043,21 @@ export function DocumentChecklist({ workerId, workerName, workerCpf }: Props) {
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="doc-issued-at">Emissão / realização</Label>
-              <input
+              <Input
                 id="doc-issued-at"
                 type="date"
                 value={pendingIssuedAt}
                 onChange={(e) => setPendingIssuedAt(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
             {pendingDatedUpload?.requiresExplicitExpiry && (
               <div className="space-y-1.5">
                 <Label htmlFor="doc-explicit-expires-at">Validade</Label>
-                <input
+                <Input
                   id="doc-explicit-expires-at"
                   type="date"
                   value={pendingExplicitExpiresAt}
                   onChange={(e) => setPendingExplicitExpiresAt(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
             )}
