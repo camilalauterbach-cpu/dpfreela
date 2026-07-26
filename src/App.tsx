@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/AppLayout";
 import { Loader2 } from "lucide-react";
+import { UpdateGate } from "@/components/UpdateGate";
 
 // Eager-loaded (auth flow)
 import Login from "./pages/Login";
@@ -67,6 +68,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <UpdateGate />
       <BrowserRouter>
         <AuthProvider>
           <Suspense fallback={<PageLoader />}>
