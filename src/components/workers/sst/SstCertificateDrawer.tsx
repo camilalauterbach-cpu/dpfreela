@@ -979,6 +979,9 @@ export function SstCertificateDrawer({
                 /Substituir/i.test(lastError) &&
                 !!current &&
                 !!onRequestReplace;
+              // Conflito detectado em create: preflight OU race na RPC.
+              const createConflictRow = preflightConflict?.row ?? null;
+              const createSamePeriod = !!preflightConflict?.sameDates;
               return (
                 <div
                   className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive flex items-start justify-between gap-2"
@@ -997,6 +1000,30 @@ export function SstCertificateDrawer({
                         <Replace className="h-3 w-3 mr-1" /> Ir para Substituir
                       </Button>
                     )}
+                    {mode === "create" && createConflictRow && createSamePeriod && onRequestReplace && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-7 text-xs"
+                        data-testid="sst-drawer-replace-now"
+                        onClick={() => onRequestReplace(createConflictRow)}
+                      >
+                        <Replace className="h-3 w-3 mr-1" /> Substituir agora
+                      </Button>
+                    )}
+                    {mode === "create" && createConflictRow && !createSamePeriod && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-7 text-xs"
+                        data-testid="sst-drawer-renew-now"
+                        onClick={() => submit.mutate({ continueAdding: false })}
+                        disabled={errors.length > 0}
+                      >
+                        <RefreshCw className="h-3 w-3 mr-1" /> Renovar agora
+                      </Button>
+                    )}
+                    {!(mode === "create" && createConflictRow) && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -1006,6 +1033,7 @@ export function SstCertificateDrawer({
                     >
                       Tentar novamente
                     </Button>
+                    )}
                   </div>
                 </div>
               );
@@ -1037,7 +1065,8 @@ export function SstCertificateDrawer({
           >
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {uploading ? "Enviando arquivo…" : submit.isPending ? "Registrando…" :
-              mode === "renew" ? "Renovar" : mode === "replace" ? "Substituir" : "Salvar"}
+              mode === "renew" || willAutoRenew ? "Renovar" :
+              mode === "replace" ? "Substituir" : "Salvar"}
           </Button>
         </SheetFooter>
       </SheetContent>
