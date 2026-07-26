@@ -75,16 +75,14 @@ export async function fetchRemoteVersion(
  * only Cache Storage entries related to the app.
  */
 export async function performUpdate(): Promise<void> {
-  try {
-    // Reload-loop guard.
-    if (typeof sessionStorage !== "undefined") {
-      if (sessionStorage.getItem(RELOAD_GUARD_KEY) === "1") {
-        // Already reloaded once in this session; do not reload again.
-        return;
-      }
-      sessionStorage.setItem(RELOAD_GUARD_KEY, "1");
+  // Reload-loop guard.
+  if (typeof sessionStorage !== "undefined") {
+    if (sessionStorage.getItem(RELOAD_GUARD_KEY) === "1") {
+      return;
     }
-
+    sessionStorage.setItem(RELOAD_GUARD_KEY, "1");
+  }
+  try {
     // Clear app-related Cache Storage buckets (never localStorage/IndexedDB).
     if (typeof caches !== "undefined" && caches?.keys) {
       try {
