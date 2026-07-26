@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FolderOpen, Loader2 } from "lucide-react";
-import { invalidateSstCaches } from "@/hooks/useSstQualifications";
 import { invalidateComplianceCaches } from "@/lib/compliance-cache";
 
 const RPC_MESSAGES: Record<string, string> = {
