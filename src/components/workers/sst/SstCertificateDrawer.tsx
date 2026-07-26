@@ -748,33 +748,30 @@ export function SstCertificateDrawer({
             )}
           </div>
 
-          {/* Alerta: tipo já cadastrado (create). */}
-          {mode === "create" && alreadyRegistered && existingRow && (
-            <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm space-y-2">
+          {/* Aviso: vigente detectada → o envio será registrado como Renovação. */}
+          {mode === "create" && effectiveExistingRow && !samePeriodBlock && (
+            <div
+              className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm space-y-2"
+              data-testid="sst-drawer-will-renew"
+            >
               <div className="flex items-start gap-2">
                 <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                 <div className="min-w-0">
                   <div className="font-medium text-amber-700 dark:text-amber-400">
-                    Este tipo já está cadastrado
+                    Já existe uma versão vigente
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Vigente até {fmtDate(existingRow.expires_at)}. Para atualizar, use
-                    Renovar ou Substituir — não é possível criar uma segunda revisão
-                    vigente do mesmo tipo.
+                    Vigente até {fmtDate(effectiveExistingRow.expires_at)}. Este envio será
+                    registrado como <strong>Renovação</strong> — a versão anterior será preservada
+                    no histórico. Se as datas forem as mesmas, use Substituir para corrigir.
                   </div>
                 </div>
               </div>
               <div className="flex gap-2">
-                {onRequestRenew && (
-                  <Button size="sm" variant="outline"
-                    onClick={() => onRequestRenew(existingRow)}>
-                    <RefreshCw className="h-3 w-3 mr-1" /> Renovar
-                  </Button>
-                )}
                 {onRequestReplace && (
                   <Button size="sm" variant="outline"
-                    onClick={() => onRequestReplace(existingRow)}>
-                    <Replace className="h-3 w-3 mr-1" /> Substituir
+                    onClick={() => onRequestReplace(effectiveExistingRow)}>
+                    <Replace className="h-3 w-3 mr-1" /> Substituir em vez disso
                   </Button>
                 )}
               </div>
