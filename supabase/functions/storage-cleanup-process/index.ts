@@ -40,6 +40,7 @@ type JobRow = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return json(405, { error: "method_not_allowed" });
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -47,9 +48,14 @@ Deno.serve(async (req) => {
     const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
     const CRON_SECRET = Deno.env.get("CLEANUP_CRON_SECRET") ?? "";
 
-    // Descobre o modo. Nunca ecoamos o valor de CRON_SECRET.
+    // verify_jwt=false: precisamos autenticar em código.
+    // Modos aceitos (fail-closed): (a) x-cron-secret == CLEANUP_CRON_SECRET, (b) JWT válido.
+    // Nunca logamos nem retornamos o valor do header/secret.
     const cronHeader = req.headers.get("x-cron-secret") ?? "";
-    const isCron = CRON_SECRET.length > 0 && cronHeader === CRON_SECRET;
+    const hasCronHeader = cronHeader.length > 0;
+    const isCron = CRON_SECRET.length >= 16 && hasCronHeader && cronHeader === CRON_SECRET;
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const hasAuthHeader = authHeader.startsWith("Bearer ") && authHeader.length > "Bearer ".length;
 
     let callerId = "cron";
     let client;
@@ -58,9 +64,8 @@ Deno.serve(async (req) => {
     if (isCron) {
       // Service role — a checagem de auth.role()='service_role' acontece dentro das RPCs.
       client = createClient(SUPABASE_URL, SERVICE_ROLE);
-    } else {
-      const token = (req.headers.get("Authorization") ?? "").replace("Bearer ", "");
-      if (!token) return json(401, { error: "Unauthorized" });
+    } else if (hasAuthHeader) {
+      const token = authHeader.slice("Bearer ".length);
       const userClient = createClient(SUPABASE_URL, ANON_KEY, {
         global: { headers: { Authorization: `Bearer ${token}` } },
       });
@@ -77,6 +82,9 @@ Deno.serve(async (req) => {
       const canAct = callerRoles.some((r) => ["admin", "manager", "operator"].includes(r));
       if (!canAct) return json(403, { error: "Forbidden" });
       client = userClient;
+    } else {
+      // Sem JWT e sem cron secret válido → 401 genérico (não distingue causa).
+      return json(401, { error: "Unauthorized" });
     }
 
     const body = await req.json().catch(() => ({}));
@@ -113,6 +121,8 @@ Deno.serve(async (req) => {
     }
 
     // ---------- STATUS READ-ONLY ----------
+    // Retorna apenas booleanos após autenticação (admin/manager/operator ou cron).
+    // Nunca expõe metadados/valor do Vault.
     if (body?.status === true) {
       const svc = createClient(SUPABASE_URL, SERVICE_ROLE);
       const { data: statusRows } = await svc.rpc("get_cleanup_cron_activation_status");
