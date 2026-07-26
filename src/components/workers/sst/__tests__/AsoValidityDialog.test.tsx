@@ -58,15 +58,17 @@ describe("AsoValidityDialog", () => {
   });
 
   it("chama RPC com expected_current_id ao salvar", async () => {
-    rpcMock.mockResolvedValueOnce({ data: { ok: true }, error: null });
+    rpcMock.mockResolvedValue({ data: { ok: true }, error: null });
     const { onOpenChange } = renderDialog();
     fireEvent.change(screen.getByTestId("aso-validity-expires-at"), {
       target: { value: "2027-01-10" },
     });
     fireEvent.click(screen.getByTestId("aso-validity-save"));
-    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
-    expect(rpcMock.mock.calls[0][0]).toBe("correct_worker_document_validity");
-    expect(rpcMock.mock.calls[0][1]).toMatchObject({
+    await waitFor(() =>
+      expect(rpcMock).toHaveBeenCalledWith("correct_worker_document_validity", expect.any(Object)),
+    );
+    const call = rpcMock.mock.calls.find((c) => c[0] === "correct_worker_document_validity")!;
+    expect(call[1]).toMatchObject({
       p_document_id: "d1",
       p_expected_current_id: "d1",
       p_issue_date: "2026-01-10",
