@@ -258,6 +258,11 @@ export function useUpdateGroupWorker() {
       queryClient.invalidateQueries({ queryKey: ["sst-summary"] });
       queryClient.invalidateQueries({ queryKey: ["sst-alert-counts"] });
       queryClient.invalidateQueries({ queryKey: ["sst-pendencies"] });
+      // Q-026: matriz de qualificações e resolução de contexto operacional
+      // dependem da role/vínculo — refazer para não manter falso "Contexto pendente".
+      queryClient.invalidateQueries({ queryKey: ["worker-qualifications"] });
+      queryClient.invalidateQueries({ queryKey: ["worker-qualifications-unified-docs"] });
+      queryClient.invalidateQueries({ queryKey: ["worker-operational-contexts"] });
       INVALIDATE_KEYS.forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
       // Q-020 hotfix: força reavaliação SST imediatamente após editar a alocação.
       if (vars.worker_id) {
