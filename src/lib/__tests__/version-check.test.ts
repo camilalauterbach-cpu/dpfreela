@@ -178,6 +178,33 @@ describe("performUpdate — target-scoped reload guard", () => {
     expect(sessionStorage.getItem(RELOAD_GUARD_KEY_EXPORT)).toBe("v3");
   });
 
+  it("manual retry for the same target executes exactly one extra reload, no third without another click", async () => {
+    const reload = mockReload();
+    // First automatic attempt reloads.
+    const r1 = await performUpdate("v2", { manualRetry: false });
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(r1).toEqual({ reloaded: true });
+
+    // Second automatic attempt for the same target is blocked.
+    const r2 = await performUpdate("v2", { manualRetry: false });
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(r2).toEqual(
+      expect.objectContaining({ reloaded: false, reason: "already-attempted" }),
+    );
+
+    // Manual retry click for the same target reloads exactly once more.
+    const r3 = await performUpdate("v2", { manualRetry: true });
+    expect(reload).toHaveBeenCalledTimes(2);
+    expect(r3).toEqual({ reloaded: true });
+
+    // Without another manual click, no further automatic reload happens.
+    const r4 = await performUpdate("v2", { manualRetry: false });
+    expect(reload).toHaveBeenCalledTimes(2);
+    expect(r4).toEqual(
+      expect.objectContaining({ reloaded: false, reason: "already-attempted" }),
+    );
+  });
+
   it("confirming remote === local clears the guard so a future new target reloads", async () => {
     const reload = mockReload();
     // Simulate a prior reload attempt for v2 in this session.
