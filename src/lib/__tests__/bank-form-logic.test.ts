@@ -125,7 +125,7 @@ describe("saveBankDataFlow — atomicidade e compensação", () => {
       generateReceiptBlob: vi.fn((p: any) => { calls.gen.push(p); return new Blob(["pdf"], { type: "application/pdf" }); }),
       uploadReceipt: vi.fn(async (path: string, blob: Blob) => { calls.up.push({ path, size: blob.size }); }),
       removeStorageObject: vi.fn(async (path: string) => { calls.remove.push(path); }),
-      insertWorkerDocument: vi.fn(async (row: any) => { calls.doc.push(row); }),
+      registerBankDocumentRevision: vi.fn(async (row: any) => { calls.doc.push(row); }),
       now: () => 1_700_000_000_000,
       ...overrides,
     };
@@ -145,7 +145,6 @@ describe("saveBankDataFlow — atomicidade e compensação", () => {
     expect(result.paymentMethodId).toBe("pm-1");
     expect(result.uploadedPath).toBe("w-9/bank_document/1700000000000.pdf");
     expect(calls.doc[0].document_type_id).toBe(BANK_DOCUMENT_TYPE_ID);
-    expect(calls.doc[0].document_type).toBe("bank_document");
     expect(calls.doc[0].file_path).toBe(result.uploadedPath);
     expect(calls.doc[0].notes).toBe("auto_generated");
     expect(deps.deletePaymentMethod).not.toHaveBeenCalled();
@@ -159,12 +158,12 @@ describe("saveBankDataFlow — atomicidade e compensação", () => {
     await expect(saveBankDataFlow(okPayload, deps)).rejects.toThrow(/boom upload/);
     expect(deps.deletePaymentMethod).toHaveBeenCalledWith("pm-1");
     expect(deps.removeStorageObject).not.toHaveBeenCalled(); // upload failed before path stored
-    expect(deps.insertWorkerDocument).not.toHaveBeenCalled();
+    expect(deps.registerBankDocumentRevision).not.toHaveBeenCalled();
   });
 
-  it("Falha no worker_documents: apaga objeto do storage e apaga payment_method (rollback)", async () => {
+  it("Falha no register RPC: apaga objeto do storage e apaga payment_method (rollback)", async () => {
     const { deps } = mkDeps({
-      insertWorkerDocument: vi.fn(async () => { throw new Error("boom doc"); }) as any,
+      registerBankDocumentRevision: vi.fn(async () => { throw new Error("boom doc"); }) as any,
     });
     await expect(saveBankDataFlow(okPayload, deps)).rejects.toThrow(/boom doc/);
     expect(deps.removeStorageObject).toHaveBeenCalledWith("w-9/bank_document/1700000000000.pdf");

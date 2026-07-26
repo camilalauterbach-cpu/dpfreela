@@ -101,9 +101,25 @@ export function BankDataForm({ workerId, workerName, workerCpf, onSuccess }: Pro
         removeStorageObject: async (path) => {
           await supabase.storage.from("worker-documents").remove([path]);
         },
-        insertWorkerDocument: async (row) => {
-          const { error } = await supabase.from("worker_documents").insert(row);
+        registerBankDocumentRevision: async (row) => {
+          const { data, error } = await supabase.rpc(
+            "register_bank_document_revision" as any,
+            {
+              p_payload: {
+                worker_id: row.worker_id,
+                document_type_id: row.document_type_id,
+                file_path: row.file_path,
+                file_name: row.file_name,
+                file_size: row.file_size,
+                mime_type: row.mime_type,
+                notes: row.notes ?? null,
+              },
+            } as any,
+          );
           if (error) throw error;
+          // Defensive: RPC returns jsonb; surface any structured error.
+          const res = data as any;
+          if (res && res.error) throw new Error(String(res.error));
         },
       });
     },

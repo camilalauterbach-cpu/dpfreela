@@ -108,17 +108,22 @@ export interface SaveDeps {
   generateReceiptBlob: (payload: BankPayload) => Blob;
   uploadReceipt: (path: string, blob: Blob) => Promise<void>;
   removeStorageObject: (path: string) => Promise<void>;
-  insertWorkerDocument: (row: {
+  /**
+   * Register the bank document revision atomically via the canonical
+   * SECURITY DEFINER RPC (`register_bank_document_revision`). The RPC:
+   *   - takes an advisory lock on (worker_id, document_type_id),
+   *   - marks any previous current bank_document as superseded, and
+   *   - inserts the new row with is_current=true.
+   * The client never runs a vulnerable update-then-insert sequence.
+   */
+  registerBankDocumentRevision: (row: {
     worker_id: string;
-    document_type: string;
     document_type_id: string;
-    category: string;
     file_path: string;
     file_name: string;
     file_size: number;
     mime_type: string;
-    status: string;
-    notes: string;
+    notes?: string;
   }) => Promise<void>;
   now?: () => number;
 }
@@ -177,16 +182,13 @@ export async function saveBankDataFlow(payload: BankPayload, deps: SaveDeps): Pr
     await deps.uploadReceipt(path, blob);
     uploadedPath = path;
     const fileName = `comprovante_bancario_${timestamp}.pdf`;
-    await deps.insertWorkerDocument({
+    await deps.registerBankDocumentRevision({
       worker_id: payload.worker_id,
-      document_type: "bank_document",
       document_type_id: BANK_DOCUMENT_TYPE_ID,
-      category: "bank_document",
       file_path: path,
       file_name: fileName,
       file_size: blob.size,
       mime_type: "application/pdf",
-      status: "uploaded",
       notes: "auto_generated",
     });
     return { paymentMethodId, uploadedPath: path, fileName };
