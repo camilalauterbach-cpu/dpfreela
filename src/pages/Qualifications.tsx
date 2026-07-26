@@ -77,7 +77,9 @@ function StatusIcon({ status, size = 18 }: { status: QualStatus; size?: number }
 export default function Qualifications() {
   const [search, setSearch] = useState("");
   const [state, setState] = useState<QualStatus | null>(null);
-  const [onlyActiveContexts, setOnlyActiveContexts] = useState(true);
+  // Padrão: mostrar todos os trabalhadores. Pessoas sem vínculo atual
+  // pertencem ao banco mestre e não podem ficar ocultas por padrão.
+  const [onlyActiveContexts, setOnlyActiveContexts] = useState(false);
   const [selectedColumnIds, setSelectedColumnIds] = useState<string[]>([]);
   const [selectionReady, setSelectionReady] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -115,6 +117,14 @@ export default function Qualifications() {
     documentTypeIds: selectionReady ? selectedColumnIds : null,
     onlyActiveContexts,
   });
+
+  useEffect(() => {
+    if (error && import.meta.env.DEV) {
+      // Detalhes técnicos ficam somente em desenvolvimento — a UI mostra mensagem humana.
+      // eslint-disable-next-line no-console
+      console.error("[qualifications] RPC falhou:", error);
+    }
+  }, [error]);
 
   const columns = data?.columns ?? [];
   const items = data?.items ?? [];
@@ -331,7 +341,7 @@ export default function Qualifications() {
           </div>
         ) : error ? (
           <div className="p-8 text-center text-sm text-destructive">
-            Erro ao carregar qualificações: {(error as Error).message}
+            Não foi possível carregar as qualificações agora. Tente novamente em instantes; se persistir, contate o suporte.
           </div>
         ) : columns.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
