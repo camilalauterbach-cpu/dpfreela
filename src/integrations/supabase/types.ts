@@ -3024,32 +3024,6 @@ export type Database = {
         }
         Returns: Json
       }
-      list_pending_storage_cleanup_jobs: {
-        Args: { p_limit?: number }
-        Returns: {
-          attempts: number
-          bucket: string
-          completed_at: string | null
-          created_at: string
-          document_type_id: string | null
-          id: string
-          last_error: string | null
-          max_attempts: number
-          next_attempt_at: string | null
-          path: string
-          source: string
-          status: string
-          trace_id: string | null
-          updated_at: string
-          worker_id: string | null
-        }[]
-        SetofOptions: {
-          from: "*"
-          to: "worker_document_storage_cleanup_jobs"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
       list_worker_duplicate_candidates: { Args: never; Returns: Json }
       list_worker_qualification_types: {
         Args: { p_include_inactive?: boolean }
@@ -3314,6 +3288,7 @@ export type Database = {
         }
         Returns: Json
       }
+      set_cleanup_cron_secret: { Args: { p_value: string }; Returns: undefined }
       set_document_type_completion_requirement: {
         Args: { p_document_type_id: string; p_requirement: string }
         Returns: Json

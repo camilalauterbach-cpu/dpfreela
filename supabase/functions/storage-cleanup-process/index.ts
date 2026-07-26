@@ -150,7 +150,8 @@ Deno.serve(async (req) => {
       byBucket.set(j.bucket, list);
     }
 
-    // Service role para operar no Storage (bucket privado sst-certificates).
+    // Service role para operar no Storage. O bucket é sempre o persistido em cada
+    // job (hoje `worker-documents`, o único bucket privado usado para NR/ASO).
     const storage = createClient(SUPABASE_URL, SERVICE_ROLE);
 
     let completed = 0;
