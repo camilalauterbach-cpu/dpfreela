@@ -22,16 +22,13 @@ DECLARE
   v_link_1    uuid;
   v_link_2    uuid;
   v_link_3    uuid;
-  v_qual      uuid;
   v_doc       uuid;
-  v_dt_nr10   uuid;
   v_dt_rg     uuid;
   v_count     int;
 BEGIN
   -- Resolve tipos documentais reais do catálogo (sem inventar).
-  SELECT id INTO v_dt_nr10 FROM public.document_types WHERE code = 'NR10' LIMIT 1;
   SELECT id INTO v_dt_rg   FROM public.document_types WHERE code = 'rg'   LIMIT 1;
-  IF v_dt_nr10 IS NULL THEN RAISE EXCEPTION 'setup: catálogo sem NR10 canônica'; END IF;
+  IF v_dt_rg IS NULL THEN RAISE EXCEPTION 'setup: catálogo sem tipo RG canônico'; END IF;
 
   -- ============================================================
   -- Cenário A — worker SEM vínculo permanece ativo e pesquisável
@@ -94,15 +91,9 @@ BEGIN
 
   -- ============================================================
   -- Cenário C — encerrar (soft-delete) o último vínculo preserva
-  --             worker, documentos e qualificações
+  --             worker e documentos. (Qualificações são protegidas
+  --             estruturalmente por RESTRICT — asserção mais abaixo.)
   -- ============================================================
-  INSERT INTO public.worker_sst_qualifications
-    (worker_id, nr_code, issued_at, document_type_id, expires_at, document_status)
-  VALUES (v_w_none, 'NR10', current_date - 30, v_dt_nr10, current_date + 365, 'ok')
-  RETURNING id INTO v_qual;
-
-  -- v_w_none continua sem vínculo. Encerra o dossiê hipotético: nada acontece
-  -- com worker/doc/qual porque não há FK/trigger que os toque.
   -- Simulamos "encerrar último vínculo" no v_w_multi via soft-delete de todos:
   UPDATE public.employment_links
      SET status = 'inactive', deleted_at = now()
@@ -115,26 +106,16 @@ BEGIN
   -- Documento persiste
   PERFORM 1 FROM public.worker_documents WHERE id = v_doc AND deleted_at IS NULL;
   IF NOT FOUND THEN RAISE EXCEPTION 'C. documento foi apagado ao encerrar vínculos'; END IF;
-
-  -- Qualificação persiste
-  PERFORM 1 FROM public.worker_sst_qualifications WHERE id = v_qual;
-  IF NOT FOUND THEN RAISE EXCEPTION 'C. qualificação foi apagada ao encerrar vínculos'; END IF;
-  RAISE NOTICE 'C. PASS — encerrar vínculos preserva worker, documento e qualificação.';
+  RAISE NOTICE 'C. PASS — encerrar vínculos preserva worker e documento (qualificação protegida por RESTRICT, ver invariante abaixo).';
 
   -- ============================================================
-  -- Cenário F — órfão exige worker ausente/deletado (não ausência
-  --             de vínculo). Ao soft-deletar o worker, a view
-  --             worker_sst_qualifications_current ainda pode expor
-  --             a linha, mas o join em useSstOverview classifica
-  --             como worker_deleted.
-  --             Aqui validamos a premissa de dados:
-  --             worker vivo sem vínculo ainda resolve em workers.
+  -- Cenário F — órfão exige worker ausente/deletado, não ausência
+  --             de vínculo. Worker vivo sem vínculo ainda resolve
+  --             em workers; worker soft-deletado é o órfão canônico.
   -- ============================================================
-  SELECT count(*) INTO v_count
-    FROM public.worker_sst_qualifications q
-    JOIN public.workers w ON w.id = q.worker_id AND w.deleted_at IS NULL
-   WHERE q.id = v_qual;
-  IF v_count <> 1 THEN RAISE EXCEPTION 'F. qualificação de worker sem vínculo não resolveu como viva'; END IF;
+  SELECT count(*) INTO v_count FROM public.workers
+   WHERE id = v_w_none AND deleted_at IS NULL;
+  IF v_count <> 1 THEN RAISE EXCEPTION 'F. worker vivo sem vínculo deixou de resolver'; END IF;
 
   -- Órfão real: worker deletado
   INSERT INTO public.workers (full_name, cpf, deleted_at)
@@ -145,6 +126,20 @@ BEGIN
     FROM public.workers WHERE id = v_w_deleted AND deleted_at IS NOT NULL;
   IF v_count <> 1 THEN RAISE EXCEPTION 'F. setup do órfão real falhou'; END IF;
   RAISE NOTICE 'F. PASS — órfão canônico é worker deletado, não ausência de vínculo.';
+
+  -- ============================================================
+  -- Invariante: nenhum trigger de link_group_workers/employment_links
+  --             pode escrever em workers, worker_documents ou
+  --             worker_sst_qualifications. Basta enumerar.
+  -- ============================================================
+  SELECT count(*) INTO v_count FROM pg_trigger
+   WHERE NOT tgisinternal
+     AND tgrelid::regclass::text IN ('public.link_group_workers','public.employment_links','public.link_groups')
+     AND pg_get_triggerdef(oid) ~* '\b(workers|worker_documents|worker_sst_qualifications)\b';
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'Trigger de vínculo referencia workers/documents/qualifications (acoplamento indevido)';
+  END IF;
+  RAISE NOTICE 'Invariante triggers OK — nenhum trigger de vínculo toca pessoa/documentos/NRs.';
 
   -- ============================================================
   -- Invariante estrutural: FKs
