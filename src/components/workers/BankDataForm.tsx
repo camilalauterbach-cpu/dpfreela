@@ -13,12 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2, ChevronDown, AlertCircle } from "lucide-react";
-import { formatCpf, normalizeCpf, validateCpf } from "@/lib/validators";
-
-// Canonical document type for the auto-generated bank data receipt.
-const BANK_DOCUMENT_TYPE_ID = "f2653649-f673-40ae-b5a0-1e9e08a83e04";
-
-type Modality = "pix" | "bank_account";
+import { formatCpf } from "@/lib/validators";
+import {
+  BANK_DOCUMENT_TYPE_ID,
+  buildPayload,
+  collectMissing as collectMissingPure,
+  saveBankDataFlow,
+  type Modality,
+} from "@/lib/bank-form-logic";
 
 interface Props {
   workerId: string;
@@ -48,23 +50,11 @@ export function BankDataForm({ workerId, workerName, workerCpf, onSuccess }: Pro
   useUnsavedFormGuard(isDirty, `bank-data-${workerId}`);
 
   function collectMissing(): string[] {
-    const errs: string[] = [];
-    if (modality === "pix") {
-      if (!pixKeyType) errs.push("Tipo de chave Pix");
-      if (!pixKey.trim()) errs.push("Chave Pix");
-    } else {
-      if (!bankName.trim()) errs.push("Banco");
-      if (!agency.trim()) errs.push("Agência");
-      if (!accountNumber.trim()) errs.push("Número da conta");
-      if (!accountType) errs.push("Tipo da conta");
-    }
-    if (!isSelfHolder) {
-      if (!holderName.trim()) errs.push("Nome do titular");
-      const cpfDigits = normalizeCpf(holderCpf);
-      if (!cpfDigits) errs.push("CPF do titular");
-      else if (!validateCpf(cpfDigits)) errs.push("CPF do titular (inválido)");
-    }
-    return errs;
+    return collectMissingPure({
+      modality, pixKeyType, pixKey, bankName, agency, accountNumber, accountType,
+      isSelfHolder, holderName, holderCpf,
+      workerName, workerCpf, workerId,
+    });
   }
 
   const saveMutation = useMutationWithFeedback<void, unknown, void, unknown>({
@@ -72,103 +62,49 @@ export function BankDataForm({ workerId, workerName, workerCpf, onSuccess }: Pro
     successMessage: "Dados bancários salvos — comprovante gerado.",
     errorTitle: "Erro ao salvar dados bancários",
     mutationFn: async () => {
-      // Normalize per-modality payload (empty strings → null, drop cross-modality fields).
-      const holderCpfDigits = isSelfHolder ? normalizeCpf(workerCpf) : normalizeCpf(holderCpf);
-      const payload =
-        modality === "pix"
-          ? {
-              worker_id: workerId,
-              method_type: "pix" as const,
-              pix_key_type: pixKeyType,
-              pix_key: pixKey.trim(),
-              bank_name: bankName.trim() || null,
-              agency: agency.trim() || null,
-              account_number: accountNumber.trim() || null,
-              account_type: null,
-              holder_name: (isSelfHolder ? workerName : holderName.trim()) || null,
-              holder_cpf: holderCpfDigits || null,
-              is_preferred: false,
-            }
-          : {
-              worker_id: workerId,
-              method_type: "bank_account" as const,
-              pix_key_type: null,
-              pix_key: null,
-              bank_name: bankName.trim(),
-              agency: agency.trim(),
-              account_number: accountNumber.trim(),
-              account_type: accountType,
-              holder_name: (isSelfHolder ? workerName : holderName.trim()) || null,
-              holder_cpf: holderCpfDigits || null,
-              is_preferred: false,
-            };
-
-      // 1. Insert payment method
-      const { data: pmRow, error: pmError } = await supabase
-        .from("worker_payment_methods")
-        .insert(payload as any)
-        .select("id")
-        .single();
-      if (pmError) throw pmError;
-      const paymentMethodId = pmRow?.id as string | undefined;
-
-      let uploadedPath: string | null = null;
-      try {
-        // 2. Generate PDF from validated per-modality data.
-        const blob = generateBankReceipt({
+      const payload = buildPayload({
+        modality, pixKeyType, pixKey, bankName, agency, accountNumber, accountType,
+        isSelfHolder, holderName, holderCpf,
+        workerName, workerCpf, workerId,
+      });
+      await saveBankDataFlow(payload, {
+        insertPaymentMethod: async (p) => {
+          const { data, error } = await supabase
+            .from("worker_payment_methods").insert(p as any).select("id").single();
+          if (error) throw error;
+          return { id: (data as any).id as string };
+        },
+        deletePaymentMethod: async (id) => {
+          await supabase.from("worker_payment_methods").delete().eq("id", id);
+        },
+        generateReceiptBlob: (p) => generateBankReceipt({
           workerName,
           workerCpf: formatCpf(workerCpf) || workerCpf,
-          bankName: payload.bank_name || undefined,
-          agency: payload.agency || undefined,
-          accountNumber: payload.account_number || undefined,
-          accountType: payload.account_type || undefined,
-          pixKeyType: payload.pix_key_type || undefined,
-          pixKey: payload.pix_key || undefined,
-          holderName: payload.holder_name || undefined,
-          holderCpf: payload.holder_cpf ? (formatCpf(payload.holder_cpf) || payload.holder_cpf) : undefined,
+          bankName: p.bank_name || undefined,
+          agency: p.agency || undefined,
+          accountNumber: p.account_number || undefined,
+          accountType: p.account_type || undefined,
+          pixKeyType: p.pix_key_type || undefined,
+          pixKey: p.pix_key || undefined,
+          holderName: p.holder_name || undefined,
+          holderCpf: p.holder_cpf ? (formatCpf(p.holder_cpf) || p.holder_cpf) : undefined,
           isSelfHolder,
           generatedByUserName: user?.user_metadata?.full_name || user?.email || "Usuário do sistema",
-        });
-
-        // 3. Upload PDF
-        const timestamp = Date.now();
-        const path = `${workerId}/bank_document/${timestamp}.pdf`;
-        const { error: uploadErr } = await supabase.storage
-          .from("worker-documents")
-          .upload(path, blob, { contentType: "application/pdf", upsert: false });
-        if (uploadErr) throw uploadErr;
-        uploadedPath = path;
-
-        // 4. Create worker_documents record (canonical document_type_id).
-        const { error: docErr } = await supabase
-          .from("worker_documents")
-          .insert({
-            worker_id: workerId,
-            document_type: "bank_document",
-            document_type_id: BANK_DOCUMENT_TYPE_ID,
-            category: "bank_document",
-            file_path: path,
-            file_name: `comprovante_bancario_${timestamp}.pdf`,
-            file_size: blob.size,
-            mime_type: "application/pdf",
-            status: "uploaded",
-            notes: "auto_generated",
-          });
-        if (docErr) throw docErr;
-      } catch (err) {
-        // Compensate: remove storage object and payment method so nothing is orphaned.
-        if (uploadedPath) {
-          await supabase.storage.from("worker-documents").remove([uploadedPath]).catch(() => {});
-        }
-        if (paymentMethodId) {
-          try {
-            await supabase.from("worker_payment_methods").delete().eq("id", paymentMethodId);
-          } catch {
-            /* best-effort cleanup */
-          }
-        }
-        throw err;
-      }
+        }),
+        uploadReceipt: async (path, blob) => {
+          const { error } = await supabase.storage
+            .from("worker-documents")
+            .upload(path, blob, { contentType: "application/pdf", upsert: false });
+          if (error) throw error;
+        },
+        removeStorageObject: async (path) => {
+          await supabase.storage.from("worker-documents").remove([path]);
+        },
+        insertWorkerDocument: async (row) => {
+          const { error } = await supabase.from("worker_documents").insert(row);
+          if (error) throw error;
+        },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["worker-documents", workerId] });
