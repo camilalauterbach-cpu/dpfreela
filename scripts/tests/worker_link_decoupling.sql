@@ -37,7 +37,7 @@ BEGIN
   -- Cenário A — worker SEM vínculo permanece ativo e pesquisável
   -- ============================================================
   INSERT INTO public.workers (full_name, cpf)
-  VALUES ('__reg_decoup_A_alone', '99900000001')
+  VALUES ('__reg_decoup_A_alone', '52998224725')
   RETURNING id INTO v_w_none;
 
   PERFORM 1 FROM public.workers
@@ -54,7 +54,7 @@ BEGIN
   --             workers e lista todos os employment_links
   -- ============================================================
   INSERT INTO public.workers (full_name, cpf)
-  VALUES ('__reg_decoup_B_multi', '99900000002')
+  VALUES ('__reg_decoup_B_multi', '11144477735')
   RETURNING id INTO v_w_multi;
 
   INSERT INTO public.employment_links (worker_id, status)
@@ -78,7 +78,7 @@ BEGIN
   -- ============================================================
   INSERT INTO public.employment_links (worker_id, status)
   VALUES (v_w_multi, 'draft');
-  SELECT count(*) INTO v_count FROM public.workers WHERE cpf = '99900000002' AND deleted_at IS NULL;
+  SELECT count(*) INTO v_count FROM public.workers WHERE cpf = '11144477735' AND deleted_at IS NULL;
   IF v_count <> 1 THEN RAISE EXCEPTION 'H. criar vínculo duplicou pessoa (%)', v_count; END IF;
   RAISE NOTICE 'H. PASS — novo vínculo reutiliza worker existente.';
 
@@ -138,7 +138,7 @@ BEGIN
 
   -- Órfão real: worker deletado
   INSERT INTO public.workers (full_name, cpf, deleted_at)
-  VALUES ('__reg_decoup_F_deleted', '99900000003', now())
+  VALUES ('__reg_decoup_F_deleted', '39053344705', now())
   RETURNING id INTO v_w_deleted;
 
   SELECT count(*) INTO v_count
