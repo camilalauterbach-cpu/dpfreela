@@ -223,6 +223,9 @@ describe("SstCertificateDrawer — preflight autoritativo", () => {
 
     // Rollback do arquivo recém-enviado
     await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByTestId("sst-drawer-error")).toBeTruthy());
+    // eslint-disable-next-line no-console
+    console.log("DOM after error:", document.body.innerHTML.slice(0, 4000));
     // CTA de renovar aparece (período diferente da vigente descoberta)
     await screen.findByTestId("sst-drawer-renew-now");
     // Nunca vaza jargão SQL / 23505
