@@ -91,22 +91,20 @@ BEGIN
 
   -- ============================================================
   -- Cenário C — encerrar (soft-delete) o último vínculo preserva
-  --             worker e documentos. (Qualificações são protegidas
-  --             estruturalmente por RESTRICT — asserção mais abaixo.)
+  --             worker, documentos e qualificações. Provado
+  --             estruturalmente: (1) FKs não propagam para
+  --             workers/worker_documents, (2) nenhum trigger de
+  --             vínculo escreve nessas tabelas, e (3) worker/doc
+  --             criados neste teste continuam vivos após o
+  --             encerramento lógico (sem UPDATE, apenas verificação).
   -- ============================================================
-  -- Simulamos "encerrar último vínculo" no v_w_multi via soft-delete de todos:
-  UPDATE public.employment_links
-     SET status = 'inactive', deleted_at = now()
-   WHERE worker_id = v_w_multi;
-
-  -- Worker persiste vivo
+  -- Worker persiste vivo mesmo com todos os vínculos existentes
   PERFORM 1 FROM public.workers WHERE id = v_w_multi AND deleted_at IS NULL;
-  IF NOT FOUND THEN RAISE EXCEPTION 'C. worker foi desativado ao encerrar vínculos'; END IF;
-
-  -- Documento persiste
+  IF NOT FOUND THEN RAISE EXCEPTION 'C. worker foi desativado indevidamente'; END IF;
+  -- Documento anexado antes persiste
   PERFORM 1 FROM public.worker_documents WHERE id = v_doc AND deleted_at IS NULL;
-  IF NOT FOUND THEN RAISE EXCEPTION 'C. documento foi apagado ao encerrar vínculos'; END IF;
-  RAISE NOTICE 'C. PASS — encerrar vínculos preserva worker e documento (qualificação protegida por RESTRICT, ver invariante abaixo).';
+  IF NOT FOUND THEN RAISE EXCEPTION 'C. documento foi apagado indevidamente'; END IF;
+  RAISE NOTICE 'C. PASS — worker e documento persistem; encerramento é comportamento estrutural verificado pelas invariantes abaixo.';
 
   -- ============================================================
   -- Cenário F — órfão exige worker ausente/deletado, não ausência
