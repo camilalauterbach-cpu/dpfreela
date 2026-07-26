@@ -161,7 +161,11 @@ export function BankDataForm({ workerId, workerName, workerCpf, onSuccess }: Pro
           await supabase.storage.from("worker-documents").remove([uploadedPath]).catch(() => {});
         }
         if (paymentMethodId) {
-          await supabase.from("worker_payment_methods").delete().eq("id", paymentMethodId).catch(() => {});
+          try {
+            await supabase.from("worker_payment_methods").delete().eq("id", paymentMethodId);
+          } catch {
+            /* best-effort cleanup */
+          }
         }
         throw err;
       }
