@@ -167,7 +167,10 @@ describe("AsoValidityDialog", () => {
     // o botão deve indicar o novo estágio.
     expect((screen.getByTestId("aso-validity-issued-at") as HTMLInputElement).disabled).toBe(true);
     expect((screen.getByTestId("aso-validity-expires-at") as HTMLInputElement).disabled).toBe(true);
-    expect(screen.getByText(/Atualizando consultas/i)).toBeInTheDocument();
+    expect(screen.getByTestId("aso-validity-invalidating-overlay")).toBeInTheDocument();
+    expect((screen.getByTestId("aso-validity-save") as HTMLButtonElement).textContent).toMatch(
+      /Atualizando consultas/i,
+    );
 
     // Clique fora/fechar via botão Cancelar deve ser bloqueado.
     fireEvent.click(screen.getByText(/Cancelar/i));
