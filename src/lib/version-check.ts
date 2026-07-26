@@ -12,7 +12,9 @@
 //   - Reload guard is bound to the target remote version (not a global
 //     boolean): a given target reloads at most once, but a later new target
 //     in the same session may still reload once.
-//   - Never touch localStorage/IndexedDB/session/form data.
+//   - The storage fallback writes ONLY to a single dedicated key
+//     (STORAGE_FALLBACK_KEY). It never clears localStorage and never touches
+//     any other user keys, IndexedDB, session storage or form data.
 
 export const LOCAL_VERSION: string =
   typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
@@ -88,19 +90,39 @@ export type UpdateResult =
   | { reloaded: true }
   | { reloaded: false; reason: "already-attempted" | "no-target" | "error"; message?: string };
 
-export async function performUpdate(targetVersion?: string): Promise<UpdateResult> {
+export type PerformUpdateOptions = {
+  /**
+   * When true, this is an explicit user-initiated retry. The reload guard for
+   * this exact target version is removed before proceeding, allowing exactly
+   * one additional reload attempt. Automatic timers must NEVER pass this.
+   */
+  manualRetry?: boolean;
+};
+
+export async function performUpdate(
+  targetVersion?: string,
+  options: PerformUpdateOptions = {},
+): Promise<UpdateResult> {
   if (!targetVersion) {
     return { reloaded: false, reason: "no-target", message: "Sem versão de destino." };
   }
   // Reload guard scoped to the target version.
   if (typeof sessionStorage !== "undefined") {
-    if (sessionStorage.getItem(RELOAD_GUARD_KEY) === targetVersion) {
+    const alreadyAttempted = sessionStorage.getItem(RELOAD_GUARD_KEY) === targetVersion;
+    if (alreadyAttempted && !options.manualRetry) {
       return {
         reloaded: false,
         reason: "already-attempted",
         message:
           "Já tentamos atualizar para esta versão nesta sessão. Verifique sua conexão e tente novamente.",
       };
+    }
+    // Manual retry: replace the guard entry so this attempt is treated as a
+    // fresh single-shot attempt for the same target version.
+    try {
+      sessionStorage.removeItem(RELOAD_GUARD_KEY);
+    } catch {
+      /* noop */
     }
     sessionStorage.setItem(RELOAD_GUARD_KEY, targetVersion);
   }
@@ -162,7 +184,7 @@ export type Controller = {
   getState: () => VersionState;
   subscribe: (listener: (state: VersionState) => void) => () => void;
   checkNow: () => Promise<void>;
-  triggerUpdate: () => Promise<UpdateResult>;
+  triggerUpdate: (options?: PerformUpdateOptions) => Promise<UpdateResult>;
   stop: () => void;
   /** Force a stale state (used by BroadcastChannel receivers, and tests). */
   markStale: (remote: string) => void;
@@ -203,7 +225,9 @@ export function createVersionController(deps: Deps = {}): Controller {
     // Storage fallback for browsers/contexts without BroadcastChannel.
     if (!hasChannel && typeof localStorage !== "undefined") {
       try {
-        // Dedicated key only — never touches any other user data.
+        // Dedicated key only. This write does NOT clear localStorage and does
+        // NOT alter any other keys — every other user preference/session
+        // entry is preserved exactly as-is.
         localStorage.setItem(
           STORAGE_FALLBACK_KEY,
           JSON.stringify({ type: "stale", remote, ts: now() }),
@@ -298,9 +322,9 @@ export function createVersionController(deps: Deps = {}): Controller {
       return () => listeners.delete(listener);
     },
     checkNow,
-    triggerUpdate: async () => {
+    triggerUpdate: async (options: PerformUpdateOptions = {}) => {
       const target = state.kind === "stale" ? state.remote : undefined;
-      return performUpdate(target);
+      return performUpdate(target, options);
     },
     markStale,
     stop() {
