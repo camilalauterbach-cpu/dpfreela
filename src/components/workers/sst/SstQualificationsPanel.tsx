@@ -418,6 +418,26 @@ export function SstQualificationsPanel({ workerId, workerName }: Props) {
             >
               Dry-run
             </Button>
+            {isAdmin && (
+              automationActive ? (
+                <span
+                  data-testid="storage-cleanup-automation-active"
+                  className="inline-flex items-center rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+                >
+                  Automação ativa
+                </span>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={activateMut.isPending}
+                  onClick={() => activateMut.mutate()}
+                  data-testid="storage-cleanup-activate"
+                >
+                  {activateMut.isPending ? "Ativando…" : "Ativar limpeza automática"}
+                </Button>
+              )
+            )}
           </div>
         </div>
       )}
