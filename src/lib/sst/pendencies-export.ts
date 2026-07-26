@@ -13,6 +13,24 @@ import { isTestDataWorker } from "@/lib/sst/test-data";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
+ * Rótulo canônico neutro exibido/exportado para trabalhador sem vínculo ativo.
+ * NUNCA classifica como pendência ou órfão — é apenas contexto informativo.
+ * Exportado para consumo direto pela UI (SstPendencies) e por testes.
+ */
+export const NO_CURRENT_LINK_LABEL = "Disponível — sem vínculo atual";
+
+/**
+ * Deriva a etiqueta agregada de vínculo(s) atual(is) para uma linha exportada.
+ * Recebe a lista de contextos ("Evento · Cargo") já resolvidos; retorna o
+ * rótulo neutro quando vazio.
+ */
+export function resolveCurrentLinkLabel(labels: string[] | undefined): string {
+  if (!labels || labels.length === 0) return NO_CURRENT_LINK_LABEL;
+  const head = labels.slice(0, 2).join("  |  ");
+  return labels.length > 2 ? `${head} +${labels.length - 2}` : head;
+}
+
+/**
  * Busca uma etiqueta informativa do(s) vínculo(s) ativo(s) por trabalhador.
  * NUNCA gera pendência — ausência de vínculo é rotulada como
  * "Disponível — sem vínculo atual" (estado neutro).
@@ -36,8 +54,7 @@ async function fetchCurrentLinksByWorker(workerIds: string[]): Promise<Map<strin
     byWorker.set(row.worker_id, arr);
   }
   for (const [wid, labels] of byWorker) {
-    const head = labels.slice(0, 2).join("  |  ");
-    out.set(wid, labels.length > 2 ? `${head} +${labels.length - 2}` : head);
+    out.set(wid, resolveCurrentLinkLabel(labels));
   }
   return out;
 }
@@ -234,7 +251,7 @@ export async function exportPendenciesXlsx(input: PendenciesExportInput): Promis
   shB.columns = HEADERS_B;
   shB.getRow(1).font = { bold: true };
   for (const p of pendencies) {
-    const link = linksByWorker.get(p.worker.worker_id) || "Disponível — sem vínculo atual";
+    const link = linksByWorker.get(p.worker.worker_id) || NO_CURRENT_LINK_LABEL;
     shB.addRow(pendencyRowValues(p, base, link));
   }
   shB.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: HEADERS_B.length } };
