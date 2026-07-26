@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createVersionController, AUTO_UPDATE_MS_EXPORT, type Controller, type VersionState } from "@/lib/version-check";
+import {
+  createVersionController,
+  AUTO_UPDATE_MS_EXPORT,
+  type Controller,
+  type VersionState,
+} from "@/lib/version-check";
 
 /**
  * Global blocking gate rendered above every route. When a newer version is
@@ -11,7 +16,28 @@ export function UpdateGate({ controller }: { controller?: Controller } = {}) {
   const [state, setState] = useState<VersionState>(ctrl.getState());
   const [countdown, setCountdown] = useState(Math.ceil(AUTO_UPDATE_MS_EXPORT / 1000));
   const [updating, setUpdating] = useState(false);
-  const triggered = useRef(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Track the last version we tried, so we don't hammer the same target in a
+  // tight loop from the auto-timer, but we DO allow the user to retry.
+  const attemptedRef = useRef<string | null>(null);
+
+  const staleRemote = state.kind === "stale" ? state.remote : null;
+
+  const runUpdate = async (auto: boolean) => {
+    if (!staleRemote) return;
+    if (updating) return;
+    if (auto && attemptedRef.current === staleRemote) return; // no auto-retry loop
+    attemptedRef.current = staleRemote;
+    setUpdating(true);
+    setErrorMsg(null);
+    const result = await ctrl.triggerUpdate();
+    if (!result.reloaded) {
+      // Failure or guard hit — surface a human message and let the user retry.
+      setUpdating(false);
+      setErrorMsg(result.message ?? "Não foi possível atualizar. Tente novamente.");
+    }
+    // On success the browser reloads; leaving `updating` true is fine.
+  };
 
   useEffect(() => {
     const unsub = ctrl.subscribe(setState);
@@ -33,17 +59,14 @@ export function UpdateGate({ controller }: { controller?: Controller } = {}) {
       setCountdown((c) => (c > 0 ? c - 1 : 0));
     }, 1000);
     const auto = setTimeout(() => {
-      if (!triggered.current) {
-        triggered.current = true;
-        setUpdating(true);
-        void ctrl.triggerUpdate();
-      }
+      void runUpdate(true);
     }, AUTO_UPDATE_MS_EXPORT);
     return () => {
       clearInterval(interval);
       clearTimeout(auto);
     };
-  }, [isStale, ctrl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStale, staleRemote]);
 
   // Block ESC + prevent focus/scroll while gate is open.
   useEffect(() => {
@@ -95,17 +118,21 @@ export function UpdateGate({ controller }: { controller?: Controller } = {}) {
             <p className="mt-4 text-xs text-muted-foreground">
               Atualização automática em <span data-testid="update-gate-countdown">{countdown}</span>s
             </p>
+            {errorMsg && (
+              <p
+                data-testid="update-gate-error"
+                className="mt-3 text-xs text-destructive"
+                role="alert"
+              >
+                {errorMsg}
+              </p>
+            )}
             <div className="mt-4 flex justify-end">
               <button
                 type="button"
                 data-testid="update-gate-action"
                 disabled={updating}
-                onClick={() => {
-                  if (triggered.current) return;
-                  triggered.current = true;
-                  setUpdating(true);
-                  void ctrl.triggerUpdate();
-                }}
+                onClick={() => void runUpdate(false)}
                 className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
               >
                 {updating ? "Atualizando…" : "Atualizar agora"}
