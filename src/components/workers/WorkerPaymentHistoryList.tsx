@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,6 +12,8 @@ import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 
 interface Props {
   workerId: string;
+  /** Navigates to the Documentos tab, where bank/Pix data is managed. */
+  onManageBankData?: () => void;
 }
 
 interface PaymentRow {
@@ -65,18 +66,11 @@ export function summarizePayments(rows: PaymentRow[]) {
   };
 }
 
-export function WorkerPaymentHistoryList({ workerId }: Props) {
+export function WorkerPaymentHistoryList({ workerId, onManageBankData }: Props) {
   const { hasAnyRole } = useAuth();
   const canDelete = hasAnyRole(["admin", "manager"]);
   const queryClient = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [pendingDelete, setPendingDelete] = useState<PaymentRow | null>(null);
-
-  const goToBankData = () => {
-    const next = new URLSearchParams(searchParams);
-    next.set("tab", "documentos");
-    setSearchParams(next);
-  };
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["worker-payment-history", workerId],
@@ -168,15 +162,17 @@ export function WorkerPaymentHistoryList({ workerId }: Props) {
             Contas bancárias e chaves Pix do trabalhador ficam na aba{" "}
             <strong>Documentos</strong>, na seção Documento bancário.
           </span>
-          <Button
-            size="sm"
-            variant="outline"
-            className="mt-3"
-            data-testid="go-to-bank-data"
-            onClick={goToBankData}
-          >
-            <Landmark className="mr-1 h-3 w-3" /> Gerenciar dados bancários / Pix
-          </Button>
+          {onManageBankData && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-3"
+              data-testid="go-to-bank-data"
+              onClick={onManageBankData}
+            >
+              <Landmark className="mr-1 h-3 w-3" /> Gerenciar dados bancários / Pix
+            </Button>
+          )}
         </AlertDescription>
       </Alert>
 
