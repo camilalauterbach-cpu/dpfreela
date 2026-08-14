@@ -240,7 +240,15 @@ export default function WorkerDetail() {
         </TabsContent>
 
         <TabsContent value="pagamento" className="mt-4">
-          <WorkerPaymentHistoryList workerId={worker.id} />
+          <WorkerPaymentHistoryList
+            workerId={worker.id}
+            onManageBankData={() => {
+              setActiveTab("documentos");
+              const next = new URLSearchParams(searchParams);
+              next.set("tab", "documentos");
+              setSearchParams(next, { replace: true });
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="vinculos" className="mt-4">
