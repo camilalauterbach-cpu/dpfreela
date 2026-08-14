@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -6,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Trash2, Info, FileText, Receipt } from "lucide-react";
+import { Loader2, Trash2, Info, FileText, Receipt, Landmark } from "lucide-react";
 import { toast } from "sonner";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 
@@ -68,7 +69,15 @@ export function WorkerPaymentHistoryList({ workerId }: Props) {
   const { hasAnyRole } = useAuth();
   const canDelete = hasAnyRole(["admin", "manager"]);
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [pendingDelete, setPendingDelete] = useState<PaymentRow | null>(null);
+
+  const goToBankData = () => {
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", "documentos");
+    next.set("category", "bank_document");
+    setSearchParams(next);
+  };
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["worker-payment-history", workerId],
@@ -156,6 +165,19 @@ export function WorkerPaymentHistoryList({ workerId }: Props) {
           Totais, saldo e histórico são calculados automaticamente a partir dos
           registros. Para criar um novo pagamento, use o módulo Folha de
           Pagamento.
+          <span className="mt-2 block">
+            Contas bancárias e chaves Pix do trabalhador ficam na aba{" "}
+            <strong>Documentos</strong>, na seção Documento bancário.
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-3"
+            data-testid="go-to-bank-data"
+            onClick={goToBankData}
+          >
+            <Landmark className="mr-1 h-3 w-3" /> Gerenciar dados bancários / Pix
+          </Button>
         </AlertDescription>
       </Alert>
 
