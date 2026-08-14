@@ -75,7 +75,6 @@ export function WorkerPaymentHistoryList({ workerId }: Props) {
   const goToBankData = () => {
     const next = new URLSearchParams(searchParams);
     next.set("tab", "documentos");
-    next.set("category", "bank_document");
     setSearchParams(next);
   };
 
